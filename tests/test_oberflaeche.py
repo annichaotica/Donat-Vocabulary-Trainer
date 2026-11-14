@@ -213,3 +213,46 @@ def test_wanderung_aus_einer_alten_datenbank():
     # Zweimal einrichten muss ebenfalls gehen
     dbm.einrichten(db)
     db.close()
+
+
+def test_jede_ansicht_ist_im_wegweiser_eingetragen():
+    """Eine Ansichtsdatei, die niemand aufruft, ist toter Code — und eine
+    Route, die auf eine fehlende Funktion zeigt, ist eine leere Seite.
+    Beides fällt ohne Bauschritt erst beim Benutzen auf.
+    """
+    app = (WURZEL / "frontend" / "js" / "app.js").read_text()
+    for datei in JS:
+        if not datei.name.startswith("ansicht_"):
+            continue
+        assert f"'./{datei.name}'" in app, f"{datei.name} wird nirgends eingebunden"
+        # Jede eingebundene Ansicht muss auch von einer Route gerufen werden.
+        kuerzel = re.search(
+            rf"import \* as (\w+) from '\./{datei.name}'", app)
+        assert kuerzel, f"{datei.name} ist nicht als Modul eingebunden"
+        assert f"{kuerzel.group(1)}." in app.split("import *")[-1], \
+            f"{datei.name} wird eingebunden, aber nie aufgerufen"
+
+
+def test_der_wegweiser_gibt_jeder_ansicht_einen_frischen_bereich():
+    """Der Fall, der wirklich auftrat: beim schnellen Wechseln schrieb die
+    überholte Ansicht nach ihren await-Stellen weiter in denselben Bereich,
+    und es standen zwei Seiten untereinander. Über eine schnelle Leitung
+    war das kaum zu sehen, über eine langsame regelmäßig.
+    """
+    app = (WURZEL / "frontend" / "js" / "app.js").read_text()
+    assert "function frischerInhalt()" in app
+    assert "const inhalt = frischerInhalt();" in app
+    # Kein Bereich mehr auf Modulebene — sonst teilten sich zwei Durchläufe
+    # wieder denselben.
+    assert "const inhalt = document.getElementById('inhalt');" not in app
+
+
+def test_der_import_laeuft_immer_zuerst_als_probelauf():
+    """Ein Import, der ungefragt tausend Zeilen in den Bestand kippt, ist
+    schlimmer als keiner."""
+    quelle = (WURZEL / "frontend" / "js" / "ansicht_import.js").read_text()
+    assert "nur_pruefen: nurPruefen" in quelle
+    assert "await lauf(true)" in quelle, "Der Probelauf muss von selbst anlaufen"
+    # Große Dateien gestückelt: ein einziger Aufruf mit zehntausend Formen
+    # läuft in die Zeitgrenze.
+    assert "PAECKCHEN" in quelle

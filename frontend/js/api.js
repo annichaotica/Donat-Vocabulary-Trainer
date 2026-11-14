@@ -87,6 +87,17 @@ export const api = {
     ruf(`/lexeme/${lexemId}/bedeutungen`, { methode: 'POST', daten }),
   bedeutungLoeschen: (id) => ruf(`/bedeutungen/${id}`, { methode: 'DELETE' }),
 
+  // Merkmalsbündel-Dateien (das Format, das die KI liefert)
+  vokabelnImportieren: (sammlungId, daten) =>
+    ruf(`/sammlungen/${sammlungId}/import/vokabeln`, { methode: 'POST', daten }),
+  uebungenImportieren: (sammlungId, daten) =>
+    ruf(`/sammlungen/${sammlungId}/import/uebungen`, { methode: 'POST', daten }),
+  // Tabellen (CSV, Anki, Quizlet)
+  importVorschau: (sammlungId, daten) =>
+    ruf(`/sammlungen/${sammlungId}/import/vorschau`, { methode: 'POST', daten }),
+  importUebernehmen: (sammlungId, daten) =>
+    ruf(`/sammlungen/${sammlungId}/import`, { methode: 'POST', daten }),
+
   uebungStand: (benutzerId, sammlungId) =>
     ruf('/uebungen/lernen/stand',
         { frage: { benutzer_id: benutzerId, sammlung_id: sammlungId } }),

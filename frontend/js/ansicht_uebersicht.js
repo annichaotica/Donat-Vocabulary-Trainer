@@ -146,6 +146,9 @@ export async function zeichnen(behaelter) {
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/wortschatz'; },
         }, 'Wortschatz'),
+        h('button', {
+          onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/import'; },
+        }, 'Einlesen'),
         s.offene_formen
           ? h('button', {
               onclick: () => {

@@ -36,7 +36,9 @@ export async function zeichnen(behaelter) {
   });
   kopf.append(suche, h('button', {
     class: 'wichtig', onclick: () => { location.hash = '#/neu'; },
-  }, '+ Wort'));
+  }, '+ Wort'), h('button', {
+    onclick: () => { location.hash = '#/import'; },
+  }, 'Datei einlesen'));
 
   el.append(h('h1', { text: 'Wortschatz' }), kopf);
   const liste = h('div', { class: 'liste', style: 'margin-top:1rem' });

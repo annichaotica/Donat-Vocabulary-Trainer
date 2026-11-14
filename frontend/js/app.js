@@ -11,15 +11,38 @@ import * as einstellungen from './ansicht_einstellungen.js';
 import * as tastatur from './tastatur.js';
 import * as ziele from './ansicht_ziele.js';
 import * as freigabe from './ansicht_freigabe.js';
+import * as einlesen from './ansicht_import.js';
 
 // Zusätzliche Stildatei (Zeichenleiste, Tastaturhilfe) nachladen. Von hier
 // aus, damit index.html unberührt bleibt.
 document.head.append(Object.assign(document.createElement('link'),
   { rel: 'stylesheet', href: '/css/zusatz.css' }));
 
-const inhalt = document.getElementById('inhalt');
 const kopf = document.getElementById('kopf');
 let laufendeSitzung = null;
+
+/** Ein FRISCHER Inhaltsbereich je Aufruf.
+ *
+ * Die Ansichten bauen sich stückweise auf und warten dazwischen auf die
+ * Schnittstelle. Wechselt man in dieser Zeit die Seite, schrieb die alte
+ * Ansicht danach weiter in denselben Bereich — und es standen zwei Seiten
+ * untereinander. Das war über eine schnelle Leitung kaum zu sehen und über
+ * eine langsame regelmäßig.
+ *
+ * Statt jede Ansicht einzeln prüfen zu lassen, ob sie noch die aktuelle
+ * ist, bekommt jeder Aufruf seinen eigenen Bereich. Der alte wird aus der
+ * Seite genommen; was dort noch ankommt, landet im Nirgendwo. Die Ansichten
+ * selbst müssen davon nichts wissen.
+ */
+function frischerInhalt() {
+  const alt = document.getElementById('inhalt');
+  const neu = document.createElement('main');
+  neu.id = 'inhalt';
+  neu.className = 'inhalt';
+  neu.tabIndex = -1;
+  alt.replaceWith(neu);
+  return neu;
+}
 
 async function darstellungAnwenden() {
   if (!zustand.benutzerId) { darstellungSetzen(null); return; }
@@ -58,7 +81,8 @@ async function kopfzeile() {
   document.getElementById('kopf-name').textContent = {
     uebersicht: 'Übersicht', wortschatz: 'Wortschatz', wort: 'Wort',
     neu: 'Neues Wort', lernen: 'Abfrage', ziele: 'Lernziele',
-    freigabe: 'Freigabe', einstellungen: 'Einstellungen',
+    freigabe: 'Freigabe', import: 'Datei einlesen',
+    einstellungen: 'Einstellungen',
     tastatur: 'Tastatur', profile: 'Profil wählen',
   }[weg[0]] || 'Vokabeltrainer';
 
@@ -110,6 +134,7 @@ async function identitaetKlaeren() {
 
 async function wegweisen() {
   if (laufendeSitzung) { laufendeSitzung.beenden(); laufendeSitzung = null; }
+  const inhalt = frischerInhalt();
   const weg = (location.hash || '#/').slice(1);
   const teile = weg.split('/').filter(Boolean);
 
@@ -158,6 +183,8 @@ async function wegweisen() {
         return await ziele.zeichnen(inhalt);
       case 'wortschatz':
         return await wortschatz.zeichnen(inhalt);
+      case 'import':
+        return await einlesen.zeichnen(inhalt);
       case 'freigabe':
         // #/freigabe listet die Lektionen, #/freigabe/12 prüft eine.
         return teile[1]

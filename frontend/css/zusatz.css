@@ -175,3 +175,25 @@ table.paradigma input[type="checkbox"] {
      liegen, wo der Daumen ist. */
   .freigabe-leiste button { flex: 1 1 100%; }
 }
+
+
+/* ------------------------------------------------------- Datei einlesen */
+
+.feldname {
+  display: block;
+  font-size: .85em;
+  color: var(--leise);
+  margin-bottom: .25rem;
+}
+.kaestchen {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: .6rem 0;
+  font-size: .95em;
+}
+.kaestchen input[type="checkbox"] {
+  width: 1.3rem; height: 1.3rem; accent-color: var(--akzent);
+}
+/* Die Dateiauswahl ist auf dem Telefon schnell breiter als der Bildschirm. */
+input[type="file"] { max-width: 100%; }

@@ -134,7 +134,7 @@ Stammformen, das Kernpensum: **Ενεστώτας (Präsens) – Αόριστο�
 | `enestotas_pass` | Ενεστώτας Παθητικής (Präsens Passiv) (Standard) | 6 | `{"genus_verbi": "passiv", "modus": "indikativ", "tempus": "praesens"}` |
 | `aoristos_pass` | Αόριστος Παθητικής (Aorist Passiv) (Standard) | 6 | `{"genus_verbi": "passiv", "modus": "indikativ", "tempus": "aorist"}` |
 | `paratatikos_pass` | Παρατατικός Παθητικής (Imperfekt Passiv) | 6 | `{"genus_verbi": "passiv", "modus": "indikativ", "tempus": "imperfekt"}` |
-| `mellontas_pass` | Μέλλοντας Παθητικής (Futur Passiv, punktuell) | 6 | `{"aspekt": "perfektiv", "genus_verbi": "passiv", "modus": "indikativ", "tempus": "futur"}` |
+| `mellontas_pass` | Μέλλοντας Παθητικής (Futur Passiv, punktuell) (Standard) | 6 | `{"aspekt": "perfektiv", "genus_verbi": "passiv", "modus": "indikativ", "tempus": "futur"}` |
 | `ypotaktiki_pass` | Υποτακτική Παθητικής (Konjunktiv Passiv) | 6 | `{"genus_verbi": "passiv", "modus": "konjunktiv", "tempus": "praesens"}` |
 | `metochi_pass` | Μετοχή παθητικού παρακειμένου (Partizip Perfekt Passiv) | 1 | `{"genus_verbi": "passiv", "nonfinit": "partizip_perfekt"}` |
 | `gerundio` | Γερούνδιο (Gerundium, -οντας) | 1 | `{"genus_verbi": "aktiv", "nonfinit": "gerundium"}` |
@@ -162,6 +162,30 @@ Stammformen, das Kernpensum: **Ενεστώτας (Präsens) – Αόριστο�
 | `adj_komparativ` | Συγκριτικός (Komparativ) (Standard) | 1 | `{"stufe": "komparativ"}` |
 | `adj_superlativ` | Υπερθετικός (Superlativ) (Standard) | 1 | `{"stufe": "superlativ"}` |
 
+*Pronomen*
+
+| Kennung | Name | Zellen | Merkmale |
+|---|---|---|---|
+| `pron_m` | maskulin Nominativ Singular (Standard) | 1 | `{"genus": "m", "kasus": "nom", "numerus": "sg"}` |
+| `pron_f` | feminin Nominativ Singular (Standard) | 1 | `{"genus": "f", "kasus": "nom", "numerus": "sg"}` |
+| `pron_n` | neutrum Nominativ Singular (Standard) | 1 | `{"genus": "n", "kasus": "nom", "numerus": "sg"}` |
+
+*Artikel*
+
+| Kennung | Name | Zellen | Merkmale |
+|---|---|---|---|
+| `art_m` | maskulin Nominativ Singular (Standard) | 1 | `{"genus": "m", "kasus": "nom", "numerus": "sg"}` |
+| `art_f` | feminin Nominativ Singular (Standard) | 1 | `{"genus": "f", "kasus": "nom", "numerus": "sg"}` |
+| `art_n` | neutrum Nominativ Singular (Standard) | 1 | `{"genus": "n", "kasus": "nom", "numerus": "sg"}` |
+
+*Zahlwort*
+
+| Kennung | Name | Zellen | Merkmale |
+|---|---|---|---|
+| `num_m` | maskulin Nominativ Singular (Standard) | 1 | `{"genus": "m", "kasus": "nom", "numerus": "sg"}` |
+| `num_f` | feminin Nominativ Singular (Standard) | 1 | `{"genus": "f", "kasus": "nom", "numerus": "sg"}` |
+| `num_n` | neutrum Nominativ Singular (Standard) | 1 | `{"genus": "n", "kasus": "nom", "numerus": "sg"}` |
+
 *Lexemmerkmale* — beschreiben das Wort, nicht eine Form:
 
 - Substantiv, `genus`: `m`, `f`, `n`, `mf`
@@ -177,6 +201,12 @@ passte eine Passivform in beide Tabellen.
 bedeuten damit aber nichts Passives. Sie brauchen das Lexemmerkmal
 `{"diathese": "deponens"}`; dann gelten die Aktivgruppen, die es bei ihnen
 gar nicht gibt, nicht als fehlend.
+
+**Pronomen, Artikel und Zahlwörter** werden ebenso nach Geschlecht gebeugt
+(αυτός/αυτή/αυτό, ο/η/το, ένας/μία/ένα) und haben darum dieselben drei
+Gruppen wie das Adjektiv. Für Adverb, Präposition, Konjunktion,
+Interjektion und Wendung gibt es keine Formgruppen — dort ist »keine
+Formen« die Wahrheit und kein Mangel, und es wird auch keiner gemeldet.
 
 
 ### Französisch (`fr`)
@@ -460,6 +490,41 @@ Das gehört **vor** das Schreiben eines Übungstextes. Ein Text mit dreißig
 unbekannten Wörtern ist keine Übung, sondern eine Enttäuschung.
 
 Wie Formen bleiben Übungen **ungeprüft**, bis ein Mensch sie freigibt.
+
+
+## Mehrdeutigkeit und Gleichlauter
+
+Zwei Dinge, die beim Import als **Notiz** erscheinen und nichts verhindern.
+Sie sind keine Fehler, sondern die Sprache — gut zu wissen sind sie
+trotzdem.
+
+**Dieselbe Übersetzung auf mehreren Wörtern.** »klein« führt auf μικρός und
+κοντός, »arbeiten« auf δουλεύω und εργάζομαι, »Auto« auf αυτοκίνητο und
+αμάξι. In der Richtung Deutsch → Griechisch hat die Frage dann zwei
+richtige Antworten, und der Trainer lässt beide gelten — wer bei »klein«
+κοντός schreibt, hat nicht geirrt. Besser ist ein `kontext` an der
+Bedeutung (»klein, Körpergröße«): dann ist die Frage eindeutig, es zählt
+nur dieses Wort, und es wird auch wirklich geübt.
+
+```json
+{"uebersetzungen": ["klein"], "kontext": "Körpergröße"}
+```
+
+**Gleichlautende Formen verschiedener Wörter.** φορά ist »das Mal« und
+zugleich »er trägt« (von φοράω). Beide Einträge bleiben bestehen, werden
+einzeln abgefragt und beim Nachschlagen beide gefunden. Eine `kennung` je
+Eintrag hilft, sie beim erneuten Import auseinanderzuhalten.
+
+
+## Lernstand lesen
+
+`lernstand_lesen(sammlung_id)` sagt, was sitzt und woran es hakt — je
+**Wort**, nicht je Aufgabe. »schwach« sind Wörter, die mindestens dreimal
+geübt wurden und trotzdem in einem Drittel der Fälle danebengingen. Genau
+sie gehören in neue Übungssätze.
+
+Die Zahlen gelten für **eine Person**: ein Lernstand ist an sie gebunden,
+und über den MCP sieht man nur den eigenen.
 
 
 ## Berichtigen und Löschen

@@ -563,3 +563,78 @@ def termin_setzen(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
                                         ELSE zustand END
                    WHERE aufgabe_id = ? AND benutzer_id = ?""",
                (datum, aufgabe_id, benutzer_id))
+
+
+# ------------------------------------------------------------- Lernstand
+
+def lernstand(db: sqlite3.Connection, benutzer_id: int, sammlung_id: int,
+              anzahl: int = 40) -> dict:
+    """Was sitzt, und woran hakt es?
+
+    Gedacht für die KI am MCP: aus »diese zwölf Wörter gehen immer wieder
+    schief« lassen sich gezielt Sätze schreiben, in denen genau sie
+    vorkommen. Das ist der Schritt von »Vokabeln abfragen« zu »üben, was
+    nötig ist«.
+
+    Gemessen wird je WORT, nicht je Aufgabe: dass an γράφω die
+    Aorist-Aufgabe hakt und die Bedeutungsaufgabe sitzt, ist für das
+    Schreiben eines Satzes zweitrangig — gebraucht wird das Wort.
+    """
+    s = dbm.zeile(db, "SELECT * FROM sammlung WHERE id = ?", (sammlung_id,))
+    if s is None:
+        raise KeyError(f"Sammlung {sammlung_id} gibt es nicht")
+
+    zeilen = dbm.zeilen(db, """
+        SELECT l.id AS lexem_id, l.lemma, l.wortart, k.nr AS lektion_nr,
+               COUNT(a.id) AS aufgaben,
+               SUM(CASE WHEN z.zustand = 'reif' THEN 1 ELSE 0 END) AS reif,
+               SUM(CASE WHEN z.zustand = 'verlernt' THEN 1 ELSE 0 END) AS verlernt,
+               SUM(CASE WHEN z.aufgabe_id IS NULL OR z.zustand = 'neu'
+                        THEN 1 ELSE 0 END) AS neu,
+               SUM(COALESCE(z.anzahl, 0)) AS versuche,
+               SUM(COALESCE(z.anzahl_fehler, 0)) AS fehler,
+               AVG(z.stabilitaet) AS stabilitaet,
+               MIN(z.faellig) AS naechste_faelligkeit
+          FROM lexem l
+          JOIN aufgabe a ON a.lexem_id = l.id AND a.aktiv = 1
+          LEFT JOIN lernzustand z
+                 ON z.aufgabe_id = a.id AND z.benutzer_id = ?
+          LEFT JOIN lektion k ON k.id = l.lektion_id
+         WHERE l.sammlung_id = ?
+         GROUP BY l.id""", (benutzer_id, sammlung_id))
+
+    def anteil(z):
+        return (z["fehler"] / z["versuche"]) if z["versuche"] else 0.0
+
+    woerter = []
+    for z in zeilen:
+        woerter.append({**z, "fehleranteil": round(anteil(z), 3),
+                        "stabilitaet": round(z["stabilitaet"], 1)
+                        if z["stabilitaet"] is not None else None})
+
+    geuebt = [w for w in woerter if w["versuche"]]
+    # "Schwach" heißt: schon geübt UND trotzdem oft daneben. Ein Wort mit
+    # einem einzigen Fehlversuch gehört nicht dazu — sonst stünde nach dem
+    # ersten Lerntag der halbe Bestand auf der Liste.
+    schwach = sorted(
+        [w for w in geuebt if w["versuche"] >= 3 and w["fehleranteil"] >= 0.34],
+        key=lambda w: (-w["fehleranteil"], -w["versuche"]))[:anzahl]
+    sitzt = sorted([w for w in geuebt if w["reif"] and not w["verlernt"]
+                    and w["fehleranteil"] < 0.2],
+                   key=lambda w: -(w["stabilitaet"] or 0))[:anzahl]
+
+    return {
+        "sammlung_id": sammlung_id, "benutzer_id": benutzer_id,
+        "woerter_gesamt": len(woerter),
+        "geuebt": len(geuebt),
+        "nie_geuebt": len(woerter) - len(geuebt),
+        "aufgaben": sum(w["aufgaben"] for w in woerter),
+        "reif": sum(w["reif"] or 0 for w in woerter),
+        "verlernt": sum(w["verlernt"] or 0 for w in woerter),
+        "schwach": schwach,
+        "sitzt": sitzt,
+        "hinweis": "»schwach« sind Wörter, die mindestens dreimal geübt "
+                   "wurden und trotzdem in einem Drittel der Fälle "
+                   "danebengingen. Genau sie gehören in neue Übungssätze. "
+                   "Die Zahlen gelten für diese eine Person.",
+    }

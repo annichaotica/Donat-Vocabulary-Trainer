@@ -1268,6 +1268,16 @@ def woerterbuch(sammlung_id: int, suche: str = Query(min_length=1),
 
 # ============================================================ Lernen
 
+@app.get("/api/sammlungen/{sammlung_id}/lernstand")
+def lernstand_lesen(sammlung_id: int, benutzer_id: int,
+                    anzahl: int = Query(default=40, le=200),
+                    db: sqlite3.Connection = DB):
+    """Was sitzt, und woran hakt es? Je Wort, nicht je Aufgabe."""
+    _holen(db, "sammlung", sammlung_id)
+    _holen(db, "benutzer", benutzer_id)
+    return lernmodul.lernstand(db, benutzer_id, sammlung_id, anzahl)
+
+
 @app.get("/api/lernen/stand")
 def lern_stand(benutzer_id: int, sammlung_id: int | None = None,
                db: sqlite3.Connection = DB):

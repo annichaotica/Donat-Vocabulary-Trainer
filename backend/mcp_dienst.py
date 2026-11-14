@@ -323,6 +323,14 @@ def vokabel_loeschen(db: sqlite3.Connection, person: dict, lexem_id: int,
                         if bestand["wiederholungen"] else None)}
 
 
+def lernstand_lesen(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                    anzahl: int = 40):
+    """Was sitzt, und woran hakt es — für diese Person."""
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id)
+    return _fehler_wandeln(_app().lernstand_lesen, sammlung_id, person["id"],
+                           max(1, min(int(anzahl), 200)), db)
+
+
 # ------------------------------------------------------- Sätze und Texte
 
 def uebung_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
@@ -864,6 +872,24 @@ WERKZEUGE: list[dict] = [
             "notiz": _s("string", ""),
         }, "required": ["uebung_id"]},
         "funktion": uebung_aendern,
+    },
+    {
+        "name": "lernstand_lesen",
+        "description":
+            "Was sitzt, und woran hakt es? Je WORT, nicht je Aufgabe — zum "
+            "Schreiben eines Satzes wird das Wort gebraucht, nicht die "
+            "Auskunft, dass daran die Aorist-Aufgabe hakt.\n\n"
+            "»schwach« sind Wörter, die mindestens dreimal geübt wurden und "
+            "trotzdem in einem Drittel der Fälle danebengingen. Genau sie "
+            "gehören in neue Übungssätze — das ist der Schritt von "
+            "»Vokabeln abfragen« zu »üben, was nötig ist«.\n\n"
+            "Die Zahlen gelten für dich, nicht für alle: ein Lernstand ist "
+            "an die Person gebunden.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+            "anzahl": _s("integer", "wie viele je Liste, höchstens 200"),
+        }, "required": ["sammlung_id"]},
+        "funktion": lernstand_lesen,
     },
     {
         "name": "text_pruefen",

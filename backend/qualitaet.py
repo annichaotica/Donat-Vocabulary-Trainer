@@ -59,6 +59,8 @@ def pruefen(db: sqlite3.Connection, lexem_id: int) -> dict:
     befunde += _formen_pruefen(formen, code, wortart, e, luecken, lex_merkmale)
     befunde += _staemme_pruefen(formen, code, wortart, luecken, lex_merkmale)
     befunde += _aufgaben_pruefen(aktive, formen, uebersetzungen)
+    befunde += _mehrdeutigkeit_pruefen(db, lexem, bedeutungen, grund)
+    befunde += _gleichlauter_pruefen(db, lexem, formen)
 
     schwer = [b for b in befunde if b["schwere"] == "fehler"]
     return {
@@ -113,6 +115,73 @@ def _lemma_pruefen(db: sqlite3.Connection, lexem: dict) -> list[dict]:
                 "Bedeutungen in EINEM Eintrag sammeln — dann gilt beim Abfragen "
                 "jede davon.")]
     return []
+
+
+def _mehrdeutigkeit_pruefen(db: sqlite3.Connection, lexem: dict,
+                            bedeutungen: list[dict],
+                            grundsprache: str) -> list[dict]:
+    """Führt dieselbe Übersetzung auf mehrere Wörter?
+
+    »klein« ergibt μικρός und κοντός, »arbeiten« δουλεύω und εργάζομαι.
+    Das ist kein Fehler — es ist die Sprache. Abgefragt wird dann aber in
+    der Richtung Deutsch → Griechisch eine Frage mit zwei richtigen
+    Antworten. Der Trainer lässt beide gelten; mit einem `kontext` wird die
+    Frage stattdessen eindeutig, und das ist das Bessere, weil dann auch
+    das gesuchte Wort geübt wird.
+
+    Darum eine NOTIZ und keine Ablehnung: entschieden hat es schon, es ist
+    nur gut zu wissen.
+    """
+    befunde = []
+    for b in bedeutungen:
+        andere = aufgaben.gleichbedeutende(db, lexem, b["id"], grundsprache)
+        if not andere:
+            continue
+        namen = ", ".join(f"»{x['lemma']}«" for x in andere[:5])
+        befunde.append(_befund(
+            "uebersetzung_mehrdeutig", "notiz",
+            f"Dieselbe Übersetzung führt auch auf {namen}.",
+            betrifft=[x["lemma"] for x in andere],
+            rat=("Beim Abfragen Deutsch → Fremdsprache gelten alle davon als "
+                 "richtig. Mit einem kontext an der Bedeutung "
+                 "(»klein, Körpergröße«) wird die Frage eindeutig — dann "
+                 "zählt nur dieses Wort und es wird auch wirklich geübt.")
+            if not b["kontext"] else
+            ("Durch den Kontext »" + b["kontext"] + "« ist die Frage "
+             "eindeutig; die anderen gelten nicht als richtig.")))
+    return befunde
+
+
+def _gleichlauter_pruefen(db: sqlite3.Connection, lexem: dict,
+                          formen: list[dict]) -> list[dict]:
+    """Gibt es diese Schreibung auch bei einem anderen Wort?
+
+    φορά ist »das Mal« und zugleich »er/sie/es trägt« (von φοράω). Beides
+    ist richtig, und keines darf das andere verdrängen. Gemeldet wird es
+    trotzdem: wer es weiß, gibt dem einen eine kennung mit und sieht beim
+    Abfragen nicht aus wie ein Fehler des Trainers.
+    """
+    texte = {f["text"] for f in formen} | {lexem["lemma"]}
+    if not texte:
+        return []
+    fragen = ",".join("?" * len(texte))
+    treffer = dbm.zeilen(db, f"""
+        SELECT DISTINCT f.text, l.lemma, l.id AS lexem_id
+          FROM form f JOIN lexem l ON l.id = f.lexem_id
+         WHERE l.sammlung_id = ? AND l.id != ? AND f.text IN ({fragen})
+         ORDER BY f.text""",
+        (lexem["sammlung_id"], lexem["id"], *sorted(texte)))
+    if not treffer:
+        return []
+    paare = ", ".join(f"»{t['text']}« auch bei »{t['lemma']}«"
+                      for t in treffer[:5])
+    return [_befund(
+        "gleichlauter", "notiz",
+        f"Gleichlautende Formen in dieser Sammlung: {paare}.",
+        betrifft=[t["text"] for t in treffer],
+        rat="Kein Fehler — φορά ist »das Mal« und »er trägt«. Beide Wörter "
+            "bleiben bestehen und werden einzeln abgefragt. Beim Nachschlagen "
+            "erscheinen beide.")]
 
 
 def _gruppe_gilt(gruppe: dict, lex_merkmale: dict) -> bool:

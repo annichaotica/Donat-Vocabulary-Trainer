@@ -233,6 +233,37 @@ def _verwechslungen(db: sqlite3.Connection, lexem: dict, code: str,
     return liste
 
 
+def gleichbedeutende(db: sqlite3.Connection, lexem: dict, bedeutung_id: int,
+                     grundsprache: str) -> list[dict]:
+    """Andere Wörter derselben Sammlung mit derselben Übersetzung.
+
+    »klein« führt im Griechischen auf μικρός und κοντός, »arbeiten« auf
+    δουλεύω und εργάζομαι. Wer bei der Frage »klein« κοντός schreibt, hat
+    nicht geirrt — er hat das andere richtige Wort genannt. Es als falsch
+    zu werten wäre schlicht unwahr und würde den Lernstand verderben.
+
+    Verglichen wird über die kleingeschriebene Übersetzung: »Der Brief«
+    und »der Brief« sind dasselbe Wort.
+    """
+    texte = [u["text"].casefold().strip() for u in
+             dbm.zeilen(db, """SELECT text FROM uebersetzung
+                                WHERE bedeutung_id = ? AND sprache = ?""",
+                        (bedeutung_id, grundsprache))]
+    if not texte:
+        return []
+    fragen = ",".join("?" * len(texte))
+    return dbm.zeilen(db, f"""
+        SELECT DISTINCT l.id AS lexem_id, l.lemma, b.kontext
+          FROM uebersetzung u
+          JOIN bedeutung b ON b.id = u.bedeutung_id
+          JOIN lexem l ON l.id = b.lexem_id
+         WHERE l.sammlung_id = ? AND l.id != ?
+           AND u.sprache = ?
+           AND LOWER(TRIM(u.text)) IN ({fragen})
+         ORDER BY l.lemma""",
+        (lexem["sammlung_id"], lexem["id"], grundsprache, *texte))
+
+
 def stamm_fuer_aufgabe(db: sqlite3.Connection, aufgabe_id: int) -> str:
     """Der Wortstamm für die Zerlegung — in dieser Reihenfolge:
 
@@ -447,10 +478,26 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
 
     if typ == "bedeutung_deutsch_fremd":
         gueltig = [lexem["lemma"]]
-        vw = _verwechslungen(db, lexem, code, ausser_text=lexem["lemma"])
+        b = dbm.zeile(db, "SELECT * FROM bedeutung WHERE id = ?", (a["ziel_id"],))
+        # Steht in der Frage ein Kontext (»klein, Körpergröße«), ist gesagt,
+        # welches Wort gemeint ist — dann gilt nur dieses. Ohne Kontext ist
+        # die Frage mehrdeutig, und jedes Wort mit derselben Übersetzung
+        # ist eine richtige Antwort.
+        auch = ([] if (b and b["kontext"])
+                else gleichbedeutende(db, lexem, a["ziel_id"], grund))
+        gueltig += [x["lemma"] for x in auch]
+        vw = [(t, bs) for t, bs in
+              _verwechslungen(db, lexem, code, ausser_text=lexem["lemma"])
+              if t not in gueltig]
         urteil = text_pruefen(str(eingabe), gueltig, p_code, verwechslungen=vw,
                               fehler_benennen=fehler_benennen)
-        return urteil, {"erwartet": gueltig}
+        auskunft = {"erwartet": gueltig}
+        if auch and urteil.treffer and urteil.treffer != lexem["lemma"]:
+            # Sagen, dass beides geht — sonst wirkt das richtige Urteil
+            # wie ein Zufall, und das gesuchte Wort bleibt ungelernt.
+            auskunft["auch_richtig"] = [x["lemma"] for x in auch]
+            auskunft["gesucht_war"] = lexem["lemma"]
+        return urteil, auskunft
 
     if typ == "form_bilden":
         f = dbm.zeile(db, "SELECT * FROM form WHERE id = ?", (a["ziel_id"],))

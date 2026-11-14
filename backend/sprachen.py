@@ -257,6 +257,19 @@ ENGLISCH = {
 
 # ---------------------------------------------------------------- Griechisch
 
+def _EL_DREI_GENERA(praefix: str) -> list[dict]:
+    """Die drei Geschlechter im Nominativ Singular.
+
+    Dieselbe Reihe für Adjektiv, Pronomen, Artikel und Zahlwort — es ist
+    dieselbe Beugung, und sie viermal auszuschreiben hieße, sie dreimal
+    falsch nachziehen zu können.
+    """
+    return [_einzeln(f"{praefix}_{g}",
+                     f"{INVENTAR['genus'][g][0]} Nominativ Singular",
+                     {"genus": g, "kasus": "nom", "numerus": "sg"})
+            for g in ("m", "f", "n")]
+
+
 _EL_KASUS = ("nom", "gen", "akk", "vok")
 
 GRIECHISCH = {
@@ -278,6 +291,9 @@ GRIECHISCH = {
         "substantiv": ["subst_nom_sg", "subst_gen_sg", "subst_akk_sg",
                        "subst_nom_pl", "subst_gen_pl", "subst_akk_pl"],
         "adjektiv": "alle",
+        "pronomen": "alle",
+        "artikel": "alle",
+        "numerale": "alle",
     },
     "code": "el",
     "name": "Griechisch",
@@ -362,17 +378,20 @@ GRIECHISCH = {
                      kurz="Γερούνδιο"),
         ],
         "substantiv": _kasusreihe("subst", "Deklination", _EL_KASUS),
-        "adjektiv": [
-            _einzeln(f"adj_{g}", f"{INVENTAR['genus'][g][0]} Nominativ Singular",
-                     {"genus": g, "kasus": "nom", "numerus": "sg"})
-            for g in ("m", "f", "n")
-        ] + [
+        "adjektiv": _EL_DREI_GENERA("adj") + [
             # καλός – καλύτερος – ο καλύτερος
             _einzeln("adj_komparativ", "Συγκριτικός (Komparativ)",
                      {"stufe": "komparativ"}, kurz="Συγκριτικός"),
             _einzeln("adj_superlativ", "Υπερθετικός (Superlativ)",
                      {"stufe": "superlativ"}, kurz="Υπερθετικός"),
         ],
+        # Auch Pronomen, Artikel und Zahlwörter werden nach Geschlecht
+        # gebeugt: αυτός/αυτή/αυτό, ο/η/το, ένας/μία/ένα, τρεις/τρία. Ohne
+        # eigene Gruppen fielen diese Formen in keine Tabelle und ließen
+        # sich weder zuschalten noch gemeinsam ansehen.
+        "pronomen": _EL_DREI_GENERA("pron"),
+        "artikel": _EL_DREI_GENERA("art"),
+        "numerale": _EL_DREI_GENERA("num"),
     },
     "stammformen": ["enestotas", "aoristos", "mellontas_stigmiaios"],
     "lexemmerkmale": {

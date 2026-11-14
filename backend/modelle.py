@@ -38,6 +38,8 @@ class BenutzerAendern(BaseModel):
     # oder beides. An der Fachbezeichnung scheitert man mitten in der
     # Abfrage — und dann ist nicht die Vokabel schuld.
     beschriftung: Literal["fach", "einfach", "beides"] | None = None
+    # Lateinische Tasten in die Zielschrift umsetzen (Griechisch).
+    tastatur_umschrift: bool | None = None
 
 
 class LegasthenieEinstellungen(BaseModel):

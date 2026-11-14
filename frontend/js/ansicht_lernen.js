@@ -11,7 +11,8 @@ import { api } from './api.js';
 import { anfuegen, h, leeren, meldung, prozent, zahl, zerlegungZeigen,
          silbenZeigen, sprechen, stimmeDa } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
-import { zeichenleiste } from './tastatur.js';
+import { zeichenleiste, umschriftAnhaengen,
+         kannUmschreiben } from './tastatur.js';
 import { zustand } from './zustand.js';
 
 const NOTEN = [
@@ -53,6 +54,10 @@ export class Sitzung {
     try {
       this.lg = await api.legasthenieLesen(zustand.benutzerId);
     } catch { this.lg = {}; }
+    try {
+      const e = await api.benutzerEinstellungen(zustand.benutzerId);
+      this.umschrift = e.tastatur_umschrift !== false;
+    } catch { this.umschrift = true; }
     // Das Tagespensum einmal zu Beginn: daran misst der Balken, und
     // daran sieht man, ob die Abfrage in zehn Fragen zu Ende ist oder
     // in dreihundert.
@@ -68,6 +73,8 @@ export class Sitzung {
     // auf eine Antwort wartet, in den Inhaltsbereich der neuen Ansicht.
     this.abgebrochen = true;
     document.removeEventListener('keydown', this.tastatur);
+    if (this._umschriftLoesen) this._umschriftLoesen();
+    if (this._umschriftReihe) this._umschriftReihe.forEach((f) => f());
   }
 
   /* ------------------------------------------------------------- Laden */
@@ -121,6 +128,20 @@ export class Sitzung {
       this.phase = 'frage';
       this.zeichnen();
     }
+  }
+
+  /* Hängt die Umschrift an ein Antwortfeld — und meldet die vorige ab.
+   *
+   * Ohne das Abmelden bliebe bei jedem Neuzeichnen ein Behandler mehr
+   * hängen; genau dieser Fehler ist hier schon zweimal passiert (der
+   * doppelte Tastenbehandler, das überholte <main>).
+   */
+  umschriftSetzen(feld) {
+    if (this._umschriftLoesen) { this._umschriftLoesen(); }
+    this._umschriftLoesen = null;
+    const code = this._antwortsprache?.code;
+    if (!feld || !this.umschrift || !kannUmschreiben(code)) return;
+    this._umschriftLoesen = umschriftAnhaengen(feld, code);
   }
 
   /* ---------------------------------------------------------- Zeichnen */
@@ -361,6 +382,7 @@ export class Sitzung {
       },
     });
     this.feld = feld;
+    this.umschriftSetzen(fertig ? null : feld);
     const kasten = h('div', {},
       h('div', { class: 'antwortfeld' },
         feld,
@@ -440,6 +462,15 @@ export class Sitzung {
           : h('div', {})));
     }
     this.feld = felder[0] || null;
+    // Bei der ganzen Reihe hängt die Umschrift an jedem Feld.
+    if (this._umschriftReihe) this._umschriftReihe.forEach((f) => f());
+    this._umschriftReihe = [];
+    if (!fertig && this.umschrift && kannUmschreiben(this._antwortsprache?.code)) {
+      for (const f of felder) {
+        this._umschriftReihe.push(
+          umschriftAnhaengen(f, this._antwortsprache.code));
+      }
+    }
     const unten = h('div', {});
     if (!fertig) {
       unten.append(h('div', { class: 'frage-werkzeuge',

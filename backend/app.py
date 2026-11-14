@@ -495,6 +495,8 @@ def benutzer_aendern(benutzer_id: int, eingabe: BenutzerAendern,
         e["neues_einstreuen"] = eingabe.neues_einstreuen
     if eingabe.beschriftung is not None:
         e["beschriftung"] = eingabe.beschriftung
+    if eingabe.tastatur_umschrift is not None:
+        e["tastatur_umschrift"] = eingabe.tastatur_umschrift
     db.execute("UPDATE benutzer SET einstellungen = ? WHERE id = ?",
                (dbm.j_schreiben(e), benutzer_id))
     return _holen(db, "benutzer", benutzer_id)

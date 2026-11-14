@@ -146,6 +146,11 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
         "neues_einstreuen": bool(e.get("neues_einstreuen", False)),
         # Wie Formen benannt werden: fach | einfach | beides
         "beschriftung": stil if stil in mk.STILE else "fach",
+        # Lateinische Tasten in die Zielschrift umsetzen, ohne das
+        # Systemlayout umzuschalten. Voreingestellt an: wer wirklich
+        # umgeschaltet hat, merkt nichts davon — Zeichen, die schon in
+        # der Zielschrift ankommen, gehen unangetastet durch.
+        "tastatur_umschrift": bool(e.get("tastatur_umschrift", True)),
     }
 
 

@@ -369,3 +369,25 @@ def test_meldung_versteht_auch_die_art_statt_der_dauer():
     quelle = (WURZEL / "frontend" / "js" / "hilfen.js").read_text()
     assert "MELDUNG_FEHLER" in quelle
     assert "Number.isFinite" in quelle, "die Dauer muss geprüft werden"
+
+
+def test_die_umschrift_wird_wieder_abgemeldet():
+    """Jeder Tastenbehandler, der bei einem Neuzeichnen hängenbleibt,
+    wirkt doppelt. Dieser Fehler ist hier schon zweimal passiert —
+    beim Tastaturbehandler und beim überholten <main>."""
+    quelle = (WURZEL / "frontend" / "js" / "ansicht_lernen.js").read_text()
+    assert "umschriftAnhaengen" in quelle
+    assert "_umschriftLoesen" in quelle
+    # Angemeldet wird nur über den Setzer, der vorher abmeldet.
+    assert quelle.count("umschriftAnhaengen(") == 2, (
+        "die Umschrift darf nur über umschriftSetzen und die Reihe "
+        "angehängt werden")
+    assert "if (this._umschriftLoesen) this._umschriftLoesen();" in quelle, \
+        "beim Beenden der Sitzung muss sie abgemeldet werden"
+
+
+def test_die_umschrift_laesst_die_zielschrift_in_ruhe():
+    """Wer sein Systemlayout wirklich umgeschaltet hat, soll nichts
+    davon merken — sonst käme die Umsetzung ein zweites Mal."""
+    quelle = (WURZEL / "frontend" / "js" / "tastatur.js").read_text()
+    assert "b.schrift.test(e.key)" in quelle

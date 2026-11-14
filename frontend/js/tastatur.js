@@ -87,6 +87,91 @@ const BELEGUNGEN = {
   },
 };
 
+/* ------------------------------------------------------------ Umschrift
+ *
+ * »Kannst du dem Programm nicht beibringen, das Tastaturlayout je nach
+ * Antwort umzustellen?« — Eine Webseite kann das nicht, und sie darf es
+ * auch nicht: eine Seite, die die Eingabe des Rechners umschaltet, wäre
+ * ein Sicherheitsproblem. Auch mit Systemrechten käme der Trainer nicht
+ * heran.
+ *
+ * Er kann aber dasselbe tun, was die griechische Systembelegung tut:
+ * dieselben physischen Tasten auf griechische Buchstaben abbilden. Die
+ * Abbildung steht ohnehin schon oben, für die Tastaturhilfe. Man tippt
+ * `grafo` und im Feld steht `γραφο` — ohne Umschalten, auf jedem Gerät,
+ * und wer doch umgeschaltet hat, merkt nichts davon: griechische Zeichen
+ * gehen unangetastet durch.
+ *
+ * Gearbeitet wird mit `event.code`, also der PHYSISCHEN Taste. Darum ist
+ * es gleichgültig, ob jemand eine deutsche oder eine amerikanische
+ * Tastatur hat — auf beiden liegt α auf derselben Taste wie im
+ * griechischen Layout.
+ */
+
+/** Der Tonos auf den Vokalen, und das Trema auf ι und υ. */
+const BETONT = {
+  α: 'ά', ε: 'έ', η: 'ή', ι: 'ί', ο: 'ό', υ: 'ύ', ω: 'ώ',
+  Α: 'Ά', Ε: 'Έ', Η: 'Ή', Ι: 'Ί', Ο: 'Ό', Υ: 'Ύ', Ω: 'Ώ',
+};
+const TREMA = { ι: 'ϊ', υ: 'ϋ', Ι: 'Ϊ', Υ: 'Ϋ' };
+
+/** Gibt es für diese Sprache überhaupt etwas umzuschreiben? */
+export function kannUmschreiben(code) {
+  return Boolean(code && Object.hasOwn(BELEGUNGEN, code)
+                 && BELEGUNGEN[code].schrift);
+}
+
+/* Hängt die Umschrift an ein Eingabefeld.
+ *
+ * Gibt eine Funktion zurück, die sie wieder abmeldet — ohne die bliebe
+ * bei jedem Neuzeichnen ein Behandler mehr hängen. Genau dieser Fehler
+ * ist in diesem Projekt schon zweimal passiert.
+ */
+export function umschriftAnhaengen(feld, code) {
+  if (!feld || !kannUmschreiben(code)) return () => {};
+  const b = BELEGUNGEN[code];
+  const tasten = { ...b.tasten, ...gelernt(code) };
+  let wartend = null;              // gedrückte tote Taste
+
+  const einfuegen = (zeichen) => {
+    const a = feld.selectionStart ?? feld.value.length;
+    const e = feld.selectionEnd ?? a;
+    feld.value = feld.value.slice(0, a) + zeichen + feld.value.slice(e);
+    const neu = a + zeichen.length;
+    feld.setSelectionRange(neu, neu);
+    feld.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  const behandler = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // Schon in der Zielschrift? Dann ist das Layout umgeschaltet und
+    // hier gibt es nichts zu tun.
+    if (e.key.length === 1 && b.schrift.test(e.key)) { wartend = null; return; }
+    // Die tote Taste: schreibt allein nichts, verändert das Nächste.
+    if (b.tot && Object.hasOwn(b.tot, e.code)) {
+      e.preventDefault();
+      wartend = e.shiftKey ? 'trema' : 'tonos';
+      return;
+    }
+    const zeichen = tasten[e.code];
+    if (!zeichen || zeichen.length !== 1) { wartend = null; return; }
+    // Nur lateinische Tasteneingaben ersetzen — was der Browser als
+    // Steuertaste meldet (Enter, Pfeile), hat keine Länge 1.
+    if (e.key.length !== 1) return;
+    e.preventDefault();
+    let aus = e.shiftKey ? zeichen.toUpperCase() : zeichen;
+    // Schluss-Sigma kennt kein Großzeichen; Σ liegt auf derselben Taste.
+    if (zeichen === 'ς' && e.shiftKey) aus = 'Σ';
+    if (wartend === 'tonos' && BETONT[aus]) aus = BETONT[aus];
+    else if (wartend === 'trema' && TREMA[aus]) aus = TREMA[aus];
+    wartend = null;
+    einfuegen(aus);
+  };
+
+  feld.addEventListener('keydown', behandler);
+  return () => feld.removeEventListener('keydown', behandler);
+}
+
 const SPEICHER = 'vokabeltrainer.tastatur.';
 
 function gelernt(code) {

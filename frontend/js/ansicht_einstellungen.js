@@ -362,6 +362,18 @@ async function teilLernen(behaelter) {
         + 'damit es trotz Rückstand vorangeht. Weitermachen darfst du immer. '
         + '0 heißt: keine Grenze.' }));
 
+  const umschrift = h('input', {
+    type: 'checkbox', checked: e.tastatur_umschrift !== false,
+  });
+  kasten.append(h('label', { class: 'schalter' }, umschrift,
+    h('span', { class: 'schalter-text' },
+      h('b', { text: 'Griechisch tippen ohne Umschalten' }),
+      h('span', { class: 'leise' },
+        'Tippst du »grafo«, steht im Feld »γραφο« — dieselbe Tastenbelegung, '
+        + 'die auch das griechische Systemlayout hat, nur macht sie der '
+        + 'Trainer selbst. Betonung wie dort: erst Ö, dann der Vokal. '
+        + 'Wer sein Layout wirklich umschaltet, merkt davon nichts.'))));
+
   const einstreuen = h('input', {
     type: 'checkbox', checked: Boolean(e.neues_einstreuen),
   });
@@ -398,7 +410,8 @@ async function teilLernen(behaelter) {
   const ausgangswerte = { retention: e.wunschretention, neu: e.neu_je_sitzung,
                           dosis: e.fragen_je_tag,
                           stil: e.beschriftung || 'fach',
-                          einstreuen: Boolean(e.neues_einstreuen) };
+                          einstreuen: Boolean(e.neues_einstreuen),
+                          umschrift: e.tastatur_umschrift !== false };
   if (e.legasthenie?.aktiv) {
     kasten.append(h('p', { class: 'leise',
       text: 'Diese Werte leitet der Legastheniemodus gerade ab. Wer sie hier '
@@ -417,6 +430,9 @@ async function teilLernen(behaelter) {
       }
       if (Number(dosis.value) !== ausgangswerte.dosis) {
         aenderungen.fragen_je_tag = Number(dosis.value);
+      }
+      if (umschrift.checked !== ausgangswerte.umschrift) {
+        aenderungen.tastatur_umschrift = umschrift.checked;
       }
       if (stil.value !== ausgangswerte.stil) {
         aenderungen.beschriftung = stil.value;

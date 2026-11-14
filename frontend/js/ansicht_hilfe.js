@@ -90,6 +90,16 @@ export async function zeichnen(behaelter) {
       + 'welches Wort anders war.')));
 
   el.append(abschnitt('Griechisch tippen',
+    h('p', {}, h('b', { text: 'Du musst nichts umschalten. ' }),
+      'Tippst du ', h('b', { text: 'grafo' }), ', steht im Feld ',
+      h('b', { text: 'γραφο' }) , ' — der Trainer bildet dieselben Tasten '
+      + 'auf griechische Buchstaben ab wie das griechische Systemlayout. '
+      + 'Betonung wie dort: erst die Taste ', h('kbd', { text: 'Ö' }),
+      ', dann den Vokal. Wortende-ς liegt auf ', h('kbd', { text: 'W' }), '.'),
+    h('p', { class: 'leise' },
+      'Wer sein Layout lieber wirklich umschaltet, kann das tun — dann '
+      + 'merkt der Trainer es und hält sich heraus. Abschalten lässt sich '
+      + 'die Umschrift unter Einstellungen.'),
     h('p', {}, 'Für Griechisch lohnt ein eigenes Tastaturlayout — man tippt '
       + 'ja ganze Wörter. Wie man es einschaltet und wo welcher Buchstabe '
       + 'liegt, steht hier: '),

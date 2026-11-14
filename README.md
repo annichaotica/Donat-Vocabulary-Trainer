@@ -32,7 +32,7 @@ Deutsch. Weitere lassen sich ohne Codeänderung einrichten.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -r requirements.txt -r requirements-test.txt
 .venv/bin/python werkzeuge/beispieldaten.py        # Beispielbestand
 .venv/bin/uvicorn app:app --app-dir backend --reload --port 8030
 ```
@@ -136,7 +136,7 @@ als eine fehlende.
 
 ```
 backend/
-  schema.sql        Datenbank. 20 Tabellen, mit Kommentaren
+  schema.sql        Datenbank. 23 Tabellen, mit Kommentaren
   merkmale.py       Grammatische Merkmale, deutsche Beschriftungen
   sprachen.py       Sprachprofile: Formgruppen, Prüfregeln, Artikel
   pruefung.py       Antwortprüfung in Schichten
@@ -152,7 +152,7 @@ backend/
 frontend/           HTML, CSS, ES-Module. Kein Bauschritt, kein npm
 mcp/                MCP-Server, nur Standardbibliothek
 werkzeuge/          Beispieldaten, Sicherung
-tests/              159 Tests
+tests/              495 Tests
 ```
 
 Warum kein Bauschritt im Frontend: ein Vokabeltrainer soll in fünf Jahren noch
@@ -173,7 +173,7 @@ Anleitung dazu steht unter `#/tastatur`.
 ## Stand
 
 **Fertig:** Datenmodell, Antwortprüfung, FSRS mit automatischer Bewertung,
-Abfrage für fünf Aufgabentypen, Wortschatzverwaltung mit Eingabemaske,
+Abfrage für sechs Aufgabentypen, Wortschatzverwaltung mit Eingabemaske,
 Sprachprofile als Daten, Qualitätsprüfung, Wörterbuchsuche über alle Formen,
 Lernziele mit dynamischen Blöcken, Legastheniemodus, MCP-Server, Docker.
 

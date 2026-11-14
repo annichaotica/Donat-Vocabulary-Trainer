@@ -1,0 +1,34 @@
+# Was nicht ins Abbild gehört.
+#
+# Die COPY-Zeilen im Dockerfile nennen einzelne Verzeichnisse, es ist
+# also kein Leck zu befürchten — diese Datei hält vor allem Ballast
+# heraus. Der eine Posten, der wirklich stört: .pyc-Dateien, die auf dem
+# Entwicklungsrechner mit Python 3.14 entstanden sind, während im Abbild
+# 3.13 läuft. Python liest sie wegen der Kennzahl gar nicht, sie machen
+# aber bei jedem Bau den Zwischenspeicher ungültig.
+
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+.git/
+.gitignore
+.github/
+.DS_Store
+
+# Daten und Geheimnisse. Zur Sicherheit doppelt gemoppelt, falls jemand
+# die COPY-Zeilen einmal durch ein `COPY . .` ersetzt.
+daten/
+.env
+.env.*
+*.db
+*.db-wal
+*.db-shm
+BETRIEB-PRIVAT.md
+
+# Gehört nicht in den Behälter: Tests laufen davor, die Anlage daneben.
+tests/
+deploy/
+mcp/
+*.md

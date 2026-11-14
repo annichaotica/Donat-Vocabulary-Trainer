@@ -1,13 +1,26 @@
 # Ein Behälter, ein Dienst, keine Bauschritte.
-FROM python:3.13-slim
+#
+# Auf den Digest festgenagelt, nicht nur auf den Tag: `python:3.13-slim`
+# zeigt jeden Monat auf ein anderes Abbild, und dann baut dieselbe Zeile
+# im Verzeichnis zwei verschiedene Behälter. Mit Digest ist der Bau
+# wiederholbar, und ein Wechsel steht im Diff statt still zu geschehen.
+# Dependabot zieht den Digest nach; der Tag davor bleibt als Lesehilfe.
+#
+# Neu holen:
+#   docker pull python:3.13-slim
+#   docker image inspect --format '{{index .RepoDigests 0}}' python:3.13-slim
+FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 
 # Kein Schreibrecht auf den Code, nur auf das Datenverzeichnis.
 RUN useradd --create-home --uid 10001 vokabel
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Aus der Lock-Datei, nicht aus requirements.txt: dort stehen nur die
+# drei obersten Pakete, im Abbild landen zwanzig. --require-hashes ist
+# der Teil, der wirkt — ohne ihn sieht pip die Prüfsummen gar nicht an.
+COPY requirements.lock .
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/

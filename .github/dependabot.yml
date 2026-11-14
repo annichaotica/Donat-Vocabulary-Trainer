@@ -1,0 +1,124 @@
+# Dependabot für den Vokabeltrainer.
+#
+# Hier pflegt EIN Mensch nebenbei. Ein wöchentlicher Schwall von Pull
+# Requests, den niemand anschaut, ist schlimmer als keine Überwachung:
+# er gewöhnt ans Wegklicken, und dann geht der eine Hinweis mit unter,
+# auf den es ankommt. Darum:
+#
+#   - PFLEGE monatlich und gebündelt: ein Pull Request je Umgebung,
+#     nicht einer je Paket. Einmal im Monat eine halbe Stunde.
+#
+#   - SICHERHEIT läuft NICHT über diesen Takt. Sicherheitsfixes kommen
+#     sofort und einzeln, sobald ein Hinweis veröffentlicht wird — aber
+#     nur, wenn im Verzeichnis unter Settings → Code security beides
+#     eingeschaltet ist:
+#         [x] Dependabot alerts
+#         [x] Dependabot security updates
+#     Ohne diese zwei Haken nützt diese Datei der Pflege und nichts der
+#     Sicherheit. Das ist der wichtigste Satz hier.
+#
+#   - Hauptfassungssprünge bleiben eigene Pull Requests. Ein starlette
+#     2.0 gehört angesehen, nicht mitzusammengeführt.
+#
+#   - `cooldown` lässt neue Fassungen ein paar Tage reifen. Wer allein
+#     pflegt, will nicht die Fassung erwischen, die am Tag nach der
+#     Veröffentlichung zurückgezogen wird.
+
+version: 2
+
+updates:
+
+  # ----------------------------------------------------------- Python
+  # Liest requirements.txt UND requirements.lock. Erst durch die
+  # Lock-Datei sieht Dependabot alle zwanzig Pakete; vorher waren es
+  # drei, und die beiden ernstesten Lücken dieses Jahres steckten in
+  # zweien der übrigen siebzehn.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: monthly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "Abhängigkeiten"
+    labels:
+      - abhaengigkeiten
+    cooldown:
+      default-days: 5
+      semver-major-days: 14
+    groups:
+      python-pflege:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # ------------------------------------- Docker: das Basisabbild
+  # Die Umgebung `docker` liest nur Dockerfiles, keine Compose-Dateien.
+  # Hier geht es also allein um das FROM. Das ist seit heute auf einen
+  # Digest festgenagelt — auf einen beweglichen Tag hätte Dependabot
+  # nichts zu melden, der bleibt ja gleich, während sich das Abbild
+  # darunter ändert.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: monthly
+      day: monday
+      time: "07:15"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "Abbild"
+    labels:
+      - abhaengigkeiten
+      - docker
+    cooldown:
+      default-days: 3
+
+  # --------------------------------------- Docker Compose: der Tunnel
+  # Eigene Umgebung, nicht `docker`. Betrifft nur
+  # deploy/cloudflared/docker-compose.yml; im Wurzel-Compose steht nur
+  # `build: .` und das selbst gebaute Abbild, da ist nichts Fremdes.
+  #
+  # Der Tunnel ist das einzige Stück, das aus dem Haus heraus mit dem
+  # offenen Netz spricht, und davor hängt das Access, das den Trainer
+  # überhaupt erst schützt. Darum kürzere Reifezeit.
+  - package-ecosystem: docker-compose
+    directory: "/deploy/cloudflared"
+    schedule:
+      interval: monthly
+      day: monday
+      time: "07:30"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "Tunnel"
+    labels:
+      - abhaengigkeiten
+      - docker
+    cooldown:
+      default-days: 3
+
+  # ---------------------------------------------------- GitHub Actions
+  # Heute gibt es keine Abläufe. Der Eintrag kostet nichts, solange
+  # .github/workflows/ leer ist, und greift vom ersten Ablauf an. Gerade
+  # Actions sind lohnende Ziele: eine übernommene Action läuft mit den
+  # Rechten des Verzeichnisses.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: quarterly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "Abläufe"
+    labels:
+      - abhaengigkeiten
+    groups:
+      actions-pflege:
+        applies-to: version-updates
+        patterns:
+          - "*"

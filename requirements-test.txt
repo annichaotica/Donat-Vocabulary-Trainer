@@ -1,0 +1,10 @@
+# Nur für die Prüfung, nicht im Abbild:
+#
+#     .venv/bin/pip install -r requirements.txt -r requirements-test.txt
+#
+# httpx steht nicht zum Spaß hier. fastapi.testclient.TestClient baut
+# darauf auf (tests/conftest.py), und `fastapi` ohne [standard] zieht es
+# nicht mit. Ohne diese Datei kann ein frischer Klon die Tests nicht
+# laufen lassen, obwohl die README es so beschreibt.
+pytest==9.2.0
+httpx==0.28.1

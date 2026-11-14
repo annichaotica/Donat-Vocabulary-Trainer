@@ -151,12 +151,27 @@ async function teilLernen(behaelter) {
   kasten.append(h('div', { class: 'regler' },
     h('label', { text: 'Neue Aufgaben je Tag' }), h('span', {}), neu, h('span', {})));
 
+  // Wie eine Form benannt wird. "Genitiv Singular" ist richtig und für
+  // viele eine Mauer; wer daran scheitert, scheitert nicht an der Vokabel.
+  const stil = h('select', {},
+    h('option', { value: 'fach', text: 'Genitiv Singular' }),
+    h('option', { value: 'beides', text: 'Genitiv Singular (wessen?, Einzahl)' }),
+    h('option', { value: 'einfach', text: 'wessen?, Einzahl' }));
+  stil.value = e.beschriftung || 'fach';
+  kasten.append(h('div', { class: 'regler' },
+    h('label', { text: 'Wie sollen die Formen benannt werden?' }),
+    h('span', {}), stil, h('span', {})));
+  kasten.append(h('p', { class: 'leise',
+    text: 'Die Namen der Zeiten bleiben immer stehen — Αόριστος heißt im '
+        + 'Lehrbuch so. Erklärt wird nur, welche Zelle darin gemeint ist.' }));
+
   // Im Legastheniemodus sind diese Werte ABGELEITET (0,95 statt 0,9 und
   // 8 statt 20). Würde man sie unverändert zurückschreiben, wären sie
   // fortan ausdrücklich gesetzt — und die Ableitung bliebe für immer
   // eingefroren, auch nach Abschalten des Modus. Darum wird nur gesendet,
   // was wirklich bewegt wurde.
-  const ausgangswerte = { retention: e.wunschretention, neu: e.neu_je_sitzung };
+  const ausgangswerte = { retention: e.wunschretention, neu: e.neu_je_sitzung,
+                          stil: e.beschriftung || 'fach' };
   if (e.legasthenie?.aktiv) {
     kasten.append(h('p', { class: 'leise',
       text: 'Diese Werte leitet der Legastheniemodus gerade ab. Wer sie hier '
@@ -172,6 +187,9 @@ async function teilLernen(behaelter) {
       }
       if (Number(neu.value) !== ausgangswerte.neu) {
         aenderungen.neu_je_sitzung = Number(neu.value);
+      }
+      if (stil.value !== ausgangswerte.stil) {
+        aenderungen.beschriftung = stil.value;
       }
       if (!Object.keys(aenderungen).length) {
         meldung('Nichts geändert.');

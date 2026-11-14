@@ -27,6 +27,10 @@ class BenutzerAendern(BaseModel):
     farbe: str | None = None
     wunschretention: float | None = Field(default=None, ge=0.70, le=0.99)
     neu_je_sitzung: int | None = Field(default=None, ge=0, le=500)
+    # Wie eine Form benannt wird: "Genitiv Singular", "wessen?, Einzahl"
+    # oder beides. An der Fachbezeichnung scheitert man mitten in der
+    # Abfrage — und dann ist nicht die Vokabel schuld.
+    beschriftung: Literal["fach", "einfach", "beides"] | None = None
 
 
 class LegasthenieEinstellungen(BaseModel):

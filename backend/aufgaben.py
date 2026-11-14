@@ -344,8 +344,14 @@ def geschwisterformen(db: sqlite3.Connection, form_id: int) -> list[str]:
                    for d, w in gruppe["merkmale"].items())]
 
 
-def frage(db: sqlite3.Connection, aufgabe_id: int) -> dict:
-    """Baut die Aufgabe für die Oberfläche."""
+def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
+    """Baut die Aufgabe für die Oberfläche.
+
+    `stil` bestimmt, wie die Form benannt wird: "Genitiv Singular",
+    "wessen?, Einzahl" oder beides. Die Wahl trifft die lernende Person —
+    an der Fachbezeichnung scheitert man mitten in der Abfrage, und dann
+    ist nicht die Vokabel schuld.
+    """
     a = dbm.zeile(db, "SELECT * FROM aufgabe WHERE id = ?", (aufgabe_id,))
     if a is None:
         raise KeyError(f"Aufgabe {aufgabe_id} gibt es nicht")
@@ -393,7 +399,8 @@ def frage(db: sqlite3.Connection, aufgabe_id: int) -> dict:
         return {**kopf,
                 "frage_text": lexem["lemma"],
                 "frage_sprache": code,
-                "frage_zusatz": sprachen.beschriften_form(code, lexem["wortart"], fm),
+                "frage_zusatz": sprachen.beschriften_form(
+                    code, lexem["wortart"], fm, stil=stil),
                 "antwort_sprache": code,
                 "vorlesen": lexem["lemma"]}
 

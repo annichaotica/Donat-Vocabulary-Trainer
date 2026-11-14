@@ -681,3 +681,72 @@ def test_antwort_aus_satzzeichen_gilt_als_leer(klient):
             "benutzer_id": b["id"], "aufgabe_id": aufgabe["aufgabe_id"],
             "antwort": eingabe}).json()
         assert ergebnis["urteil"]["hinweis"] == "Keine Antwort eingegeben.", eingabe
+
+
+# ------------------------------------------- Wie Formen benannt werden
+
+def _griechisch(klient, name="Benennerin"):
+    b = klient.post("/api/benutzer", json={"name": name}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{
+            "lemma": "το καρότο", "wortart": "substantiv",
+            "merkmale": {"genus": "n"},
+            "bedeutungen": [{"uebersetzungen": ["die Karotte", "die Möhre"]}],
+            "formen": [{"text": "καρότο", "merkmale": {
+                "kasus": "nom", "numerus": "sg"}, "ist_grundform": True},
+                {"text": "καρότου", "merkmale": {
+                    "kasus": "gen", "numerus": "sg"}}]}]})
+    klient.post(f"/api/sammlungen/{s['id']}/freigabe", json={"lektion_nr": None,
+                                                             "lexem_ids": [1]})
+    return b, s
+
+
+def _formfrage(klient, benutzer_id, sammlung_id):
+    aufgaben = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": benutzer_id, "sammlung_id": sammlung_id,
+        "nur": "frei", "anzahl": 40}).json()
+    # Nicht über die Beschriftung suchen — die ist ja gerade das, was sich
+    # ändert. Das Wort hat genau eine abgefragte Form.
+    return next(a for a in aufgaben if a["typ"] == "form_bilden")
+
+
+def test_formbezeichnung_laesst_sich_umstellen(klient):
+    """»Genitiv Singular« ist richtig und für die Hälfte der Lernenden eine
+    Mauer. Wer daran scheitert, scheitert nicht an der Vokabel."""
+    b, s = _griechisch(klient)
+    fach = _formfrage(klient, b["id"], s["id"])
+    assert fach["frage_zusatz"] == "Genitiv Singular"
+
+    klient.patch(f"/api/benutzer/{b['id']}", json={"beschriftung": "einfach"})
+    einfach = _formfrage(klient, b["id"], s["id"])
+    assert einfach["frage_zusatz"] == "wessen?, Einzahl"
+
+    klient.patch(f"/api/benutzer/{b['id']}", json={"beschriftung": "beides"})
+    beides = _formfrage(klient, b["id"], s["id"])
+    assert beides["frage_zusatz"] == "Genitiv Singular (wessen?, Einzahl)"
+
+
+def test_person_und_zahl_werden_zu_einem_wort(klient):
+    """»1. Person Singular« muss man erst zusammensetzen. »ich« nicht."""
+    import sys
+    sys.path.insert(0, "backend")
+    import merkmale as mk
+    bund = {"modus": "indikativ", "tempus": "aorist",
+            "person": "1", "numerus": "sg"}
+    assert mk.beschriften(bund, stil="einfach").startswith("ich")
+    assert "1. Person" in mk.beschriften(bund)
+
+
+def test_die_namen_der_zeiten_bleiben_stehen(klient):
+    """Αόριστος heißt im Lehrbuch so — das ist kein Fachjargon, den man
+    wegerklären dürfte, sondern der Name der Tabelle."""
+    import sys
+    sys.path.insert(0, "backend")
+    import sprachen
+    bund = {"modus": "indikativ", "tempus": "aorist", "genus_verbi": "aktiv",
+            "person": "1", "numerus": "sg"}
+    einfach = sprachen.beschriften_form("el", "verb", bund, stil="einfach")
+    assert einfach.startswith("Αόριστος")
+    assert "ich" in einfach

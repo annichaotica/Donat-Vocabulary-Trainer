@@ -166,15 +166,96 @@ def als_json(merkmale: dict) -> str:
     return json.dumps(merkmale, sort_keys=True, ensure_ascii=False)
 
 
-def beschriften(merkmale: dict, profil: dict | None = None, kurz: bool = False) -> str:
+# Dieselben Merkmale in Alltagssprache.
+#
+# "Genitiv Singular" ist richtig und für die Hälfte der Lernenden eine
+# Mauer. Wer in der Schule die vier Fälle über ihre Fragewörter gelernt
+# hat — wer? wessen? wem? wen? —, kommt damit sofort zurecht; wer sie nie
+# gelernt hat, mit "Genitiv" auch nicht.
+#
+# Nur dort hinterlegt, wo es hilft. Fehlt ein Eintrag, bleibt die
+# Fachbezeichnung stehen; das ist besser als eine erfundene Umschreibung.
+EINFACH: dict[str, dict[str, str]] = {
+    "kasus": {
+        "nom": "wer oder was?", "gen": "wessen?", "dat": "wem?",
+        "akk": "wen oder was?", "vok": "Anrede", "abl": "womit?",
+    },
+    "numerus": {"sg": "Einzahl", "pl": "Mehrzahl", "dual": "Zweizahl"},
+    "genus": {"m": "männlich", "f": "weiblich", "n": "sächlich",
+              "mf": "männlich und weiblich"},
+    "tempus": {
+        "praesens": "jetzt", "imperfekt": "früher, immer wieder",
+        "aorist": "früher, einmal", "praeteritum": "früher",
+        "perfekt": "schon geschehen", "plusquamperfekt": "davor geschehen",
+        "futur": "später", "futur_ii": "bis dann geschehen",
+    },
+    "modus": {
+        "indikativ": "Aussage", "konjunktiv": "Möglichkeit oder Wunsch",
+        "imperativ": "Aufforderung", "konditional": "Bedingung",
+        "optativ": "Wunsch",
+    },
+    "genus_verbi": {"aktiv": "tut selbst", "passiv": "wird getan",
+                    "medium": "an sich selbst"},
+    "stufe": {"grund": "einfach", "komparativ": "mehr als",
+              "superlativ": "am meisten"},
+    "nonfinit": {
+        "infinitiv": "Grundform", "partizip_praesens": "gerade dabei",
+        "partizip_perfekt": "fertig, wie ein Eigenschaftswort",
+        "gerundium": "beim Tun", "supinum": "um zu",
+    },
+    "aspekt": {"perfektiv": "einmalig", "imperfektiv": "andauernd"},
+}
+
+# Person und Zahl zusammen ergeben ein Wort, das jeder versteht. Einzeln
+# gesagt ("1. Person", "Singular") muss man es erst zusammensetzen —
+# genau daran scheitert man mitten in der Abfrage.
+PERSONEN = {
+    ("1", "sg"): "ich", ("2", "sg"): "du", ("3", "sg"): "er/sie/es",
+    ("1", "pl"): "wir", ("2", "pl"): "ihr", ("3", "pl"): "sie",
+}
+
+STILE = ("fach", "einfach", "beides")
+
+
+def _einfach(merkmale: dict) -> str:
+    """Dasselbe Bündel in Alltagssprache."""
+    teile: list[str] = []
+    person = merkmale.get("person")
+    numerus = merkmale.get("numerus")
+    zusammen = PERSONEN.get((str(person), str(numerus))) if person else None
+    for dimension in REIHENFOLGE:
+        if dimension not in merkmale:
+            continue
+        if zusammen and dimension in ("person", "numerus"):
+            if dimension == "person":
+                teile.append(zusammen)
+            continue
+        wert = merkmale[dimension]
+        ersatz = EINFACH.get(dimension, {}).get(wert)
+        if ersatz:
+            teile.append(ersatz)
+            continue
+        eintrag = INVENTAR.get(dimension, {}).get(wert)
+        teile.append(eintrag[0] if eintrag else str(wert))
+    return ", ".join(teile)
+
+
+def beschriften(merkmale: dict, profil: dict | None = None, kurz: bool = False,
+                stil: str = "fach") -> str:
     """Macht aus einem Merkmalsbündel eine lesbare Beschriftung.
 
     {"person":"1","numerus":"sg","tempus":"praesens","modus":"indikativ"}
     -> "1. Person Singular Präsens Indikativ"
 
-    Das Sprachprofil darf Beschriftungen überschreiben, damit Französisch
-    "Passé composé" sagt, wo das allgemeine Inventar "Perfekt" sagt.
+    Mit `stil="einfach"` dasselbe in Alltagssprache ("ich, jetzt, Aussage"),
+    mit `stil="beides"` beides nebeneinander. Das Sprachprofil darf
+    Beschriftungen überschreiben, damit Französisch "Passé composé" sagt,
+    wo das allgemeine Inventar "Perfekt" sagt.
     """
+    if stil == "einfach":
+        schlicht = _einfach(merkmale)
+        if schlicht:
+            return schlicht
     eigene = (profil or {}).get("beschriftungen", {})
     teile: list[str] = []
     for dimension in REIHENFOLGE:
@@ -193,7 +274,14 @@ def beschriften(merkmale: dict, profil: dict | None = None, kurz: bool = False) 
             teile.append(str(merkmale[dimension]))
     if not teile:
         return "Grundform"
-    return " ".join(teile)
+    fach = " ".join(teile)
+    if stil == "beides":
+        schlicht = _einfach(merkmale)
+        # Nur anhängen, wenn es etwas anderes sagt — "Grundform
+        # (Grundform)" hilft niemandem.
+        if schlicht and schlicht.replace(", ", " ").casefold() != fach.casefold():
+            return f"{fach} ({schlicht})"
+    return fach
 
 
 def sortierbar(merkmale: dict) -> tuple:

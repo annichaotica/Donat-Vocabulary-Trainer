@@ -14,6 +14,7 @@ Eine neue Sprache ist ein neuer Eintrag hier, keine Änderung am Code.
 
 from __future__ import annotations
 
+import merkmale as mk
 from merkmale import (INVENTAR, WORTARTEN, MerkmalFehler, beschriften,
                       normieren, pruefen as pruefen_merkmale)
 
@@ -661,8 +662,19 @@ def _passt(gruppe: dict, merkmale: dict, wortart: str = "") -> bool:
     return all(voll.get(d) == w for d, w in gruppe["merkmale"].items())
 
 
+def _gleiche_worte(a: str, b: str) -> bool:
+    """Dieselben Wörter, gleich in welcher Reihenfolge.
+
+    "feminin Nominativ Singular" und "Nominativ Singular feminin" sind
+    dasselbe; ohne diesen Vergleich gälte der Gruppenname als eigener Name
+    und bliebe in der einfachen Beschriftung unübersetzt stehen.
+    """
+    teilen = lambda t: sorted(t.replace(",", " ").casefold().split())
+    return teilen(a) == teilen(b)
+
+
 def beschriften_form(code: str, wortart: str, merkmale: dict,
-                     kurz: bool = False) -> str:
+                     kurz: bool = False, stil: str = "fach") -> str:
     """Beschriftet eine Form mit dem Namen ihrer Formgruppe und, falls die
     Gruppe eine Personenreihe hat, der Person.
 
@@ -674,14 +686,34 @@ def beschriften_form(code: str, wortart: str, merkmale: dict,
     kandidaten = [g for g in formgruppen(code, wortart)
                   if _passt(g, merkmale, wortart)]
     if not kandidaten:
-        return beschriften(merkmale, kurz=kurz)
+        return beschriften(merkmale, kurz=kurz, stil=stil)
     # Die spezifischste Gruppe gewinnt (die mit den meisten festen Merkmalen).
     gruppe = max(kandidaten, key=lambda g: len(g["merkmale"]))
     name = gruppe["kurz"] if kurz else gruppe["name"]
     rest = {d: w for d, w in merkmale.items() if d not in gruppe["merkmale"]}
-    if not rest:
-        return name
-    return f"{name}, {beschriften(rest, kurz=kurz)}"
+    fach = f"{name}, {beschriften(rest, kurz=kurz)}" if rest else name
+    if stil == "fach":
+        return fach
+
+    # Nur das erklären, was über den Gruppennamen hinausgeht. Die Gruppe
+    # selbst erklären wir, wenn die Zelle IST die Gruppe (einzellige
+    # Gruppen wie "Genitiv Singular" oder "Συγκριτικός").
+    schlicht = mk._einfach(rest) if rest else mk._einfach(gruppe["merkmale"])
+    if not schlicht or _gleiche_worte(schlicht, fach):
+        return fach
+    # Trägt die Gruppe einen eigenen Namen — "Αόριστος", "Passé composé" —,
+    # bleibt er stehen: so heißt die Tabelle im Lehrbuch, das ist kein
+    # Fachjargon zum Wegerklären. Heißt sie dagegen einfach so, wie ihre
+    # Merkmale lauten ("Genitiv Singular"), dann IST der Name die
+    # Fachbezeichnung und darf ersetzt werden.
+    abgeleitet = _gleiche_worte(name, beschriften(gruppe["merkmale"], kurz=kurz))
+    if stil == "einfach":
+        if abgeleitet:
+            return mk._einfach(merkmale)
+        return f"{name}, {schlicht}"
+    # Zwei Klammern hintereinander liest niemand gern.
+    return (f"{fach} — {schlicht}" if fach.endswith(")")
+            else f"{fach} ({schlicht})")
 
 
 def pruefen_lexemmerkmale(code: str, wortart: str, merkmale: dict) -> dict[str, str]:

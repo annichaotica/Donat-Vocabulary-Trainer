@@ -16,6 +16,7 @@ import bewertung as bewertungsmodul
 import datenbank as dbm
 import fsrs
 import legasthenie as legasthenie_modul
+import merkmale as mk
 
 # Reihenfolge, in der fällige Aufgaben genommen werden.
 #   verlernt  — was zuletzt schiefging, zuerst
@@ -67,11 +68,14 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
             retention = 0.95
         if lg.get("weniger_neues") and "neu_je_sitzung" not in e:
             neu = 8
+    stil = e.get("beschriftung", "fach")
     return {
         "wunschretention": retention,
         "neu_je_sitzung": neu,
         "name": b["name"],
         "legasthenie": lg,
+        # Wie Formen benannt werden: fach | einfach | beides
+        "beschriftung": stil if stil in mk.STILE else "fach",
     }
 
 
@@ -160,7 +164,8 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                 **_aufgabe_ausbauen(db, {**dict(z),
                                          "aufgabe_id": eintrag["aufgabe_id"],
                                          "typ": eintrag["typ"]},
-                                    e["wunschretention"], e["legasthenie"]),
+                                    e["wunschretention"], e["legasthenie"],
+                                    e["beschriftung"]),
                 "herkunft": eintrag["herkunft"],
                 "lernziel": {"id": lernziel_id, "name": plan["name"],
                              "begruendung": plan["begruendung"]},
@@ -264,19 +269,20 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     for r in reihe[:anzahl]:
         _zustand_sichern(db, r["aufgabe_id"], benutzer_id)
         ergebnis.append(_aufgabe_ausbauen(db, r, e["wunschretention"],
-                                          e["legasthenie"]))
+                                          e["legasthenie"], e["beschriftung"]))
     return ergebnis
 
 
 def _aufgabe_ausbauen(db: sqlite3.Connection, r: dict, wunschretention: float,
-                      legasthenie: dict | None = None) -> dict:
+                      legasthenie: dict | None = None,
+                      stil: str = "fach") -> dict:
     """Aufgabe plus Begründung plus Terminvorschau.
 
     Im Legastheniemodus kommt das Schreibgerüst gleich mit: ins leere Feld zu
     tippen ist genau der Teil, der schwerfällt. Es wird hier erzeugt und nicht
     in der Oberfläche, weil nur hier die erwartete Antwort bekannt ist.
     """
-    f = aufgaben.frage(db, r["aufgabe_id"])
+    f = aufgaben.frage(db, r["aufgabe_id"], stil)
     lg = legasthenie or {}
     if (lg.get("aktiv") and lg.get("maske_stufe") is not None
             and f.get("eingabeart") == "text"):

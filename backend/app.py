@@ -28,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 import aufgaben
 import einlesen
 import drossel
+import freigabe as freigabemodul
 import datenbank as dbm
 import legasthenie
 import lernen as lernmodul
@@ -47,7 +48,8 @@ from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      ImportEingabe, LernzielAendern, LernzielAnlegen,
                      SammelimportEingabe,
                      McpTokenAnlegen,
-                     FormAendern, LexemAendern, LexemEingabe,
+                     FormAendern, FreigabeEingabe,
+                     LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
                      SammlungEinstellungen, SpracheAnlegen,
                      SprachprofilSetzen, TextPruefenEingabe,
@@ -430,7 +432,12 @@ def sammlungen_liste(benutzer_id: int | None = None, db: sqlite3.Connection = DB
         return dbm.zeilen(db, "SELECT * FROM sammlung ORDER BY name")
     return dbm.zeilen(db, """
         SELECT s.*, (s.besitzer_id = ?) AS eigen,
-               (SELECT COUNT(*) FROM lexem l WHERE l.sammlung_id = s.id) AS lexeme
+               (SELECT COUNT(*) FROM lexem l WHERE l.sammlung_id = s.id) AS lexeme,
+               -- Hier mit, nicht in einem eigenen Aufruf: die Übersicht
+               -- soll nicht je Sammlung einen Rundlauf brauchen, nur um
+               -- den Freigabeknopf zeigen zu können.
+               (SELECT COUNT(*) FROM form f JOIN lexem l ON l.id = f.lexem_id
+                 WHERE l.sammlung_id = s.id AND f.geprueft = 0) AS offene_formen
           FROM sammlung s
          WHERE s.besitzer_id = ?
             OR s.id IN (SELECT sammlung_id FROM freigabe WHERE benutzer_id = ?)
@@ -541,6 +548,50 @@ def vokabeln_importieren(sammlung_id: int, eingabe: SammelimportEingabe,
         return sammelimport.importieren(db, sammlung_id, eingabe.eintraege,
                                         eingabe.nur_pruefen, eingabe.quelle)
     except (sammelimport.ImportFehler, mk.MerkmalFehler) as fehler:
+        raise HTTPException(400, str(fehler))
+
+
+# ============================================================ Freigabe
+
+@app.get("/api/sammlungen/{sammlung_id}/freigabe/lektionen")
+def freigabe_lektionen(sammlung_id: int, db: sqlite3.Connection = DB):
+    """Wo ist noch etwas freizugeben? Der Einstieg in die Prüfansicht."""
+    _holen(db, "sammlung", sammlung_id)
+    return freigabemodul.offene_lektionen(db, sammlung_id)
+
+
+@app.get("/api/sammlungen/{sammlung_id}/freigabe")
+def freigabe_ansicht(sammlung_id: int, lektion_nr: int | None = None,
+                     wortart: str | None = None, nur_offene: bool = True,
+                     ab: int = 0, anzahl: int = Query(default=25, le=100),
+                     db: sqlite3.Connection = DB):
+    """Die Prüfansicht: je Wort die Formen als Paradigmentabelle.
+
+    Eine Liste von Formen in Eingabereihenfolge lässt sich nicht prüfen.
+    Eine Tabelle mit einer leeren oder doppelt besetzten Zelle sieht man
+    auf einen Blick.
+    """
+    _holen(db, "sammlung", sammlung_id)
+    return freigabemodul.uebersicht(db, sammlung_id, lektion_nr, wortart,
+                                    nur_offene, ab, anzahl)
+
+
+@app.post("/api/sammlungen/{sammlung_id}/freigabe")
+def freigabe_setzen(sammlung_id: int, eingabe: FreigabeEingabe,
+                    request: Request = None, db: sqlite3.Connection = DB):
+    """Gibt Formen frei — je Wort oder je Lektion, Zellen abwählbar.
+
+    Bewusst nur über die Oberfläche: es gibt dafür kein MCP-Werkzeug. Ein
+    Agent, der seine eigenen Einträge im Stapel freigibt, hätte die
+    Prüfung abgeschafft, nicht erledigt.
+    """
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    _holen(db, "sammlung", sammlung_id)
+    try:
+        return freigabemodul.setzen(
+            db, sammlung_id, eingabe.form_ids, eingabe.lexem_ids,
+            eingabe.lektion_nr, eingabe.ausser, eingabe.geprueft)
+    except freigabemodul.FreigabeFehler as fehler:
         raise HTTPException(400, str(fehler))
 
 

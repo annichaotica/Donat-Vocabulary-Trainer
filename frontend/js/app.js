@@ -10,6 +10,7 @@ import * as wortschatz from './ansicht_wortschatz.js';
 import * as einstellungen from './ansicht_einstellungen.js';
 import * as tastatur from './tastatur.js';
 import * as ziele from './ansicht_ziele.js';
+import * as freigabe from './ansicht_freigabe.js';
 
 // Zusätzliche Stildatei (Zeichenleiste, Tastaturhilfe) nachladen. Von hier
 // aus, damit index.html unberührt bleibt.
@@ -57,8 +58,8 @@ async function kopfzeile() {
   document.getElementById('kopf-name').textContent = {
     uebersicht: 'Übersicht', wortschatz: 'Wortschatz', wort: 'Wort',
     neu: 'Neues Wort', lernen: 'Abfrage', ziele: 'Lernziele',
-    einstellungen: 'Einstellungen', tastatur: 'Tastatur',
-    profile: 'Profil wählen',
+    freigabe: 'Freigabe', einstellungen: 'Einstellungen',
+    tastatur: 'Tastatur', profile: 'Profil wählen',
   }[weg[0]] || 'Vokabeltrainer';
 
   // Den laufenden Reiter kennzeichnen.
@@ -157,6 +158,11 @@ async function wegweisen() {
         return await ziele.zeichnen(inhalt);
       case 'wortschatz':
         return await wortschatz.zeichnen(inhalt);
+      case 'freigabe':
+        // #/freigabe listet die Lektionen, #/freigabe/12 prüft eine.
+        return teile[1]
+          ? await freigabe.zeichnenLektion(inhalt, teile[1])
+          : await freigabe.zeichnen(inhalt);
       case 'wort':
         return await wortschatz.zeichnenEinzeln(inhalt, Number(teile[1]));
       case 'neu':

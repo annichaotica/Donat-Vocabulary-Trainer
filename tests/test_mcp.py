@@ -222,9 +222,12 @@ def test_angelegte_formen_bleiben_ungeprueft(mcp):
     form = gelesen["formen"][0]
     assert form["geprueft"] is False and form["quelle"] == "ki"
 
-    # form_id, nicht id: genau diese Zahl verlangen form_aendern,
-    # form_loeschen und formen_bestaetigen.
-    werkzeug(mcp, "formen_bestaetigen", form_ids=[form["form_id"]])
+    # Über die Schnittstelle gibt es dafür nichts: die Freigabe gehört dem
+    # Menschen und findet in der Oberfläche statt. Hier nur der Nachweis,
+    # dass es so bleibt.
+    assert "formen_bestaetigen" not in [
+        w["name"] for w in ruf(mcp, "tools/list").json()["result"]["tools"]]
+    mcp.klient.post(f"/api/formen/{form['form_id']}/bestaetigen")
     danach = werkzeug(mcp, "vokabel_lesen", lexem_id=ergebnis["lexem_id"])
     assert danach["formen"][0]["geprueft"] is True
 

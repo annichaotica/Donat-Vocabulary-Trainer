@@ -100,6 +100,20 @@ class SammelimportEingabe(BaseModel):
     quelle: Quelle = "ki"
 
 
+class FreigabeEingabe(BaseModel):
+    """Was soll freigegeben werden?
+
+    Mindestens eines von form_ids, lexem_ids, lektion_nr muss dastehen.
+    Eine ganze Sammlung auf einmal freizugeben wäre keine Prüfung.
+    `ausser` ist der Weg für die abgewählten Zellen.
+    """
+    form_ids: list[int] | None = None
+    lexem_ids: list[int] | None = None
+    lektion_nr: int | None = None
+    ausser: list[int] | None = None
+    geprueft: bool = True
+
+
 class UebungEingabe(BaseModel):
     """Ein Übungssatz oder ein Text.
 

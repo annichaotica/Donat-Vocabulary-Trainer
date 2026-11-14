@@ -126,6 +126,14 @@ export async function zeichnen(behaelter) {
         h('span', { class: 'marke', text: sprache ? sprache.name : s.sprache })),
       h('p', { class: 'leise', style: 'margin:.2rem 0 0',
                text: `${s.lexeme ?? 0} Wörter${s.eigen ? '' : ' · freigegeben'}` }),
+      // Ungeprüfte Formen werden nicht abgefragt. Wer das nicht weiß, sucht
+      // vergeblich nach den Wörtern, die die KI gerade eingetragen hat —
+      // darum steht es hier und nicht in einem Untermenü.
+      s.offene_formen
+        ? h('p', { class: 'leise', style: 'margin:.3rem 0 0' },
+            h('span', { class: 'marke warnung',
+              text: `${s.offene_formen} Formen warten auf Freigabe` }))
+        : null,
       h('div', { class: 'zahlen' },
         zahlKasten(stand.faellig, 'fällig', 'faellig'),
         zahlKasten(stand.neu, 'neu', 'neu'),
@@ -138,6 +146,14 @@ export async function zeichnen(behaelter) {
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/wortschatz'; },
         }, 'Wortschatz'),
+        s.offene_formen
+          ? h('button', {
+              onclick: () => {
+                merken({ sammlungId: s.id });
+                location.hash = '#/freigabe';
+              },
+            }, 'Freigabe')
+          : null,
         h('button', {
           class: 'schlicht',
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/einstellungen'; },

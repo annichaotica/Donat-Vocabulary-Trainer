@@ -39,7 +39,8 @@ ANLEITUNG = (
     "formgruppen_zeigen für die Sprache, dann eintragen. Vollständige "
     "Paradigmen liefern — der Trainer erzeugt daraus die Aufgaben und leitet "
     "den Wortstamm ab. Eingetragene Formen bleiben ungeprüft, bis ein Mensch "
-    "sie freigibt.\n\n"
+    "sie freigibt — das geschieht in der Oberfläche unter "
+    "»Freigabe«, nicht über diese Schnittstelle.\n\n"
     "Für Übungssätze und Texte: zuerst text_pruefen, damit der Text zur "
     "Stufe passt, dann uebungen_importieren. Fremde Texte werden verlinkt, "
     "nicht abgeschrieben."
@@ -471,12 +472,12 @@ def formen_ergaenzen(db: sqlite3.Connection, person: dict, lexem_id: int,
             "pruefung": _bericht_kurz(_fehler_wandeln(a.lexem_pruefen, lexem_id, db))}
 
 
-def formen_bestaetigen(db: sqlite3.Connection, person: dict, form_ids: list):
-    a = _app()
-    for form_id in form_ids:
-        zugang.form_pruefen(db, person["id"], form_id)
-        _fehler_wandeln(a.form_bestaetigen, form_id, db)
-    return {"bestaetigt": len(form_ids)}
+# Ein Werkzeug zum Freigeben gibt es hier absichtlich NICHT. Es hieß
+# formen_bestaetigen und nahm eine Liste von Kennungen; die Beschreibung bat
+# darum, die eigenen Einträge nicht selbst freizugeben. Eine Bitte ist keine
+# Sperre. Die Freigabe gehört dem Menschen und findet in der Oberfläche
+# statt (Prüfansicht je Lektion) — ein Agent, der seine eigenen Einträge im
+# Stapel freigibt, hätte die Prüfung abgeschafft, nicht erledigt.
 
 
 def eintrag_pruefen(db: sqlite3.Connection, person: dict, lexem_id: int):
@@ -940,18 +941,6 @@ WERKZEUGE: list[dict] = [
             "als_geprueft": _s("boolean", "nur auf ausdrücklichen Wunsch")},
             "required": ["lexem_id", "formen"]},
         "funktion": formen_ergaenzen,
-    },
-    {
-        "name": "formen_bestaetigen",
-        "description": "Formen als geprüft markieren — erst danach werden sie "
-                       "abgefragt. NUR benutzen, wenn ein Mensch sie angesehen "
-                       "hat oder die Benutzerin ausdrücklich darum bittet. "
-                       "Nicht selbst die eigenen Einträge freigeben.",
-        "inputSchema": {"type": "object", "properties": {
-            "form_ids": _s("array", "Kennungen aus vokabel_lesen",
-                           items={"type": "integer"})},
-            "required": ["form_ids"]},
-        "funktion": formen_bestaetigen,
     },
     {
         "name": "eintrag_pruefen",

@@ -110,3 +110,68 @@ input.falsch, select.falsch {
   background: var(--grund-3);
   color: var(--leise);
 }
+
+
+/* ---------------------------------------------------------- Freigabe
+   Die Prüfansicht zeigt viele Tabellen untereinander. Sie muss auf dem
+   Telefon lesbar bleiben: die Tabellen rollen einzeln in ihrem Rahmen,
+   die Seite selbst rollt nie seitwärts. */
+
+.freigabe-leiste {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  padding: .7rem 0;
+  background: linear-gradient(to top, var(--grund) 60%, transparent);
+}
+.freigabe-leiste button { flex: 1 1 10rem; }
+
+/* Kopfzeile einer Wortkarte: Lemma links, Zähler rechts. Die Marke darf
+   nicht mitwachsen — als Band über die halbe Karte liest sie sich wie ein
+   Balken und nicht wie eine Zahl. */
+.freigabe-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.freigabe-kopf .marke { flex: none; }
+.freigabe-knoepfe { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .8rem; }
+
+/* Platz für die klebende Leiste: ohne ihn deckt sie die letzte Zeile der
+   letzten Karte ab, und genau die will man noch ansehen. */
+.freigabe-liste { padding-bottom: 4.5rem; }
+
+table.paradigma tr.abgewaehlt td { background: none; opacity: .5; }
+table.paradigma tr.abgewaehlt td.form { text-decoration: line-through; }
+table.paradigma tr.zelle-leer td { background: none; }
+table.paradigma input[type="checkbox"] {
+  width: 1.4rem;
+  height: 1.4rem;
+  accent-color: var(--richtig);
+}
+
+.befund {
+  margin: .4rem 0;
+  padding: .45rem .6rem;
+  border-radius: var(--rundung-klein, .4rem);
+  border-left: 3px solid var(--fast);
+  background: var(--fast-grund);
+  font-size: .9em;
+}
+.befund.fehler { border-left-color: var(--falsch); background: var(--falsch-grund); }
+
+/* Auf dem schmalen Gerät sitzt die Hauptleiste unten (--leiste, gesetzt in
+   stil.css bei 44rem) — die klebende Freigabeleiste muss darüber bleiben,
+   sonst verschwindet sie hinter dem Daumenbalken. */
+@media (max-width: 44rem) {
+  .freigabe-leiste { bottom: var(--leiste, 0px); }
+  .freigabe-liste { padding-bottom: calc(4.5rem + var(--leiste, 0px)); }
+  /* Untereinander statt nebeneinander: zwei Knöpfe zu je 10rem passen
+     bei 360 px nicht in eine Zeile, und der wichtigere soll unten
+     liegen, wo der Daumen ist. */
+  .freigabe-leiste button { flex: 1 1 100%; }
+}

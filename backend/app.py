@@ -69,6 +69,27 @@ app = FastAPI(title="Vokabeltrainer", version="0.2.0", lifespan=lebenslauf)
 app.middleware("http")(wache.wache)
 
 
+@app.middleware("http")
+async def frische_oberflaeche(request: Request, weiter):
+    """Oberflächendateien immer gegenprüfen lassen.
+
+    Ohne das hält der Browser die ES-Module fest, und nach jeder
+    Aktualisierung sähe man tagelang die alte Fassung — ohne Hinweis, dass
+    etwas veraltet ist. Ein Bauschritt mit Versionsnummern im Dateinamen
+    wäre die andere Lösung; den will dieses Projekt bewusst nicht.
+
+    `no-cache` heißt NICHT "nicht speichern", sondern "vor der Benutzung
+    nachfragen". Mit dem ETag antwortet der Server dann meist mit 304 und
+    schickt gar nichts — es kostet eine Rückfrage, keine Übertragung.
+    """
+    antwort = await weiter(request)
+    pfad = request.url.path
+    if (pfad.startswith(("/js/", "/css/")) or pfad in ("/", "/index.html")
+            or pfad.endswith(".webmanifest")):
+        antwort.headers["Cache-Control"] = "no-cache"
+    return antwort
+
+
 def datenbank() -> Iterator[sqlite3.Connection]:
     db = dbm.verbindung()
     try:

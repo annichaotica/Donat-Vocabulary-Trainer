@@ -111,3 +111,22 @@ def test_kein_aufruf_einer_unbekannten_stammdatenfunktion():
             continue
         benutzt |= set(re.findall(r"\bstammdaten\.(\w+)\s*\(", datei.read_text()))
     assert not (benutzt - eingetragen), sorted(benutzt - eingetragen)
+
+
+def test_oberflaechendateien_werden_gegengeprueft():
+    """Ohne das hält der Browser die ES-Module fest und zeigt nach einer
+    Aktualisierung tagelang die alte Fassung — ohne jeden Hinweis."""
+    import pathlib, sys
+    sys.path.insert(0, str(WURZEL / "backend"))
+    import tempfile
+    import datenbank as dbm
+    dbm.PFAD = pathlib.Path(tempfile.mkdtemp()) / "t.db"
+    from fastapi.testclient import TestClient
+    import app as anwendung
+    with TestClient(anwendung.app) as k:
+        for pfad in ("/", "/js/app.js", "/css/stil.css"):
+            antwort = k.get(pfad)
+            assert antwort.status_code == 200, pfad
+            assert antwort.headers.get("cache-control") == "no-cache", pfad
+        # Die Schnittstelle ist davon nicht betroffen
+        assert k.get("/api/zustand").headers.get("cache-control") is None

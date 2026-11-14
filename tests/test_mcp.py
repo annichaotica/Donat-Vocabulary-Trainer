@@ -385,3 +385,50 @@ def test_die_erste_person_wird_verwalterin(klient):
     leute = {b["name"]: b for b in klient.get("/api/benutzer").json()}
     assert leute["Erste"]["verwalter"] == 1
     assert leute["Zweite"]["verwalter"] == 0
+
+
+# ------------------------------------------- Kopfzeilen und Sperre
+
+def test_das_merkmal_geht_auch_in_x_account_key(mcp):
+    """Der Konnektor in claude.ai lässt nur eine feste Liste von
+    Headernamen zu. Weder Authorization noch ein eigener Name stehen
+    darauf — x-account-key schon."""
+    antwort = mcp.klient.post("/mcp", headers={"x-account-key": mcp.token},
+                              json={"jsonrpc": "2.0", "id": 1,
+                                    "method": "tools/list"})
+    assert antwort.status_code == 200
+    assert len(antwort.json()["result"]["tools"]) >= 13
+
+
+def test_vorangestelltes_bearer_wird_vertragen(mcp):
+    """Falls es jemand aus Gewohnheit mitschreibt."""
+    antwort = mcp.klient.post("/mcp",
+                              headers={"x-account-key": f"Bearer {mcp.token}"},
+                              json={"jsonrpc": "2.0", "id": 1,
+                                    "method": "tools/list"})
+    assert antwort.status_code == 200
+
+
+def test_durchprobieren_wird_gesperrt(mcp):
+    import drossel
+    drossel.zuruecksetzen()
+    try:
+        letzte = None
+        for i in range(drossel.GRENZE + 2):
+            letzte = mcp.klient.post(
+                "/mcp", headers={"Authorization": f"Bearer falsch{i}",
+                                 "CF-Connecting-IP": "198.51.100.7"},
+                json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        assert letzte.status_code == 429
+        assert "Fehlversuche" in letzte.json()["detail"]
+        assert letzte.headers.get("Retry-After")
+
+        # Das richtige Merkmal von einer ANDEREN Adresse geht weiter
+        gut = mcp.klient.post("/mcp",
+                              headers={"Authorization": f"Bearer {mcp.token}",
+                                       "CF-Connecting-IP": "203.0.113.1"},
+                              json={"jsonrpc": "2.0", "id": 1,
+                                    "method": "tools/list"})
+        assert gut.status_code == 200
+    finally:
+        drossel.zuruecksetzen()

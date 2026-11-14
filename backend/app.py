@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 
 import aufgaben
 import einlesen
+import drossel
 import datenbank as dbm
 import legasthenie
 import lernen as lernmodul
@@ -1042,20 +1043,51 @@ def lern_verlauf(benutzer_id: int, aufgabe_id: int | None = None,
 #
 # Die Schnittstelle schaltet sich selbst frei, sobald es ein Token gibt.
 # Ohne Token kommt niemand hinein, auch nicht versehentlich.
+#
+# Das Merkmal darf in drei Kopfzeilen stehen. Der Grund für die dritte ist
+# ärgerlich, aber bindend: der Konnektor in claude.ai lässt nur eine feste
+# Liste von Headernamen zu. Weder "Authorization" noch ein eigener Name
+# stehen darauf — "x-account-key" schon.
+MCP_KOPFZEILEN = ("authorization", "x-vokabel-token", "x-account-key")
+
+
+def _mcp_geheimnis(request: Request) -> str:
+    kopf = request.headers.get("authorization", "")
+    if kopf[:7].lower() == "bearer ":
+        return kopf[7:].strip()
+    for name in MCP_KOPFZEILEN[1:]:
+        wert = request.headers.get(name, "").strip()
+        if wert:
+            # Auch hier ein vorangestelltes "Bearer " vertragen, falls es
+            # jemand aus Gewohnheit mitschreibt.
+            return wert[7:].strip() if wert[:7].lower() == "bearer " else wert
+    return ""
+
 
 def _mcp_person(request: Request, db: sqlite3.Connection) -> dict:
-    kopf = request.headers.get("authorization", "")
-    geheimnis = kopf[7:].strip() if kopf[:7].lower() == "bearer " else ""
-    if not geheimnis:
-        geheimnis = request.headers.get("x-vokabel-token", "").strip()
-    treffer = zugang.person_zu_token(db, geheimnis)
+    # Ohne Access davor trägt das Merkmal die Last allein. Darum eine Sperre
+    # gegen Durchprobieren — erraten lässt sich ein 256-Bit-Merkmal zwar
+    # nicht, aber eine Liste geleakter Merkmale ließe sich durchgehen.
+    wer = drossel.kennung_aus_anfrage(request)
+    rest = drossel.gesperrt(wer)
+    if rest > 0:
+        raise HTTPException(429, f"Zu viele Fehlversuche. Wieder möglich in "
+                                 f"{int(rest // 60) + 1} Minuten.",
+                            headers={"Retry-After": str(int(rest) + 1)})
+
+    treffer = zugang.person_zu_token(db, _mcp_geheimnis(request))
     if treffer is None:
+        sperre = drossel.fehlversuch(wer)
         if not zugang.mcp_eingeschaltet(db):
             raise HTTPException(503, "Die MCP-Schnittstelle ist noch nicht "
                                      "eingerichtet. In den Einstellungen des "
                                      "Trainers ein Zugangsmerkmal anlegen.")
+        hinweis = (" Weitere Versuche sind für eine Weile gesperrt."
+                   if sperre > 0 else "")
         raise HTTPException(401, "Kein gültiges Zugangsmerkmal. Erwartet wird "
-                                 "die Kopfzeile Authorization: Bearer <Token>.")
+                                 "es in der Kopfzeile Authorization (Bearer) "
+                                 "oder x-account-key." + hinweis)
+    drossel.geschafft(wer)
     return dict(treffer["benutzer"])
 
 

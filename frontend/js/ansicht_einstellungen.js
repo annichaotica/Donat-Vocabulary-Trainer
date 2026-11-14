@@ -223,21 +223,51 @@ async function teilZugaenge(behaelter) {
     kasten.append(tafel);
   }
 
-  const name = h('input', { type: 'text', placeholder: 'z.B. Claude-App auf dem iPad' });
+  // Vorbelegt, damit der Knopf nicht ins Leere läuft. Vorher blieb bei
+  // leerem Feld nur eine Kurzmeldung, die nach zwei Sekunden verschwand —
+  // es sah aus, als täte der Knopf nichts.
+  const vorschlag = `Claude, ${new Date().toLocaleDateString('de-DE',
+    { day: 'numeric', month: 'long' })}`;
+  const name = h('input', {
+    type: 'text', value: vorschlag,
+    placeholder: 'z.B. Claude-App auf dem iPad',
+    oninput: () => { hinweis.hidden = true; name.classList.remove('falsch'); },
+  });
+  const hinweis = h('p', {
+    class: 'leise', hidden: true, style: 'margin:0;color:var(--falsch)',
+    text: 'Gib dem Zugang einen Namen — dann weißt du später, welches '
+        + 'Gerät du zurücknimmst.',
+  });
+  const knopf = h('button', {
+    class: 'wichtig',
+    onclick: async () => {
+      if (!name.value.trim()) {
+        hinweis.hidden = false;
+        name.classList.add('falsch');
+        name.focus();
+        return;
+      }
+      knopf.disabled = true;
+      knopf.textContent = 'Wird angelegt …';
+      try {
+        const neu = await api.mcpTokenAnlegen(zustand.benutzerId,
+                                              { name: name.value.trim() });
+        zeigeToken(kasten, neu);
+        name.value = '';
+      } catch (fehler) {
+        hinweis.hidden = false;
+        hinweis.textContent = fehler.message;
+      } finally {
+        knopf.disabled = false;
+        knopf.textContent = 'Zugang anlegen';
+      }
+    },
+  }, 'Zugang anlegen');
+
   kasten.append(h('div', { style: 'display:grid;gap:.5rem;margin-top:.8rem' },
-    name,
-    h('button', {
-      class: 'wichtig',
-      onclick: async () => {
-        if (!name.value.trim()) { meldung('Wofür ist der Zugang?'); return; }
-        try {
-          const neu = await api.mcpTokenAnlegen(zustand.benutzerId,
-                                                { name: name.value.trim() });
-          zeigeToken(kasten, neu);
-          name.value = '';
-        } catch (fehler) { meldung(fehler.message); }
-      },
-    }, 'Zugang anlegen')));
+    h('label', { class: 'leise', for: 'zugangsname',
+                 text: 'Wofür ist der Zugang?' }),
+    name, hinweis, knopf));
   return kasten;
 }
 

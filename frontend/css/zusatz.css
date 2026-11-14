@@ -97,3 +97,9 @@
 @media (max-width: 44rem) {
   .fusszeile { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
 }
+
+/* Feld, dessen Eingabe fehlt. */
+input.falsch, select.falsch {
+  border-color: var(--falsch);
+  background: var(--falsch-grund);
+}

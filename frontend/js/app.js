@@ -122,9 +122,13 @@ async function wegweisen() {
     location.hash = '#/uebersicht';
     return;
   }
-  // Ohne Profil geht nichts weiter.
+  // Ohne Profil geht nichts weiter. Aber nicht stillschweigend: merken,
+  // wohin jemand eigentlich wollte, und nach der Wahl dorthin
+  // zurückkehren. Sonst landet man unerklärt beim Profilwähler und
+  // sucht die Seite, die man aufgerufen hatte.
   if (!zustand.benutzerId && teile[0] !== 'profile') {
-    return uebersicht.zeichnenProfile(inhalt);
+    const ziel = location.hash || '#/uebersicht';
+    return uebersicht.zeichnenProfile(inhalt, ziel !== '#/' ? ziel : null);
   }
 
   try {

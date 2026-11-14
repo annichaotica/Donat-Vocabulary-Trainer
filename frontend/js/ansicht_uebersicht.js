@@ -5,10 +5,15 @@ import { h, leeren, meldung } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 
-export async function zeichnenProfile(behaelter) {
+export async function zeichnenProfile(behaelter, zurueckNach = null) {
   const leute = await api.benutzer();
   const el = leeren(behaelter);
   el.append(h('h1', { text: 'Wer lernt?' }));
+  if (zurueckNach) {
+    el.append(h('p', { class: 'leise',
+      text: 'Auf diesem Gerät ist noch kein Profil gewählt. Danach geht es '
+          + 'dorthin weiter, wo du hinwolltest.' }));
+  }
   if (!leute.length) {
     el.append(h('p', { text: 'Noch kein Profil angelegt. Jeder bekommt eigene '
                            + 'Sammlungen und einen eigenen Lernstand.' }));
@@ -16,7 +21,10 @@ export async function zeichnenProfile(behaelter) {
   el.append(h('div', { class: 'karte-reihe' },
     leute.map((p) => h('button', {
       class: 'karte klickbar',
-      onclick: () => { merken({ benutzerId: p.id, sammlungId: null }); location.hash = '#/uebersicht'; },
+      onclick: () => {
+        merken({ benutzerId: p.id, sammlungId: null });
+        location.hash = zurueckNach || '#/uebersicht';
+      },
     },
       h('div', { style: 'display:flex;align-items:center;gap:.75rem' },
         h('span', {
@@ -37,7 +45,7 @@ export async function zeichnenProfile(behaelter) {
           try {
             const neu = await api.benutzerAnlegen({ name: name.value.trim(), farbe: farbe.value });
             merken({ benutzerId: neu.id, sammlungId: null });
-            location.hash = '#/uebersicht';
+            location.hash = zurueckNach || '#/uebersicht';
           } catch (fehler) { meldung(fehler.message); }
         },
       }, 'Anlegen'))));

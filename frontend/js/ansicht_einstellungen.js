@@ -23,6 +23,7 @@ export async function zeichnen(behaelter) {
   if (zustand.sammlungId) el.append(await teilZugriff(behaelter));
   el.append(await teilLernen(behaelter));
   el.append(await teilLegasthenie(behaelter));
+  el.append(await teilAussen(behaelter));
   el.append(await teilZugaenge(behaelter));
   el.append(h('details', { class: 'karte' },
     h('summary', { text: 'Tastatur' }),
@@ -38,6 +39,78 @@ export async function zeichnen(behaelter) {
       h('button', {
         onclick: () => { location.hash = '#/tastatur'; },
       }, 'Fremde Schrift: wo liegt welcher Buchstabe?'))));
+}
+
+/* ------------------------------------------- Zugang von außen */
+
+/* Welche Mailadresse zu welchem Profil gehört.
+ *
+ * Von außen steht Cloudflare Access davor und schickt die geprüfte
+ * Mailadresse mit. Kennt der Trainer sie nicht, legt er ein NEUES,
+ * leeres Profil an — der eigene Lernstand bleibt dann unsichtbar, und
+ * es sieht aus, als sei alles weg. Darum werden die Adressen hier
+ * eingetragen, am besten bevor sich jemand zum ersten Mal anmeldet.
+ */
+async function teilAussen() {
+  const kasten = h('details', { class: 'karte' },
+    h('summary', { text: 'Zugang von außen (Mailadressen)' }));
+  const inhalt = h('div', { style: 'margin-top:.7rem' });
+  kasten.append(inhalt);
+
+  inhalt.append(h('p', { class: 'leise',
+    text: 'Wer von außen auf den Trainer kommt, meldet sich mit seiner '
+        + 'Mailadresse an. Damit er dabei sein eigenes Profil bekommt und '
+        + 'nicht ein neues, leeres, muss die Adresse hier stehen — '
+        + 'am besten vor der ersten Anmeldung.' }));
+
+  let profile = [];
+  try { profile = await api.benutzer(); } catch { /* gleich unten */ }
+  if (!profile.length) {
+    inhalt.append(h('p', { class: 'leise', text: 'Keine Profile gefunden.' }));
+    return kasten;
+  }
+
+  for (const p of profile) {
+    // Die Adresse selbst gibt nur die Einzelabfrage heraus, und von
+    // außen nur fürs eigene Profil. Geht sie nicht, bleibt das Feld
+    // leer und der Zustand daneben sagt trotzdem, ob etwas gebunden ist.
+    let bekannt = null;
+    try { bekannt = (await api.benutzerLesen(p.id)).email; } catch { /* nichts */ }
+
+    const feld = h('input', {
+      type: 'email', placeholder: 'noch keine Adresse',
+      value: bekannt || '', style: 'min-width:16rem',
+    });
+    const zustandText = h('span', { class: 'leise',
+      text: p.hat_mail ? 'gebunden' : 'nicht gebunden' });
+
+    const zeile = h('div', { class: 'zugriff-zeile' },
+      h('b', { text: p.name }),
+      feld,
+      h('button', {
+        onclick: async () => {
+          try {
+            const neu = await api.benutzerAendern(p.id, { email: feld.value });
+            zustandText.textContent = neu.email ? 'gebunden' : 'nicht gebunden';
+            meldung(neu.email
+              ? `${p.name} meldet sich künftig als ${neu.email} an.`
+              : `${p.name} hat jetzt keine Adresse mehr.`);
+          } catch (fehler) {
+            meldung(fehler.message, 'fehler');
+          }
+        },
+      }, 'Übernehmen'),
+      zustandText);
+    inhalt.append(zeile);
+  }
+
+  inhalt.append(h('p', { class: 'leise', style: 'margin-top:.8rem',
+    text: 'Die Adresse muss dieselbe sein, die auch in der Zugriffsregel '
+        + 'steht — sonst kommt die Person gar nicht erst bis hierher. '
+        + 'Leeres Feld und Übernehmen löst die Bindung wieder. Fremde '
+        + 'Profile lassen sich nur im Heimnetz eintragen; von außen darf '
+        + 'jede Person nur ihr eigenes ändern.' }));
+  return kasten;
 }
 
 /* --------------------------------------------- Wer darf mitlernen */

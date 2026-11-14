@@ -54,6 +54,7 @@ export const api = {
 
   ich: () => ruf('/ich'),
   benutzer: () => ruf('/benutzer'),
+  benutzerLesen: (id) => ruf(`/benutzer/${id}`),
   mcpToken: (id) => ruf(`/benutzer/${id}/mcp-token`),
   mcpTokenAnlegen: (id, daten) =>
     ruf(`/benutzer/${id}/mcp-token`, { methode: 'POST', daten }),

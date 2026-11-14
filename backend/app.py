@@ -374,6 +374,19 @@ def benutzer_liste(db: sqlite3.Connection = DB):
                                FROM benutzer ORDER BY name""")
 
 
+@app.get("/api/benutzer/{benutzer_id}")
+def benutzer_lesen(benutzer_id: int, db: sqlite3.Connection = DB):
+    """Ein einzelnes Profil, mit Mailadresse.
+
+    Die Liste zeigt nur, OB eine Adresse gebunden ist. Hier steht sie —
+    und die Wache lässt von außen nur das eigene Profil durch.
+    """
+    b = _holen(db, "benutzer", benutzer_id)
+    return {"id": b["id"], "name": b["name"], "farbe": b["farbe"],
+            "verwalter": b["verwalter"], "angelegt": b["angelegt"],
+            "email": b["email"]}
+
+
 @app.post("/api/benutzer", status_code=201)
 def benutzer_anlegen(eingabe: BenutzerAnlegen, db: sqlite3.Connection = DB):
     erster = not dbm.wert(db, "SELECT 1 FROM benutzer LIMIT 1")
@@ -386,6 +399,50 @@ def benutzer_anlegen(eingabe: BenutzerAnlegen, db: sqlite3.Connection = DB):
     return _holen(db, "benutzer", cur.lastrowid)
 
 
+def _mail_binden(db: sqlite3.Connection, benutzer_id: int, mail: str) -> None:
+    """Bindet eine Mailadresse an ein Profil — der Zugang von außen.
+
+    Ohne diese Bindung legt die erste Anmeldung über Access ein NEUES
+    Profil an (so steht es in identitaet.py, und das ist dort richtig:
+    wer durch Access kommt, ist eingeladen). Wer schon ein Profil mit
+    Lernstand hat, bekommt dadurch aber ein zweites, leeres — genau das
+    ist hier passiert. Die Adresse vorher einzutragen verhindert es.
+
+    Hält ein anderes Profil diese Adresse schon, gibt es zwei Fälle. Ist
+    es leer, war es so ein versehentlich angelegtes: es wird abgeräumt
+    und die Adresse wandert herüber. Hat es Lernstand, wird abgelehnt —
+    zwei Bestände zusammenzuführen ist nichts, was nebenbei und ohne
+    Rückfrage geschehen darf.
+    """
+    mail = mail.strip().lower()
+    if not mail:
+        db.execute("UPDATE benutzer SET email = NULL WHERE id = ?",
+                   (benutzer_id,))
+        return
+    if not identitaet._MAIL.match(mail):
+        raise HTTPException(400, f"{mail!r} sieht nicht wie eine Mailadresse aus")
+    anderer = dbm.zeile(db, "SELECT * FROM benutzer WHERE email = ? AND id != ?",
+                        (mail, benutzer_id))
+    if anderer is not None:
+        spuren = {
+            "Lernstand": "SELECT COUNT(*) FROM lernzustand WHERE benutzer_id = ?",
+            "Übungsstand": "SELECT COUNT(*) FROM textlernzustand WHERE benutzer_id = ?",
+            "Sammlungen": "SELECT COUNT(*) FROM sammlung WHERE besitzer_id = ?",
+            "Lernziele": "SELECT COUNT(*) FROM lernziel WHERE benutzer_id = ?",
+            "Zugänge": "SELECT COUNT(*) FROM mcp_token WHERE benutzer_id = ?",
+        }
+        hat = {name: (dbm.wert(db, sql, (anderer["id"],)) or 0)
+               for name, sql in spuren.items()}
+        if any(hat.values()):
+            was = ", ".join(f"{n}: {z}" for n, z in hat.items() if z)
+            raise HTTPException(409,
+                f"Das Profil {anderer['name']!r} hat diese Adresse und ist "
+                f"nicht leer ({was}). Zusammenführen geht nicht nebenbei — "
+                f"erst dort aufräumen oder die Adresse dort entfernen.")
+        db.execute("DELETE FROM benutzer WHERE id = ?", (anderer["id"],))
+    db.execute("UPDATE benutzer SET email = ? WHERE id = ?", (mail, benutzer_id))
+
+
 @app.patch("/api/benutzer/{benutzer_id}")
 def benutzer_aendern(benutzer_id: int, eingabe: BenutzerAendern,
                      db: sqlite3.Connection = DB):
@@ -394,6 +451,8 @@ def benutzer_aendern(benutzer_id: int, eingabe: BenutzerAendern,
         db.execute("UPDATE benutzer SET name = ? WHERE id = ?", (eingabe.name, benutzer_id))
     if eingabe.farbe is not None:
         db.execute("UPDATE benutzer SET farbe = ? WHERE id = ?", (eingabe.farbe, benutzer_id))
+    if eingabe.email is not None:
+        _mail_binden(db, benutzer_id, eingabe.email)
     e = dbm.j_lesen(b["einstellungen"])
     if eingabe.wunschretention is not None:
         e["wunschretention"] = eingabe.wunschretention

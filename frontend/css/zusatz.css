@@ -498,3 +498,8 @@ input[type="file"] { max-width: 100%; }
 .hilfe-schritte { margin: .4rem 0; padding-left: 1.3rem; }
 .hilfe-schritte li { margin: .35rem 0; }
 .hilfe-inhalt input[readonly] { width: 100%; }
+
+/* Eine Zeile je Profil beim Zugang von außen: Name, Adresse, Knopf. */
+.zugriff-zeile { display: flex; gap: .6rem; align-items: center;
+                 flex-wrap: wrap; margin: .5rem 0; }
+.zugriff-zeile > b { min-width: 7rem; }

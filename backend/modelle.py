@@ -25,6 +25,9 @@ class BenutzerAnlegen(BaseModel):
 class BenutzerAendern(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=60)
     farbe: str | None = None
+    # Die Mailadresse, unter der Cloudflare Access diese Person kennt.
+    # Leerer String entfernt die Bindung wieder.
+    email: str | None = Field(default=None, max_length=254)
     wunschretention: float | None = Field(default=None, ge=0.70, le=0.99)
     neu_je_sitzung: int | None = Field(default=None, ge=0, le=500)
     # Die Tagesdosis in Fragen; 0 heißt ausdrücklich ohne Grenze.

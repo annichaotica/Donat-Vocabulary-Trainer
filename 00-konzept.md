@@ -124,8 +124,8 @@ Intervallen.
 
 | | |
 |---|---|
-| Läuft auf | Familienserver, Docker, Port **8020** |
-| Erreichbar | `http://familienserver:8020` im Heimnetz, von Mac, iPad, Handy |
+| Läuft auf | Familienserver, Docker, Port **8030** |
+| Erreichbar | `http://familienserver:8030` im Heimnetz, von Mac, iPad, Handy |
 | Backend | Python, FastAPI |
 | Datenbank | **SQLite** in `/srv/vokabeltrainer/` — eine Datei, wird von der bestehenden `/srv`-Sicherung automatisch mitgenommen, kein zusätzlicher Postgres-Container |
 | Frontend | HTML, CSS und ES-Module ohne Bauschritt. Kein npm, keine Übersetzungsstufe, in fünf Jahren noch wartbar. Als PWA auf den Startbildschirm legbar |

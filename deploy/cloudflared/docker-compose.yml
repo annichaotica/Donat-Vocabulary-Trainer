@@ -1,0 +1,35 @@
+# Cloudflare-Tunnel für den Familienserver.
+#
+# Warum ein Tunnel und keine Portweiterleitung: die Verbindung geht von
+# innen nach außen. Im Router bleibt kein Port offen, es gibt keine
+# erreichbare IP-Adresse des Hauses, und ein wechselnder Anschluss macht
+# nichts aus. Was von außen hereindarf, steht ausschließlich in der
+# Tunnelkonfiguration bei Cloudflare.
+#
+# DAVOR GEHÖRT CLOUDFLARE ACCESS. Der Vokabeltrainer hat keinerlei
+# Anmeldung — die Profile sind bloße Namen ohne Passwort. Ohne Access wäre
+# er für jeden lesbar und änderbar, der die Adresse kennt.
+#
+# Einrichtung:
+#   1. Tunnel in Cloudflare anlegen, Token holen
+#   2. Token nach .env schreiben:  TUNNEL_TOKEN=ey...
+#   3. chmod 600 .env
+#   4. docker compose up -d
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.11.0
+    container_name: cloudflared
+    restart: unless-stopped
+    # Netz des Wirts, damit die Dienste unter 127.0.0.1:<port> erreichbar
+    # sind — sie liegen in verschiedenen Compose-Projekten mit eigenen Netzen.
+    network_mode: host
+    command: tunnel --no-autoupdate --loglevel info run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:?TUNNEL_TOKEN fehlt - siehe Kopf dieser Datei}
+      - TZ=Europe/Berlin
+    healthcheck:
+      test: ["CMD", "cloudflared", "--version"]
+      interval: 120s
+      timeout: 10s
+      retries: 3

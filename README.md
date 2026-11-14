@@ -32,10 +32,10 @@ Deutsch. Weitere lassen sich ohne Codeänderung einrichten.
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python werkzeuge/beispieldaten.py        # Beispielbestand
-.venv/bin/uvicorn app:app --app-dir backend --reload --port 8020
+.venv/bin/uvicorn app:app --app-dir backend --reload --port 8030
 ```
 
-Dann <http://localhost:8020>. Tests: `.venv/bin/python -m pytest tests/ -q`
+Dann <http://localhost:8030>. Tests: `.venv/bin/python -m pytest tests/ -q`
 
 ### Auf dem Familienserver
 
@@ -46,27 +46,41 @@ sudo mkdir -p /srv/vokabeltrainer && sudo chown "$USER" /srv/vokabeltrainer
 cd /srv/vokabeltrainer && docker compose up -d --build
 ```
 
-Erreichbar unter <http://familienserver:8020>, nur im Heimnetz. Port 8020,
-weil 80 (Startseite), 2283 (Immich), 8010 (Paperless) und 9925 (Mealie)
-belegt sind.
+Erreichbar unter <http://familienserver:8030>, nur im Heimnetz.
+
+Port 8030, weil die näherliegenden belegt sind: 80 und **8020** gehören dem
+Caddy (Startseite und der Autodesk-Spiegel), 2283 Immich, 8010 Paperless,
+9925 Mealie.
 
 Auf dem iPhone oder iPad die Seite aufrufen und „Zum Home-Bildschirm" —
 dann startet sie wie eine App.
 
 ### Sicherung
 
-Die Datenbank liegt unter `/srv/vokabeltrainer/daten/` und wird damit von der
-bestehenden `/srv`-Sicherung mitgenommen. **Aber:** sie läuft im WAL-Modus,
-ein bloßes Kopieren der Datei während eines Schreibvorgangs ergibt einen
-unvollständigen Stand. Darum vor dem Borg-Aufruf in
-`/usr/local/sbin/familienserver-sichern` einhängen:
+**Ist eingerichtet.** Die Datenbank läuft im WAL-Modus; sie einfach
+mitzukopieren ergäbe während eines Schreibvorgangs einen unvollständigen
+Stand. Darum schreibt `/usr/local/sbin/familienserver-sichern` seit dem
+14.11.2026 einen eigenen Abzug — nach demselben Muster wie bei Mealie:
 
-```sh
-/srv/vokabeltrainer/werkzeuge/sicherung.sh
-```
+* Abzug über die Sicherungsschnittstelle von SQLite nach
+  `/var/backups/familienserver/vokabeltrainer.db`, auf `journal_mode=delete`
+  gestellt, damit keine Begleitdateien danebenliegen.
+* Die laufende Datei samt `-wal` und `-shm` ist aus dem Borg-Archiv
+  ausgeschlossen.
+* Schlägt der Abzug fehl, setzt das nur den Fehlerstand — die Sicherung von
+  Immich und Paperless läuft trotzdem durch.
 
-Das Skript legt einen in sich stimmigen Abzug unter `daten/abzug/` ab, prüft
-ihn und behält die letzten sieben.
+Die Fassung vor der Ergänzung liegt daneben als
+`familienserver-sichern.vor-vokabeltrainer-2026-11-14`.
+
+Für den Mac oder einen Abzug von Hand gibt es zusätzlich
+`werkzeuge/sicherung.sh`.
+
+### Von außen erreichbar
+
+Über einen Cloudflare-Tunnel mit Cloudflare Access davor — siehe
+[`deploy/cloudflared/LIESMICH.md`](deploy/cloudflared/LIESMICH.md). Kein
+offener Port im Router.
 
 ## Der MCP-Server
 
@@ -81,7 +95,7 @@ Er braucht **keine Fremdpakete**, nur Python 3.
 
 ```sh
 claude mcp add vokabeltrainer \
-  --env VOKABEL_URL=http://familienserver:8020 \
+  --env VOKABEL_URL=http://familienserver:8030 \
   -- python3 /Users/annuschkabrenner/Projects/Vokabeltrainer/mcp/vokabeltrainer_mcp.py
 ```
 
@@ -95,7 +109,7 @@ In `~/Library/Application Support/Claude/claude_desktop_config.json`:
     "vokabeltrainer": {
       "command": "python3",
       "args": ["/Users/annuschkabrenner/Projects/Vokabeltrainer/mcp/vokabeltrainer_mcp.py"],
-      "env": { "VOKABEL_URL": "http://familienserver:8020" }
+      "env": { "VOKABEL_URL": "http://familienserver:8030" }
     }
   }
 }

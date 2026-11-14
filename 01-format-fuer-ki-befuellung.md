@@ -78,7 +78,7 @@ war. So sieht der fertige Datensatz aus:
   ]
 }
 ```bash
-curl -X POST http://familienserver:8020/api/lexeme \
+curl -X POST http://familienserver:8030/api/lexeme \
      -H 'Content-Type: application/json' \
      -d @wort.json
 ```

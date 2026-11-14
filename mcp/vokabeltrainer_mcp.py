@@ -4,7 +4,7 @@
 Spricht über die HTTP-Schnittstelle mit dem Trainer. Keine Fremdpakete, nur
 die Standardbibliothek — damit er in fünf Jahren noch startet.
 
-    VOKABEL_URL=http://familienserver:8020 python3 vokabeltrainer_mcp.py
+    VOKABEL_URL=http://familienserver:8030 python3 vokabeltrainer_mcp.py
 
 Der Server tut mehr, als Daten durchzureichen: nach jedem Anlegen läuft die
 Qualitätsprüfung mit und ihr Ergebnis geht in die Antwort zurück. Der Agent
@@ -23,7 +23,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-ADRESSE = os.environ.get("VOKABEL_URL", "http://localhost:8020").rstrip("/")
+ADRESSE = os.environ.get("VOKABEL_URL", "http://localhost:8030").rstrip("/")
 NAME = "vokabeltrainer"
 VERSION = "0.1.0"
 PROTOKOLL = "2025-06-18"

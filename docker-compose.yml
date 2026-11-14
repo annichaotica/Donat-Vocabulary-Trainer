@@ -2,8 +2,9 @@
 #
 #   cd /srv/vokabeltrainer && docker compose up -d
 #
-# Port 8020 — 80 (Startseite), 2283 (Immich), 8010 (Paperless) und
-# 9925 (Mealie) sind belegt.
+# Port 8030. Belegt sind: 80 und 8020 (Caddy — Startseite und der
+# Autodesk-Spiegel), 2283 (Immich), 8010 (Paperless), 9925 (Mealie),
+# 2019 (Caddy-Verwaltung), 2222 (zweiter SSH).
 #
 # Die Datenbank liegt unter /srv/vokabeltrainer/daten und wird damit von
 # der bestehenden /srv-Sicherung mitgenommen. Siehe aber den Hinweis zur
@@ -17,7 +18,12 @@ services:
     container_name: vokabeltrainer
     restart: unless-stopped
     ports:
-      - "8020:8020"
+      - "8030:8030"
+    # Als der Benutzer laufen, dem ./daten gehört. Das Abbild legt zwar einen
+    # eigenen Benutzer an, aber die eingehängte Verzeichnis bringt die Rechte
+    # des Wirts mit — und so kommt man auch von der Kommandozeile ohne sudo
+    # an die Datenbank. Bei einem anderen Wirt: `id -u`:`id -g` einsetzen.
+    user: "1000:1000"
     volumes:
       - ./daten:/daten
     environment:

@@ -1,7 +1,7 @@
 """Vokabeltrainer — HTTP-Schnittstelle und Auslieferung der Oberfläche.
 
 Start zur Entwicklung:
-    .venv/bin/uvicorn app:app --reload --app-dir backend --port 8020
+    .venv/bin/uvicorn app:app --reload --app-dir backend --port 8030
 
 Im Betrieb läuft dasselbe im Docker-Container auf dem Familienserver.
 """

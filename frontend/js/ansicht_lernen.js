@@ -252,6 +252,17 @@ export class Sitzung {
       kasten.append(h('p', { class: 'frage-beispiel' },
         h('span', { class: 'leise', text: 'wie bei: ' }), a.frage_hilfe));
     }
+    // Wer gemeint ist, in der Sprache selbst. In Klammern, wo das
+    // Pronomen freiwillig ist — im Griechischen sagt die Endung es schon.
+    if ((a.pronomen || []).length) {
+      const text = a.pronomen.join(' / ');
+      kasten.append(h('p', { class: 'frage-pronomen', lang: a.antwort_sprache },
+        a.pronomen_pflicht ? text : `(${text})`,
+        a.pronomen_pflicht
+          ? null
+          : h('span', { class: 'leise',
+                        text: ' — darf mitgeschrieben werden' })));
+    }
     if (a.typ === 'bedeutung_fremd_deutsch' && a.anzahl_bedeutungen > 1) {
       kasten.append(h('p', { class: 'frage-hinweis',
         text: `${a.anzahl_bedeutungen} Bedeutungen hinterlegt — eine genügt.` }));
@@ -361,7 +372,12 @@ export class Sitzung {
       felder.push(feld);
       kasten.append(h('div', { class: 'reihenzeile' + (r ? ' ' + r.urteil : '') },
         h('div', { class: 'reihenname' },
-          h('span', { text: z.beschriftung }),
+          h('span', {},
+            (z.pronomen || []).length
+              ? h('span', { class: 'zeilenpronomen', lang: a.antwort_sprache,
+                            text: z.pronomen.join('/') + ' ' })
+              : null,
+            z.beschriftung),
           z.beispiel
             ? h('span', { class: 'leise', text: z.beispiel })
             : null),

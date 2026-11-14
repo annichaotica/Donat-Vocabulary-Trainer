@@ -429,3 +429,14 @@ input[type="file"] { max-width: 100%; }
 .gruppenhilfe dl { margin: .5rem 0 0; }
 .gruppenhilfe dt { font-weight: 600; margin-top: .5rem; }
 .gruppenhilfe dd { margin: 0 0 0 .8rem; }
+
+
+/* Das Personalpronomen an der Formfrage. Es sagt, WER gemeint ist — in
+   der Sprache selbst, nicht über den Umweg "2. Person Singular". */
+.frage-pronomen {
+  margin: .3rem 0 0;
+  font-size: 1.05em;
+  font-weight: 600;
+}
+.frage-pronomen .leise { font-weight: 400; font-size: .82em; }
+.zeilenpronomen { font-weight: 600; }

@@ -211,3 +211,60 @@ def test_ein_tippfehler_laesst_die_reihe_nicht_durchfallen(klient):
     ergebnis = pruefen(klient, b, reihe, _alle(reihe, fast))
     assert ergebnis["urteil"]["urteil"] == "fast"
     assert ergebnis["aufloesung"]["richtig"] == 5
+
+
+# ------------------------------------------------- Personalpronomen
+
+def test_die_reihe_zeigt_wer_gemeint_ist(klient):
+    """»2. Person Singular« sagt es über einen Umweg, »εσύ« sagt es direkt."""
+    b, s = _aufbau(klient)
+    reihe = _reihe(klient, b, s)
+    assert [z["pronomen"] for z in reihe["zellen"]] == [
+        ["εγώ"], ["εσύ"], ["αυτός", "αυτή", "αυτό"],
+        ["εμείς"], ["εσείς"], ["αυτοί", "αυτές", "αυτά"]]
+
+
+def test_mitgeschriebenes_pronomen_ist_kein_fehler(klient):
+    """Im Griechischen ist es freiwillig — wer es dazuschreibt, hat nichts
+    falsch gemacht."""
+    b, s = _aufbau(klient)
+    reihe = _reihe(klient, b, s)
+    mit = ["εγώ γράφω", "εσύ γράφεις", "αυτός γράφει",
+           "εμείς γράφουμε", "εσείς γράφετε", "αυτοί γράφουν"]
+    ergebnis = pruefen(klient, b, reihe, _alle(reihe, mit))
+    assert ergebnis["urteil"]["urteil"] == "richtig"
+
+
+def test_auch_bei_der_einzelnen_form(klient):
+    b = klient.post("/api/benutzer", json={"name": "Pronominale"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{
+            "lemma": "γράφω", "wortart": "verb",
+            "bedeutungen": [{"uebersetzungen": ["schreiben", "reden"]}],
+            "formen": [{"text": "γράφεις", "merkmale": {
+                "modus": "indikativ", "tempus": "praesens",
+                "person": "2", "numerus": "sg"}}]}]})
+    klient.post(f"/api/sammlungen/{s['id']}/freigabe", json={"lexem_ids": [1]})
+    aufgaben = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"],
+        "nur": "frei", "anzahl": 20}).json()
+    form = next(a for a in aufgaben if a["typ"] == "form_bilden")
+    assert form["pronomen"] == ["εσύ"]
+    assert form["pronomen_pflicht"] is False
+    antwort = klient.post("/api/lernen/pruefen", json={
+        "benutzer_id": b["id"], "aufgabe_id": form["aufgabe_id"],
+        "antwort": "εσύ γράφεις"}).json()
+    assert antwort["urteil"]["urteil"] == "richtig"
+
+
+def test_beim_imperativ_steht_kein_pronomen(klient):
+    """»du geh!« sagt niemand."""
+    import sys
+    sys.path.insert(0, "backend")
+    import sprachen
+    assert sprachen.personalpronomen("el", {
+        "modus": "imperativ", "person": "2", "numerus": "sg"}) == []
+    assert sprachen.personalpronomen("de", {
+        "person": "1", "numerus": "pl"}) == ["wir"]

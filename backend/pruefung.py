@@ -229,10 +229,35 @@ def _besser(neu: Urteil, alt: Urteil | None) -> bool:
     return alt.hinweis is None and neu.hinweis is not None
 
 
+def _vorsilbe_trennen(text: str, vorsilben: list[str]) -> str:
+    """Trennt ein führendes Wort ab, wenn es eine der erlaubten Vorsilben ist.
+
+    Gebraucht für Personalpronomen: wer bei γράφω »εγώ γράφω« schreibt,
+    hat nichts falsch gemacht — im Griechischen ist das Pronomen
+    freiwillig. Und wer es im Lehrbuch mit Pronomen gelernt hat, schreibt
+    es eben mit.
+    """
+    if not vorsilben:
+        return text
+    klein = text.casefold().lstrip()
+    for v in sorted((x.casefold() for x in vorsilben), key=len, reverse=True):
+        if v.endswith("'"):                        # j'ai
+            if klein.startswith(v):
+                rest = text.lstrip()[len(v):].strip()
+                if rest:
+                    return rest
+        elif klein.startswith(v + " "):
+            rest = text.lstrip()[len(v) + 1:].strip()
+            if rest:
+                return rest
+    return text
+
+
 def pruefen(eingabe: str, erwartet: list[str], profil: dict,
             verwechslungen: list[tuple[str, str]] | None = None,
             artikel_verlangt: str | None = None,
-            fehler_benennen: bool = True) -> Urteil:
+            fehler_benennen: bool = True,
+            vorsilben: list[str] | None = None) -> Urteil:
     """Prüft eine Eingabe gegen alle gültigen Antworten.
 
     erwartet          alle zulässigen Antworten; eine zu treffen genügt
@@ -271,6 +296,12 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
             urteil.fehlerart = art["art"]
             urteil.fehlertext = art["text"]
         return urteil
+
+    # Ein freiwilliges Pronomen vorne weg — auf beiden Seiten, damit es
+    # gleich ist, ob es in der Antwort oder in der hinterlegten Form steht.
+    if vorsilben:
+        eingabe = _vorsilbe_trennen(eingabe, vorsilben)
+        erwartet = [_vorsilbe_trennen(e, vorsilben) for e in erwartet]
 
     regeln = _regeln(profil)
     diakritika = regeln.get("diakritika", "hinweis")

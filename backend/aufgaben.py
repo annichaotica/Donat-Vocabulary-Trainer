@@ -431,6 +431,7 @@ def _reihe_zellen(db: sqlite3.Connection, a: dict, lexem: dict, code: str,
                              else sprachen.beschriften_form(
                                  code, lexem["wortart"], zelle, stil=stil)),
             "beispiel": mk.beispiel(zelle),
+            "pronomen": sprachen.personalpronomen(code, zelle),
             "erwartet": nach_zelle.get(schl, []),
         })
     return gruppe, zellen
@@ -497,6 +498,11 @@ def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
                 # besser als "Akkusativ", aber erst "ich sehe DEN Hund"
                 # macht es in einer Sekunde klar.
                 "frage_hilfe": mk.beispiel(fm),
+                # Wer gemeint ist, in der Sprache selbst. Im Griechischen
+                # in Klammern: dort sagt die Endung es schon, aber sehen
+                # will man es trotzdem.
+                "pronomen": sprachen.personalpronomen(code, fm),
+                "pronomen_pflicht": sprachen.pronomen_pflicht(code),
                 "antwort_sprache": code,
                 "vorlesen": lexem["lemma"]}
 
@@ -627,7 +633,8 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
         vw = [(t, b) for t, b in _verwechslungen(db, lexem, code, None)
               if t not in gueltig]
         urteil = text_pruefen(str(eingabe), gueltig, p_code, verwechslungen=vw,
-                              fehler_benennen=fehler_benennen)
+                              fehler_benennen=fehler_benennen,
+                              vorsilben=sprachen.personalpronomen(code, fm))
         return urteil, {"erwartet": gueltig,
                         "beschriftung": sprachen.beschriften_form(
                             code, lexem["wortart"], fm)}
@@ -642,7 +649,8 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
             # Verwechslung, sondern die Nachbarfelder — sie als solche zu
             # melden wäre irreführend.
             einzel = text_pruefen(text, z["erwartet"], p_code,
-                                  fehler_benennen=fehler_benennen)
+                                  fehler_benennen=fehler_benennen,
+                                  vorsilben=z.get("pronomen"))
             ergebnisse.append({
                 "zelle": z["zelle"], "beschriftung": z["beschriftung"],
                 "urteil": einzel.urteil, "erwartet": z["erwartet"],

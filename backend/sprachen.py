@@ -761,6 +761,64 @@ ERLAUBTE_SCHLUESSEL = {"name", "schrift", "stimme", "pruefung", "artikel",
                        "tastatur_empfohlen", "partikeln"}
 
 
+# Personalpronomen je Person und Zahl.
+#
+# Zwei verschiedene Lagen, und beide müssen bedient werden:
+#
+# Im Deutschen, Englischen und Französischen GEHÖRT das Pronomen zur Form
+# — "gehst" allein sagt man nicht. Wer konjugieren lernt, lernt "du gehst".
+#
+# Im Griechischen braucht es keines: die Endung sagt schon, wer gemeint
+# ist. Dort ist es trotzdem nützlich zu SEHEN, wer gemeint ist — und wer
+# es mitschreibt, hat nichts falsch gemacht.
+#
+# Darum überall: anzeigen, und beim Prüfen als freiwillig behandeln.
+PERSONALPRONOMEN: dict[str, dict[str, list[str]]] = {
+    "de": {"1sg": ["ich"], "2sg": ["du"], "3sg": ["er", "sie", "es"],
+           "1pl": ["wir"], "2pl": ["ihr"], "3pl": ["sie"]},
+    "en": {"1sg": ["I"], "2sg": ["you"], "3sg": ["he", "she", "it"],
+           "1pl": ["we"], "2pl": ["you"], "3pl": ["they"]},
+    "fr": {"1sg": ["je", "j'"], "2sg": ["tu"], "3sg": ["il", "elle", "on"],
+           "1pl": ["nous"], "2pl": ["vous"], "3pl": ["ils", "elles"]},
+    "es": {"1sg": ["yo"], "2sg": ["tú"], "3sg": ["él", "ella", "usted"],
+           "1pl": ["nosotros", "nosotras"],
+           "2pl": ["vosotros", "vosotras"],
+           "3pl": ["ellos", "ellas", "ustedes"]},
+    "el": {"1sg": ["εγώ"], "2sg": ["εσύ"], "3sg": ["αυτός", "αυτή", "αυτό"],
+           "1pl": ["εμείς"], "2pl": ["εσείς"],
+           "3pl": ["αυτοί", "αυτές", "αυτά"]},
+    "gmh": {"1sg": ["ich"], "2sg": ["dû"], "3sg": ["er", "siu", "ez"],
+            "1pl": ["wir"], "2pl": ["ir"], "3pl": ["sie"]},
+}
+
+# Wo das Pronomen zur Form gehört und wo es nur eine Lesehilfe ist.
+# Im Griechischen steht es in Klammern — es wird nicht verlangt.
+PRONOMEN_PFLICHT = {"de": True, "en": True, "fr": True, "es": False,
+                    "el": False, "gmh": False}
+
+
+def personalpronomen(code: str, merkmale: dict) -> list[str]:
+    """Die möglichen Pronomen zu dieser Person und Zahl, in dieser Sprache."""
+    person = merkmale.get("person")
+    if not person or merkmale.get("nonfinit"):
+        return []
+    # Beim Imperativ steht kein Pronomen: "geh!", nicht "du geh!".
+    if merkmale.get("modus") == "imperativ":
+        return []
+    schluessel = f"{person}{merkmale.get('numerus', 'sg')}"
+    eigene = profil(code).get("personalpronomen")
+    tabelle = eigene if eigene is not None else PERSONALPRONOMEN.get(code, {})
+    return list(tabelle.get(schluessel, []))
+
+
+def pronomen_pflicht(code: str) -> bool:
+    """Gehört das Pronomen zur Form, oder ist es nur eine Lesehilfe?"""
+    p = profil(code)
+    if "pronomen_pflicht" in p:
+        return bool(p["pronomen_pflicht"])
+    return PRONOMEN_PFLICHT.get(code, False)
+
+
 def partikeln(code: str) -> list[str]:
     """Vorangestellte Wörtchen, die nicht zum Stamm gehören."""
     return list(profil(code).get("partikeln", []))

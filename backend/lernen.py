@@ -132,6 +132,90 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
     }
 
 
+# Wie viele zuletzt gefragte Wörter gemieden werden, solange es Auswahl
+# gibt. Zwei reichen: so entsteht weder eine Wiederholung noch ein
+# Hin und Her zwischen genau zwei Wörtern.
+ZULETZT_MEIDEN = 2
+
+
+def _schon_gefragt_heute(db: sqlite3.Connection, benutzer_id: int) -> int:
+    """Wie viele Abfragen heute schon waren — als Zähler zum Abwechseln.
+
+    Aus dem Protokoll statt aus einem Sitzungszustand: der Server hält
+    keine Sitzung, und über Geräte hinweg soll es trotzdem stimmen.
+    """
+    return dbm.wert(db, """
+        SELECT COUNT(*) FROM wiederholung
+         WHERE benutzer_id = ? AND zeitpunkt >= ? AND zeitpunkt < ?""",
+        (benutzer_id, heute().isoformat(),
+         (heute() + dt.timedelta(days=1)).isoformat())) or 0
+
+
+def _zuletzt_gefragt(db: sqlite3.Connection, benutzer_id: int,
+                     anzahl: int = ZULETZT_MEIDEN) -> list[int]:
+    """Die zuletzt gefragten Wörter dieser Person.
+
+    Gebraucht, weil die Oberfläche je EINE Aufgabe holt und der Block bei
+    jedem Abruf neu gerechnet wird. Ohne dieses Gedächtnis stünde das
+    soeben falsch beantwortete Wort sofort wieder vorn — es ist ja das
+    dringendste —, und man bekäme dasselbe Wort ein Dutzend Mal
+    hintereinander. Genau so fühlte es sich auch an.
+    """
+    gesehen: list[int] = []
+    for z in dbm.zeilen(db, """
+            SELECT a.lexem_id FROM wiederholung w
+              JOIN aufgabe a ON a.id = w.aufgabe_id
+             WHERE w.benutzer_id = ?
+             ORDER BY w.zeitpunkt DESC, w.id DESC LIMIT 40""", (benutzer_id,)):
+        if z["lexem_id"] not in gesehen:
+            gesehen.append(z["lexem_id"])
+        if len(gesehen) >= anzahl:
+            break
+    return gesehen
+
+
+def _abstand_halten(reihe: list[dict], meiden: list[int],
+                    anzahl: int) -> list[dict]:
+    """Stellt die zuletzt gefragten Wörter hintan — aber nur, solange es
+    etwas anderes gibt. Bleibt am Ende nur noch ein Wort übrig, wird es
+    selbstverständlich gefragt."""
+    if not meiden:
+        return reihe
+    frisch = [r for r in reihe if r["lexem_id"] not in meiden]
+    spaeter = [r for r in reihe if r["lexem_id"] in meiden]
+    return (frisch + spaeter) if len(frisch) >= min(anzahl, 1) else reihe
+
+
+def _dringlichkeitsstufe(r: dict) -> tuple:
+    """Woran sich bemisst, ob zwei Aufgaben GLEICH dringend sind."""
+    zustand = r.get("zustand") or "neu"
+    rang = {"verlernt": 0, "lernen": 1, "reif": 1}.get(zustand, 3)
+    return (rang, r.get("faellig") or "")
+
+
+def _abwechseln(reihe: list[dict], saat: int) -> list[dict]:
+    """Unter GLEICH dringenden Aufgaben nicht immer dieselbe zuerst.
+
+    Die Oberfläche holt je eine Aufgabe und nimmt den Kopf der Liste.
+    Sind drei Wörter gleich dringend, stand damit immer dasselbe vorn und
+    es entstand ein starrer Dreierzyklus — γράφω, διαβάζω, παίζω, γράφω …
+    Das ist kaum besser als dasselbe Wort zweimal.
+
+    Gedreht wird nur innerhalb einer Stufe; die Rangfolge zwischen
+    verlernt, fällig und neu bleibt unangetastet.
+    """
+    if len(reihe) <= 1:
+        return reihe
+    stufe = _dringlichkeitsstufe(reihe[0])
+    gleich = [i for i, r in enumerate(reihe)
+              if _dringlichkeitsstufe(r) == stufe]
+    if len(gleich) <= 1:
+        return reihe
+    gewaehlt = gleich[saat % len(gleich)]
+    return [reihe[gewaehlt]] + [r for i, r in enumerate(reihe)
+                                if i != gewaehlt]
+
+
 def naechste(db: sqlite3.Connection, benutzer_id: int,
              sammlung_id: int | None = None,
              lektion_id: int | None = None,
@@ -158,7 +242,11 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         plan = lernziele.block(db, benutzer_id, lernziel_id, max(anzahl, 20))
         e = benutzer_einstellungen(db, benutzer_id)
         ergebnis = []
-        for eintrag in plan["aufgaben"][:anzahl]:
+        gewaehlt = _abwechseln(plan["aufgaben"],
+                               _schon_gefragt_heute(db, benutzer_id))
+        gewaehlt = _abstand_halten(gewaehlt,
+                                   _zuletzt_gefragt(db, benutzer_id), anzahl)
+        for eintrag in gewaehlt[:anzahl]:
             z = _zustand_sichern(db, eintrag["aufgabe_id"], benutzer_id)
             ergebnis.append({
                 **_aufgabe_ausbauen(db, {**dict(z),
@@ -288,6 +376,14 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                     dazu.add(r["lexem_id"])
             gefiltert.append(r)
         reihe = gefiltert
+
+    # Erst zum Schluss: die Auswahl steht, nur die Reihenfolge wird noch
+    # so gedreht, dass nicht dasselbe Wort zweimal hintereinander kommt
+    # und unter gleich Dringendem abgewechselt wird.
+    # Erst abwechseln, DANN Abstand halten: andersherum holte das
+    # Abwechseln die eben zurückgestellten Wörter wieder nach vorn.
+    reihe = _abwechseln(reihe, _schon_gefragt_heute(db, benutzer_id))
+    reihe = _abstand_halten(reihe, _zuletzt_gefragt(db, benutzer_id), anzahl)
 
     ergebnis = []
     for r in reihe[:anzahl]:

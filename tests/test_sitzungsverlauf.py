@@ -127,3 +127,106 @@ def test_bleibt_nur_ein_wort_uebrig_wird_es_trotzdem_gefragt(klient):
             "bewertung": 1})
     assert len(folge) == 5, "das einzige Wort muss weiter gefragt werden"
     assert set(folge) == {1}
+
+
+# ------------------------------------------------- Tagespensum und Ende
+
+def test_der_stand_sagt_wie_viel_heute_noch_kommt(klient):
+    """»Hat die irgendwann ein Ende?« — ohne diese Zahl weiß das niemand,
+    und der Balken war nach 25 Fragen voll, gleich ob noch dreißig oder
+    dreihundert kamen."""
+    b, s = _bestand(klient)
+    stand = klient.get("/api/lernen/stand", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"]}).json()
+    assert stand["heute_erledigt"] == 0
+    assert stand["heute_offen"] > 0
+    assert stand["heute_gesamt"] == stand["heute_offen"]
+    # Nicht der ganze Bestand: der Tagesvorrat an Wörtern begrenzt ihn.
+    assert stand["heute_offen"] <= stand["gesamt"]
+    assert stand["neue_woerter_frei"] > 0
+
+
+def test_das_pensum_waechst_mit_dem_erledigten_mit(klient):
+    b, s = _bestand(klient)
+    vorher = klient.get("/api/lernen/stand", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"]}).json()
+    _sitzung(klient, b, s, runden=5)
+    nachher = klient.get("/api/lernen/stand", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"]}).json()
+    assert nachher["heute_erledigt"] == 5
+    assert nachher["heute_erledigt"] + nachher["heute_offen"] \
+        == nachher["heute_gesamt"]
+    assert nachher["neue_woerter_frei"] < vorher["neue_woerter_frei"]
+
+
+def test_die_abfrage_endet_wenn_das_pensum_abgearbeitet_ist(klient):
+    """Sie läuft nicht endlos: ist alles Fällige getan und der Tagesvorrat
+    aufgebraucht, kommt nichts mehr."""
+    b = klient.post("/api/benutzer", json={"name": "Fleissige"}).json()
+    klient.patch(f"/api/benutzer/{b['id']}", json={"neu_je_sitzung": 1})
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": stamm + "ω", "wortart": "verb",
+                       "bedeutungen": [{"uebersetzungen": [b1, b2]}]}
+                      for stamm, b1, b2 in VERBEN[:3]]})
+    klient.post(f"/api/sammlungen/{s['id']}/freigabe",
+                json={"lexem_ids": [1, 2, 3]})
+    folge = []
+    for _ in range(30):
+        liste = klient.get("/api/lernen/naechste", params={
+            "benutzer_id": b["id"], "sammlung_id": s["id"], "anzahl": 1}).json()
+        if not liste:
+            break
+        folge.append(liste[0]["lexem_id"])
+        klient.post("/api/lernen/bewerten", json={
+            "benutzer_id": b["id"], "aufgabe_id": liste[0]["aufgabe_id"],
+            "bewertung": 3})
+    assert len(folge) < 30, "die Abfrage muss ein Ende haben"
+    assert len(set(folge)) == 1, "ein Wort am Tag heißt ein Wort"
+
+
+def test_neues_einstreuen_holt_neues_vor_das_faellige(klient):
+    """Der Schalter: mehr Abwechslung gegen etwas später wiederholte
+    Vokabeln. Das ist eine Entscheidung über das eigene Lernen, darum eine
+    Einstellung und keine Vorgabe.
+
+    Geprüft wird, was er wirklich tut: ausgeschaltet kommt erst alles
+    Fällige, eingeschaltet schiebt sich Neues dazwischen.
+    """
+    b, s = _bestand(klient)
+
+    # Einen echten Rückstand aufbauen: zehn VERSCHIEDENE Aufgaben einmal
+    # falsch. Danach liegt Fälliges vor allem Neuen.
+    offen = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"], "anzahl": 10}).json()
+    assert len(offen) >= 8
+    for a in offen:
+        klient.post("/api/lernen/bewerten", json={
+            "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+            "bewertung": 1})
+
+    def zustaende(runden=6):
+        """Eine Frage nach der anderen, wie es die Oberfläche tut — der
+        Schalter wirkt bei jeder dritten, nicht auf einen Schlag."""
+        gesehen = []
+        for _ in range(runden):
+            liste = klient.get("/api/lernen/naechste", params={
+                "benutzer_id": b["id"], "sammlung_id": s["id"],
+                "anzahl": 1}).json()
+            if not liste:
+                break
+            gesehen.append(liste[0]["lernstand"]["zustand"] or "neu")
+            klient.post("/api/lernen/bewerten", json={
+                "benutzer_id": b["id"], "aufgabe_id": liste[0]["aufgabe_id"],
+                "bewertung": 1})          # fällig halten, sonst leert sich der Berg
+        return gesehen
+
+    aus = zustaende()
+    assert "neu" not in aus, f"ohne Schalter kommt erst Fälliges: {aus}"
+
+    klient.patch(f"/api/benutzer/{b['id']}", json={"neues_einstreuen": True})
+    an = zustaende()
+    assert "neu" in an, f"mit Schalter muss Neues dazwischenkommen: {an}"
+    # Aber nicht überhandnehmen — das Fällige bleibt in der Mehrzahl.
+    assert an.count("neu") <= len(an) // 2, an

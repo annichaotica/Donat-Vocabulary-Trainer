@@ -53,6 +53,13 @@ export class Sitzung {
     try {
       this.lg = await api.legasthenieLesen(zustand.benutzerId);
     } catch { this.lg = {}; }
+    // Das Tagespensum einmal zu Beginn: daran misst der Balken, und
+    // daran sieht man, ob die Abfrage in zehn Fragen zu Ende ist oder
+    // in dreihundert.
+    try {
+      this.pensum = await api.stand(zustand.benutzerId,
+                                    this.optionen.sammlungId || null);
+    } catch { this.pensum = null; }
     await this.naechste();
   }
 
@@ -210,11 +217,20 @@ export class Sitzung {
 
   teilFortschritt() {
     const g = this.gezaehlt;
+    // Am Tagespensum messen, nicht an einer erfundenen Marke. Vorher war
+    // der Balken nach 25 Fragen voll, gleich ob noch dreißig oder
+    // dreihundert kamen — und man wusste nie, ob eine Abfrage endet.
+    const p = this.pensum;
+    const anteil = p && p.heute_gesamt
+      ? Math.round((p.heute_erledigt / p.heute_gesamt) * 100)
+      : Math.min(100, g.gesamt * 4);
+    const text = p && p.heute_gesamt
+      ? `${p.heute_erledigt} von ${p.heute_gesamt} heute`
+        + (g.gesamt ? ` · ${g.richtig} richtig` : '')
+      : (g.gesamt ? `${g.gesamt} bearbeitet · ${g.richtig} richtig` : 'Los geht’s');
     return h('div', {},
-      h('div', { class: 'fortschritt' },
-        h('i', { style: `width:${Math.min(100, g.gesamt * 4)}%` })),
-      h('p', { class: 'leise', style: 'margin:.3rem 0 0',
-               text: g.gesamt ? `${g.gesamt} bearbeitet · ${g.richtig} richtig` : 'Los geht’s' }));
+      h('div', { class: 'fortschritt' }, h('i', { style: `width:${anteil}%` })),
+      h('p', { class: 'leise', style: 'margin:.3rem 0 0', text }));
   }
 
   teilFrage() {
@@ -770,8 +786,23 @@ export class Sitzung {
         aufgedeckt: Boolean(this.aufgedeckt),
       });
       this.gezaehlt.gesamt += 1;
+      if (this.pensum) {
+        this.pensum.heute_erledigt += 1;
+        // Eine erledigte Aufgabe, die gleich wiederkommt, bleibt offen.
+        if (ergebnis.einschaetzung?.bewertung !== 1
+            && this.pensum.heute_offen > 0) {
+          this.pensum.heute_offen -= 1;
+          this.pensum.heute_gesamt = this.pensum.heute_erledigt
+                                   + this.pensum.heute_offen;
+        } else {
+          this.pensum.heute_gesamt += 1;
+        }
+      }
+      // Länger als die üblichen Meldungen: hier steht die Auskunft, die
+      // man wirklich lesen will — wie es gewertet wurde und wann es
+      // wiederkommt. 1,8 Sekunden waren zu kurz, um beides zu erfassen.
       meldung(`${ergebnis.einschaetzung ? ergebnis.einschaetzung.name : 'Gewertet'}`
-            + ` · wieder dran ${ergebnis.termin_text}.`, 1800);
+            + ` · wieder dran ${ergebnis.termin_text}.`, 3600);
     } catch (fehler) {
       meldung(fehler.message);
       this.phase = 'rueckmeldung';     // noch einmal versuchbar

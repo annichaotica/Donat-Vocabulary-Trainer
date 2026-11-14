@@ -74,6 +74,9 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
         "neu_je_sitzung": neu,
         "name": b["name"],
         "legasthenie": lg,
+        # Neues durchgehend untermischen statt erst nach allem Fälligen?
+        # Mehr Abwechslung, dafür rücken echte Wiederholungen nach hinten.
+        "neues_einstreuen": bool(e.get("neues_einstreuen", False)),
         # Wie Formen benannt werden: fach | einfach | beides
         "beschriftung": stil if stil in mk.STILE else "fach",
     }
@@ -121,14 +124,77 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
     werte = (benutzer_id, *sammlungen)
     zahl = lambda bedingung, zusatz=(): dbm.wert(
         db, f"SELECT COUNT(*) {grund} AND {bedingung}", (*werte, *zusatz)) or 0
+    e = benutzer_einstellungen(db, benutzer_id)
+    morgen = (heute() + dt.timedelta(days=1)).isoformat()
+    erledigt = dbm.wert(db, """
+        SELECT COUNT(*) FROM wiederholung
+         WHERE benutzer_id = ? AND zeitpunkt >= ? AND zeitpunkt < ?""",
+        (benutzer_id, heute_text, morgen)) or 0
+    # Wie viele WÖRTER heute schon angefangen wurden — der Tagesvorrat
+    # zählt Wörter, nicht Aufgaben.
+    begonnen = {z["lexem_id"] for z in dbm.zeilen(db, f"""
+        SELECT DISTINCT a.lexem_id FROM wiederholung w
+          JOIN aufgabe a ON a.id = w.aufgabe_id
+          JOIN lexem l ON l.id = a.lexem_id
+         WHERE w.benutzer_id = ? AND w.zeitpunkt >= ? AND w.zeitpunkt < ?
+           AND w.stabilitaet_vor IS NULL
+           AND l.sammlung_id IN ({platzhalter})""",
+        (benutzer_id, heute_text, morgen, *sammlungen))}
+    rest_woerter = max(0, e["neu_je_sitzung"] - len(begonnen))
+
+    faellig = zahl("z.zustand IN ('lernen','reif') AND z.faellig <= ?",
+                   (heute_text,))
+    verlernt = zahl("z.zustand = 'verlernt'")
+    # Was heute noch an NEUEM dazukommt: die Aufgaben der nächsten Wörter,
+    # so weit der Vorrat reicht. Ohne diese Zahl weiß niemand, ob die
+    # Abfrage in zehn Fragen zu Ende ist oder in dreihundert.
+    neu_offen = 0
+    if rest_woerter:
+        for z in dbm.zeilen(db, f"""
+                SELECT l.id, COUNT(*) AS aufgaben
+                  FROM lexem l JOIN aufgabe a ON a.lexem_id = l.id AND a.aktiv = 1
+                  LEFT JOIN lernzustand z
+                         ON z.aufgabe_id = a.id AND z.benutzer_id = ?
+                 WHERE l.sammlung_id IN ({platzhalter})
+                   AND (z.zustand IS NULL OR z.zustand = 'neu')
+                 GROUP BY l.id
+                 ORDER BY (SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id)
+                            IS NULL,
+                          (SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id),
+                          l.reihenfolge, l.id
+                 LIMIT ?""",
+                (benutzer_id, *sammlungen, rest_woerter + len(begonnen))):
+            if z["id"] in begonnen:
+                continue
+            neu_offen += z["aufgaben"]
+            rest_woerter -= 1
+            if rest_woerter <= 0:
+                break
+    # Angefangene Wörter bringen ihre übrigen Aufgaben heute noch mit.
+    if begonnen:
+        neu_offen += dbm.wert(db, f"""
+            SELECT COUNT(*) FROM aufgabe a
+              JOIN lexem l ON l.id = a.lexem_id
+              LEFT JOIN lernzustand z
+                     ON z.aufgabe_id = a.id AND z.benutzer_id = ?
+             WHERE a.aktiv = 1 AND l.id IN ({','.join('?' * len(begonnen))})
+               AND (z.zustand IS NULL OR z.zustand = 'neu')""",
+            (benutzer_id, *begonnen)) or 0
+
+    offen = faellig + verlernt + neu_offen
     return {
         "gesamt": dbm.wert(db, f"SELECT COUNT(*) {grund}", werte) or 0,
         "neu": zahl("(z.zustand IS NULL OR z.zustand = 'neu')"),
-        "faellig": zahl("z.zustand IN ('lernen','reif') AND z.faellig <= ?",
-                        (heute_text,)),
-        "verlernt": zahl("z.zustand = 'verlernt'"),
+        "faellig": faellig,
+        "verlernt": verlernt,
         "reif": zahl("z.zustand = 'reif'"),
         "ausgesetzt": zahl("z.zustand = 'ausgesetzt'"),
+        # Das Tagespensum: wie viel heute schon erledigt ist und wie viel
+        # noch kommt. Eine Abfrage endet, wenn beides aufgeht.
+        "heute_erledigt": erledigt,
+        "heute_offen": offen,
+        "heute_gesamt": erledigt + offen,
+        "neue_woerter_frei": max(0, e["neu_je_sitzung"] - len(begonnen)),
     }
 
 
@@ -184,6 +250,47 @@ def _abstand_halten(reihe: list[dict], meiden: list[int],
     frisch = [r for r in reihe if r["lexem_id"] not in meiden]
     spaeter = [r for r in reihe if r["lexem_id"] in meiden]
     return (frisch + spaeter) if len(frisch) >= min(anzahl, 1) else reihe
+
+
+# Jede wievielte Frage ein neues Wort sein darf, wenn eingestreut wird.
+# Drei zu eins: genug Abwechslung, ohne dass das Fällige liegenbleibt.
+EINSTREUEN_JEDE = 3
+
+
+def _ist_neu(r: dict) -> bool:
+    return (r.get("zustand") or "neu") == "neu"
+
+
+def _neues_einstreuen(reihe: list[dict], nachschub: list[dict],
+                      zaehler: int, meiden: list[int] | None = None
+                      ) -> list[dict]:
+    """Holt gelegentlich etwas Neues nach vorn, auch wenn noch Fälliges da ist.
+
+    Ohne das arbeitet man erst alles Fällige ab und sieht stundenlang
+    dieselben Wörter; mit ihm kommt zwischendurch etwas Neues. Der Preis
+    ist, dass echte Wiederholungen etwas nach hinten rücken — darum ist es
+    eine Einstellung und keine Vorgabe.
+
+    `nachschub` wird eigens geholt: bei großem Rückstand enthält das
+    normale Abfragefenster überhaupt nichts Neues, das sich vorziehen
+    ließe.
+    """
+    if zaehler % EINSTREUEN_JEDE != EINSTREUEN_JEDE - 1:
+        return reihe
+    schon = next((i for i, r in enumerate(reihe) if _ist_neu(r)), None)
+    if schon is not None:
+        return ([reihe[schon]] + [r for i, r in enumerate(reihe) if i != schon]
+                if schon else reihe)
+    if not nachschub:
+        return reihe
+    vorhanden = {r["aufgabe_id"] for r in reihe}
+    frei = [r for r in nachschub if r["aufgabe_id"] not in vorhanden]
+    # Am liebsten ein Wort, das gerade nicht dran war — sonst holt man
+    # sich die Einseitigkeit durch die Hintertür wieder herein.
+    neu = next((r for r in frei if r["lexem_id"] not in (meiden or [])),
+               next(iter(frei), None))
+    return [neu] + [r for r in reihe if r["aufgabe_id"] != neu["aufgabe_id"]] \
+        if neu else reihe
 
 
 def _dringlichkeitsstufe(r: dict) -> tuple:
@@ -284,6 +391,10 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     if typen:
         bedingungen.append(f"a.typ IN ({','.join('?' * len(typen))})")
         werte += list(typen)
+    # Der Ausschnitt OHNE die Bedingung zum Lernstand — gebraucht, um für
+    # das Einstreuen eigens Neues zu holen.
+    grundbedingungen = list(bedingungen)
+    grundwerte = list(werte[1:])
 
     # Die Sortierung ist die eigentliche Entscheidung. Sie steht hier
     # vollständig und ist in der Oberfläche als "Warum jetzt?" nachlesbar.
@@ -382,8 +493,40 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # und unter gleich Dringendem abgewechselt wird.
     # Erst abwechseln, DANN Abstand halten: andersherum holte das
     # Abwechseln die eben zurückgestellten Wörter wieder nach vorn.
-    reihe = _abwechseln(reihe, _schon_gefragt_heute(db, benutzer_id))
-    reihe = _abstand_halten(reihe, _zuletzt_gefragt(db, benutzer_id), anzahl)
+    zaehler = _schon_gefragt_heute(db, benutzer_id)
+    nachschub = None
+    if nur is None and e["neues_einstreuen"]:
+        # Eigene Abfrage nur für Neues — im normalen Fenster steht bei
+        # großem Rückstand keines.
+        nachschub = dbm.zeilen(db, f"""
+            SELECT * FROM (
+              SELECT a.id AS aufgabe_id, a.typ, l.id AS lexem_id, l.lemma,
+                     l.sammlung_id, z.zustand, z.stabilitaet, z.schwierigkeit,
+                     z.faellig, z.letzte_wiederholung, z.anzahl,
+                     z.anzahl_fehler, l.reihenfolge AS wort_folge,
+                     (SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id)
+                         AS lektion_nr,
+                     ROW_NUMBER() OVER (PARTITION BY l.id
+                                        ORDER BY a.typ, a.id) AS rang_im_wort
+                FROM aufgabe a
+                JOIN lexem l ON l.id = a.lexem_id
+                LEFT JOIN lernzustand z
+                       ON z.aufgabe_id = a.id AND z.benutzer_id = ?
+               WHERE {' AND '.join(grundbedingungen)}
+                 AND (z.zustand IS NULL OR z.zustand = 'neu')
+            )
+             ORDER BY rang_im_wort, {LERNREIHENFOLGE}
+             LIMIT 12""", (benutzer_id, *grundwerte))
+        nachschub = [r for r in nachschub
+                     if r["lexem_id"] in dazu or len(dazu) < rest_neu]
+    zuletzt = _zuletzt_gefragt(db, benutzer_id)
+    reihe = _abwechseln(reihe, zaehler)
+    reihe = _abstand_halten(reihe, zuletzt, anzahl)
+    # Zuletzt, nicht zuerst: sonst schiebt das Abstandhalten das eben
+    # vorgezogene Neue wieder nach hinten — bei wenigen Wörtern ist ja
+    # jedes "kürzlich dran gewesen".
+    if nachschub is not None:
+        reihe = _neues_einstreuen(reihe, nachschub, zaehler, zuletzt)
 
     ergebnis = []
     for r in reihe[:anzahl]:

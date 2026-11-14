@@ -398,6 +398,8 @@ def benutzer_aendern(benutzer_id: int, eingabe: BenutzerAendern,
         e["wunschretention"] = eingabe.wunschretention
     if eingabe.neu_je_sitzung is not None:
         e["neu_je_sitzung"] = eingabe.neu_je_sitzung
+    if eingabe.neues_einstreuen is not None:
+        e["neues_einstreuen"] = eingabe.neues_einstreuen
     if eingabe.beschriftung is not None:
         e["beschriftung"] = eingabe.beschriftung
     db.execute("UPDATE benutzer SET einstellungen = ? WHERE id = ?",

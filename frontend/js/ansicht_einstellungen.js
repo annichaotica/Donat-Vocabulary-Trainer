@@ -178,6 +178,20 @@ async function teilLernen(behaelter) {
   kasten.append(h('div', { class: 'regler' },
     h('label', { text: 'Neue Aufgaben je Tag' }), h('span', {}), neu, h('span', {})));
 
+  const einstreuen = h('input', {
+    type: 'checkbox', checked: Boolean(e.neues_einstreuen),
+  });
+  kasten.append(h('label', { class: 'schalter' }, einstreuen,
+    h('span', { class: 'schalter-text' },
+      h('b', { text: 'Neues durchgehend untermischen' }),
+      h('span', { text: 'Normalerweise kommt erst alles Fällige dran und '
+                      + 'danach Neues. Das ist für das Behalten das Beste, '
+                      + 'macht eine lange Sitzung aber einseitig: man sieht '
+                      + 'stundenlang dieselben Wörter.' }),
+      h('span', { class: 'beispielzeile',
+                  text: 'Eingeschaltet ist jede dritte Frage etwas Neues — '
+                      + 'dafür rücken echte Wiederholungen etwas nach hinten.' }))));
+
   // Wie eine Form benannt wird. "Genitiv Singular" ist richtig und für
   // viele eine Mauer; wer daran scheitert, scheitert nicht an der Vokabel.
   const stil = h('select', {},
@@ -198,7 +212,8 @@ async function teilLernen(behaelter) {
   // eingefroren, auch nach Abschalten des Modus. Darum wird nur gesendet,
   // was wirklich bewegt wurde.
   const ausgangswerte = { retention: e.wunschretention, neu: e.neu_je_sitzung,
-                          stil: e.beschriftung || 'fach' };
+                          stil: e.beschriftung || 'fach',
+                          einstreuen: Boolean(e.neues_einstreuen) };
   if (e.legasthenie?.aktiv) {
     kasten.append(h('p', { class: 'leise',
       text: 'Diese Werte leitet der Legastheniemodus gerade ab. Wer sie hier '
@@ -217,6 +232,9 @@ async function teilLernen(behaelter) {
       }
       if (stil.value !== ausgangswerte.stil) {
         aenderungen.beschriftung = stil.value;
+      }
+      if (einstreuen.checked !== ausgangswerte.einstreuen) {
+        aenderungen.neues_einstreuen = einstreuen.checked;
       }
       if (!Object.keys(aenderungen).length) {
         meldung('Nichts geändert.');

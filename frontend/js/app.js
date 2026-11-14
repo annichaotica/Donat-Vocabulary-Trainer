@@ -132,6 +132,16 @@ async function identitaetKlaeren() {
   return identitaet;
 }
 
+/** Welche Sprache lernt die gewählte Sammlung gerade? */
+async function spracheDerSammlung() {
+  if (!zustand.sammlungId || !zustand.benutzerId) return null;
+  try {
+    const alle = await api.sammlungen(zustand.benutzerId);
+    return (alle.find((s) => s.id === zustand.sammlungId) || {}).sprache || null;
+  } catch { return null; }
+}
+
+
 async function wegweisen() {
   if (laufendeSitzung) { laufendeSitzung.beenden(); laufendeSitzung = null; }
   const inhalt = frischerInhalt();
@@ -197,7 +207,9 @@ async function wegweisen() {
       case 'einstellungen':
         return await einstellungen.zeichnen(inhalt);
       case 'tastatur':
-        return tastatur.zeichnen(inhalt);
+        // #/tastatur/el zeigt gleich die richtige Belegung; ohne Angabe
+        // die der laufenden Sammlung.
+        return tastatur.zeichnen(inhalt, teile[1] || await spracheDerSammlung());
       default:
         leeren(inhalt).append(h('div', { class: 'leer' },
           h('p', { text: 'Diese Seite gibt es nicht.' }),

@@ -222,3 +222,76 @@ input[type="file"] { max-width: 100%; }
 .uebungstext .ziel { font-weight: 600; overflow-wrap: anywhere; }
 .uebungstext .grund { color: var(--leise); overflow-wrap: anywhere; }
 .uebungstext .leise { margin-top: .25rem; }
+
+
+/* ---------------------------------------------------- Tastaturbelegung
+   Eine Abbildung der Tasten. Sie muss auf dem Telefon mitschrumpfen, aber
+   lesbar bleiben — darum Breite über clamp und nicht über feste Pixel. */
+
+.tastaturbild {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  margin: .8rem 0;
+  overflow-x: auto;
+  padding-bottom: .3rem;
+}
+.tastenreihe { display: flex; gap: .3rem; }
+.taste {
+  flex: none;
+  width: clamp(2.1rem, 6.2vw, 3rem);
+  height: clamp(2.6rem, 7.4vw, 3.4rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--rand);
+  border-radius: .35rem;
+  background: var(--grund-2);
+  line-height: 1.1;
+}
+.taste-zeichen { font-size: clamp(1rem, 3.2vw, 1.25rem); font-weight: 600; }
+.taste-aufdruck {
+  font-size: clamp(.58rem, 1.9vw, .7rem);
+  color: var(--leise);
+  letter-spacing: 0;
+}
+.taste.leer .taste-zeichen { color: var(--leise); font-weight: 400; }
+.taste.tot {
+  border-style: dashed;
+  border-color: var(--fast);
+  background: var(--fast-grund);
+}
+.taste.gesucht {
+  background: var(--richtig-grund);
+  border-color: var(--richtig);
+  box-shadow: 0 0 0 2px var(--richtig);
+}
+.taste.gedrueckt {
+  background: var(--akzent);
+  color: var(--grund);
+  transform: translateY(1px);
+}
+.taste.gedrueckt .taste-aufdruck { color: inherit; opacity: .8; }
+/* Auf dem Telefon lieber kleinere Tasten als eine Reihe, die seitlich
+   weggerollt werden muss: bei einer Nachschlagetafel will man die ganze
+   Tastatur auf einmal sehen. Zwölf Tasten je Reihe, darauf rechnet die
+   Breite. */
+@media (max-width: 44rem) {
+  .tastenreihe { gap: .2rem; }
+  .taste {
+    width: min(2.4rem, calc((100vw - 6.4rem) / 12));
+    height: clamp(2.3rem, 9vw, 3rem);
+  }
+  .taste-zeichen { font-size: clamp(.85rem, 3.8vw, 1.15rem); }
+  .taste-aufdruck { font-size: clamp(.5rem, 2.2vw, .65rem); }
+}
+
+.belegungshinweis {
+  margin: .45rem 0;
+  padding-left: .7rem;
+  border-left: 2px solid var(--rand);
+  font-size: .92em;
+}

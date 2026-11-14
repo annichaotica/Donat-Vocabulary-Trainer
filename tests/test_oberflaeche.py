@@ -256,3 +256,24 @@ def test_der_import_laeuft_immer_zuerst_als_probelauf():
     # Große Dateien gestückelt: ein einziger Aufruf mit zehntausend Formen
     # läuft in die Zeitgrenze.
     assert "PAECKCHEN" in quelle
+
+
+def test_die_tastaturbelegung_ist_auffindbar():
+    """Eine Nachschlagetafel nützt nur, wenn man sie findet, ohne die
+    Adresse zu kennen."""
+    quelle = (WURZEL / "frontend" / "js").glob("*.js")
+    verweise = [d.name for d in quelle if "#/tastatur" in d.read_text()]
+    assert "ansicht_einstellungen.js" in verweise
+    assert "tastatur.js" in verweise
+
+
+def test_die_belegung_lernt_nur_zeichen_der_richtigen_schrift():
+    """Ohne diese Prüfung schriebe ein Tippversuch mit deutscher Tastatur
+    lauter lateinische Buchstaben in die Abbildung — und die wäre hinterher
+    falsch statt hilfreich."""
+    quelle = (WURZEL / "frontend" / "js" / "tastatur.js").read_text()
+    assert "schrift:" in quelle
+    assert "b.schrift.test(zeichen)" in quelle
+    # Und die deutsche Beschriftung, nicht die amerikanische: auf einer
+    # deutschen Tastatur sind Y und Z vertauscht.
+    assert "['KeyY', 'Z']" in quelle and "['KeyZ', 'Y']" in quelle

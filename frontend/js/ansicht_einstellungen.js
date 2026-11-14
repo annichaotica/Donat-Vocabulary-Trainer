@@ -26,7 +26,14 @@ export async function zeichnen(behaelter) {
       h('li', {}, h('kbd', { text: '1' }), '–', h('kbd', { text: '4' }), ' bewerten'),
       h('li', {}, h('kbd', { text: 'Enter' }), ' prüfen, dann vorgeschlagene Bewertung'),
       h('li', {}, h('kbd', { text: 'l' }), ' lernen, ',
-        h('kbd', { text: 'w' }), ' Wortschatz, ', h('kbd', { text: 'u' }), ' Übersicht'))));
+        h('kbd', { text: 'w' }), ' Wortschatz, ', h('kbd', { text: 'u' }), ' Übersicht')),
+    // Der Weg zur Belegung gehört hierher und nicht nur in den Hinweis
+    // unter dem Antwortfeld: dort steht er erst, wenn man schon mitten
+    // in der Abfrage sitzt und sucht.
+    h('p', { style: 'margin-bottom:0' },
+      h('button', {
+        onclick: () => { location.hash = '#/tastatur'; },
+      }, 'Fremde Schrift: wo liegt welcher Buchstabe?'))));
 }
 
 /* ------------------------------------------------- Sammlung: was abfragen */

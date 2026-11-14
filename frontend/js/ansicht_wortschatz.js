@@ -80,10 +80,52 @@ export async function zeichnen(behaelter) {
 
 /* ------------------------------------------------------- Einzelansicht */
 
+/** Die Wörter, die noch auf Freigabe warten — die Reihe, die man durchgeht.
+ *
+ *  Ohne sie heißt Prüfen: Wort anklicken, bestätigen, zurück zur Liste,
+ *  scrollen, nächstes anklicken. Das nervt beim dritten Wort.
+ */
+/** Der zuletzt angemeldete Tastaturbehandler der Einzelansicht.
+ *
+ *  Sie zeichnet sich auch ohne Seitenwechsel neu — etwa nachdem eine
+ *  einzelne Form bestätigt wurde. Dann bleibt der Inhaltsbereich
+ *  derselbe, und ohne dieses Abmelden hinge ein zweiter Behandler daran:
+ *  Enter löste doppelt aus.
+ */
+let tastenbehandler = null;
+
+
+async function warteschlange(sammlungId) {
+  try {
+    const offen = await api.lexeme(sammlungId,
+                                   { nur_ungepruefte: true, anzahl: 500 });
+    return offen.lexeme.map((l) => l.id);
+  } catch { return []; }
+}
+
+
 export async function zeichnenEinzeln(behaelter, lexemId) {
   const lexem = await api.lexem(lexemId);
   const sprache = await stammdaten.sprache(lexem.sprache);
   const el = leeren(behaelter);
+  if (tastenbehandler) {
+    document.removeEventListener('keydown', tastenbehandler);
+    tastenbehandler = null;
+  }
+  const reihe = await warteschlange(lexem.sammlung_id);
+  const stelle = reihe.indexOf(lexem.id);
+  const naechstes = () => {
+    // Nach dem Bestätigen ist dieses Wort aus der Reihe heraus — das
+    // nächste rückt auf dieselbe Stelle. Darum nicht stelle+1.
+    const rest = reihe.filter((id) => id !== lexem.id);
+    if (!rest.length) return null;
+    return rest[Math.min(Math.max(stelle, 0), rest.length - 1)];
+  };
+  const weiterZu = (id) => {
+    if (id) location.hash = `#/wort/${id}`;
+    else { meldung('Alle Wörter dieser Sammlung sind freigegeben.');
+           location.hash = '#/wortschatz'; }
+  };
 
   el.append(h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap' },
     h('div', {},
@@ -95,6 +137,22 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
     sprache.stimme
       ? h('button', { onclick: () => sprechen(lexem.lemma, sprache.stimme) }, '🔊 Hören')
       : null));
+
+  // Wo man in der Durchsicht steht, und wie man weiterkommt.
+  if (stelle >= 0 && reihe.length > 1) {
+    el.append(h('div', { class: 'durchsicht' },
+      h('span', { class: 'leise',
+                  text: `${stelle + 1} von ${reihe.length} noch ungeprüft` }),
+      h('div', { class: 'durchsicht-knoepfe' },
+        h('button', {
+          disabled: stelle === 0,
+          onclick: () => weiterZu(reihe[stelle - 1]),
+        }, '‹ Vorheriges'),
+        h('button', {
+          disabled: stelle >= reihe.length - 1,
+          onclick: () => weiterZu(reihe[stelle + 1]),
+        }, 'Nächstes ›'))));
+  }
 
   // Bedeutungen
   el.append(h('h2', { text: 'Bedeutungen' }));
@@ -164,13 +222,15 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
                  text: `${ungeprueft.length} Formen sind noch ungeprüft und werden `
                      + 'darum nicht abgefragt. Eine erfundene Form, die unbemerkt '
                      + 'gepaukt wird, ist schlimmer als eine fehlende.' }),
-        h('button', {
-          onclick: async () => {
-            for (const f of ungeprueft) await api.formBestaetigen(f.id);
-            meldung(`${ungeprueft.length} Formen bestätigt.`);
-            zeichnenEinzeln(behaelter, lexemId);
-          },
-        }, 'Alle bestätigen')));
+        h('div', { class: 'freigabe-knoepfe' },
+          h('button', {
+            class: 'wichtig',
+            onclick: () => bestaetigenUndWeiter(ungeprueft),
+          }, reihe.length > 1 ? 'Bestätigen und weiter' : 'Alle bestätigen'),
+          reihe.length > 1
+            ? h('button', { onclick: () => weiterZu(naechstes()) },
+                'Später — nächstes Wort')
+            : null)));
     }
   }
   el.append(await teilNeueForm(behaelter, lexem));
@@ -186,6 +246,12 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
       class: a.aktiv ? null : 'leise',
     }, `${a.typ}${a.aktiv ? '' : ' — abgeschaltet'}`)))));
 
+  if (stelle >= 0 && reihe.length > 1) {
+    el.append(h('p', { class: 'leise', style: 'margin-top:1rem' },
+      h('kbd', { text: 'Enter' }), ' bestätigt und geht weiter, ',
+      h('kbd', { text: '→' }), ' und ', h('kbd', { text: '←' }), ' blättern.'));
+  }
+
   el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:1.5rem' },
     h('button', { onclick: () => { location.hash = '#/wortschatz'; } }, 'Zurück zur Liste'),
     h('button', {
@@ -197,6 +263,39 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
         location.hash = '#/wortschatz';
       },
     }, 'Wort löschen')));
+
+  async function bestaetigenUndWeiter(ungeprueft) {
+    const ziel = naechstes();
+    for (const f of ungeprueft) await api.formBestaetigen(f.id);
+    meldung(`${lexem.lemma}: ${ungeprueft.length} Formen bestätigt.`);
+    if (reihe.length > 1) weiterZu(ziel);
+    else zeichnenEinzeln(behaelter, lexemId);
+  }
+
+  // Tastatur. Beim Durchsehen von dreißig Wörtern zählt jeder Griff zur
+  // Maus — und genau dafür ist diese Ansicht jetzt da.
+  const aufTaste = (e) => {
+    if (!el.isConnected) {
+      document.removeEventListener('keydown', aufTaste);
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(
+        document.activeElement?.tagName)) return;
+    if (e.key === 'Enter') {
+      const offen = lexem.formen.filter((f) => !f.geprueft);
+      e.preventDefault();
+      if (offen.length) bestaetigenUndWeiter(offen);
+      else weiterZu(naechstes());
+    } else if (e.key === 'ArrowRight' && stelle >= 0
+               && stelle < reihe.length - 1) {
+      e.preventDefault(); weiterZu(reihe[stelle + 1]);
+    } else if (e.key === 'ArrowLeft' && stelle > 0) {
+      e.preventDefault(); weiterZu(reihe[stelle - 1]);
+    }
+  };
+  tastenbehandler = aufTaste;
+  document.addEventListener('keydown', aufTaste);
 }
 
 function teilNeueBedeutung(behaelter, lexem) {

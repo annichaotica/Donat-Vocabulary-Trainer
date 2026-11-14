@@ -318,3 +318,18 @@ def test_die_freigabe_laesst_sich_ohne_maus_durchgehen():
     # sonst reagiert er noch in der Abfrage auf Enter.
     assert "el.isConnected" in quelle
     assert "removeEventListener('keydown', aufTaste)" in quelle
+
+
+def test_die_wortdurchsicht_hat_ein_weiter():
+    """Der eigentliche Weg beim Prüfen gepflegter Wörter: Wort ansehen,
+    bestätigen, nächstes. Ohne »weiter« heißt das jedes Mal zurück zur
+    Liste und scrollen."""
+    quelle = (WURZEL / "frontend" / "js" / "ansicht_wortschatz.js").read_text()
+    assert "async function warteschlange" in quelle
+    assert "nur_ungepruefte: true" in quelle
+    assert "bestaetigenUndWeiter" in quelle
+    assert "ArrowRight" in quelle and "ArrowLeft" in quelle
+    # Die Ansicht zeichnet sich auch ohne Seitenwechsel neu — dann darf
+    # kein zweiter Behandler hängenbleiben, sonst löst Enter doppelt aus.
+    assert "let tastenbehandler = null;" in quelle
+    assert "removeEventListener('keydown', tastenbehandler)" in quelle

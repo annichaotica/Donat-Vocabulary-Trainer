@@ -130,3 +130,66 @@ def test_oberflaechendateien_werden_gegengeprueft():
             assert antwort.headers.get("cache-control") == "no-cache", pfad
         # Die Schnittstelle ist davon nicht betroffen
         assert k.get("/api/zustand").headers.get("cache-control") is None
+
+
+def test_wanderung_aus_einer_alten_datenbank():
+    """Der Fall, der wirklich auftrat: alle Tests starten mit einer frischen
+    Datenbank, deshalb fiel nie auf, dass ein Index im Schemaskript auf eine
+    Spalte zeigte, die erst die Wanderung anlegt. In einer bestehenden
+    Datenbank ist CREATE TABLE IF NOT EXISTS wirkungslos — der Index lief
+    ins Leere und der Dienst startete nicht mehr.
+    """
+    import sqlite3
+    import sys
+    import tempfile
+    sys.path.insert(0, str(WURZEL / "backend"))
+    import datenbank as dbm
+
+    pfad = pathlib.Path(tempfile.mkdtemp()) / "alt.db"
+    alt = sqlite3.connect(pfad)
+    # Eine Datenbank, wie sie vor den Erweiterungen aussah
+    alt.executescript("""
+        CREATE TABLE schema_stand (version INTEGER NOT NULL);
+        INSERT INTO schema_stand VALUES (1);
+        CREATE TABLE sprache (code TEXT PRIMARY KEY, name TEXT NOT NULL,
+            schrift TEXT NOT NULL DEFAULT 'latein', stimme TEXT,
+            profil TEXT NOT NULL DEFAULT '{}');
+        CREATE TABLE benutzer (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+            farbe TEXT NOT NULL DEFAULT '#6b7fd7',
+            einstellungen TEXT NOT NULL DEFAULT '{}',
+            angelegt TEXT NOT NULL DEFAULT (datetime('now')));
+        CREATE TABLE sammlung (id INTEGER PRIMARY KEY, besitzer_id INTEGER NOT NULL,
+            name TEXT NOT NULL, sprache TEXT NOT NULL,
+            grundsprache TEXT NOT NULL DEFAULT 'de', beschreibung TEXT,
+            angelegt TEXT NOT NULL DEFAULT (datetime('now')));
+        CREATE TABLE lektion (id INTEGER PRIMARY KEY, sammlung_id INTEGER NOT NULL,
+            name TEXT NOT NULL, reihenfolge INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE lexem (id INTEGER PRIMARY KEY, sammlung_id INTEGER NOT NULL,
+            lektion_id INTEGER, lemma TEXT NOT NULL, wortart TEXT NOT NULL,
+            merkmale TEXT NOT NULL DEFAULT '{}', notiz TEXT,
+            angelegt TEXT NOT NULL DEFAULT (datetime('now')),
+            geaendert TEXT NOT NULL DEFAULT (datetime('now')));
+        INSERT INTO benutzer (name) VALUES ('Alt');
+        INSERT INTO sammlung (besitzer_id, name, sprache) VALUES (1, 'Alt', 'el');
+        INSERT INTO lektion (sammlung_id, name) VALUES (1, 'Erste');
+        INSERT INTO lexem (sammlung_id, lemma, wortart) VALUES (1, 'παλιό', 'adjektiv');
+    """)
+    alt.commit()
+    alt.close()
+
+    db = dbm.verbindung(pfad)
+    dbm.einrichten(db)                        # darf nicht werfen
+    assert dbm.wert(db, "SELECT version FROM schema_stand") == dbm.SCHEMA_VERSION
+    # Die Daten sind noch da
+    assert dbm.wert(db, "SELECT lemma FROM lexem") == "παλιό"
+    assert dbm.wert(db, "SELECT name FROM benutzer") == "Alt"
+    # Und die nachgerüsteten Spalten samt Index sind vorhanden
+    assert {"nr", "beschreibung"} <= dbm.spalten(db, "lektion")
+    assert {"reihenfolge", "kennung"} <= dbm.spalten(db, "lexem")
+    indizes = {z[0] for z in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='index'")}
+    assert "idx_lektion_nr" in indizes
+    assert "idx_lexem_kennung" in indizes
+    # Zweimal einrichten muss ebenfalls gehen
+    dbm.einrichten(db)
+    db.close()

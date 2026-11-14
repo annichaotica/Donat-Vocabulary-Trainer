@@ -43,8 +43,10 @@ def einrichten(db: sqlite3.Connection) -> None:
     stand = db.execute("SELECT version FROM schema_stand").fetchone()
     if stand is None:
         db.execute("INSERT INTO schema_stand (version) VALUES (?)", (SCHEMA_VERSION,))
-    else:
-        wandern(db, stand["version"])
+    # Die Wanderung läuft IMMER, nicht nur bei abweichendem Stand. Sie legt
+    # auch die Indizes an, die auf nachgerüsteten Spalten liegen — die
+    # dürfen nicht im Schemaskript stehen, weil sie dort zu früh kämen.
+    wandern(db, stand["version"] if stand else SCHEMA_VERSION)
     sprachen_pflegen(db)
     sprachprofile_laden(db)
 

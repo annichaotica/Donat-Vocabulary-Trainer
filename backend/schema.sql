@@ -92,8 +92,9 @@ CREATE TABLE IF NOT EXISTS lektion (
     beschreibung TEXT,
     reihenfolge  INTEGER NOT NULL DEFAULT 0
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_lektion_nr
-    ON lektion(sammlung_id, nr) WHERE nr IS NOT NULL;
+-- Der Index auf nr steht in datenbank.py bei der Wanderung, nicht hier:
+-- in einer bestehenden Datenbank ist CREATE TABLE IF NOT EXISTS wirkungslos,
+-- die Spalte kommt erst durch ALTER TABLE — ein Index hier liefe zu früh.
 CREATE INDEX IF NOT EXISTS idx_lektion_sammlung ON lektion(sammlung_id);
 
 -- ------------------------------------------------------------------ Lexeme
@@ -122,9 +123,7 @@ CREATE TABLE IF NOT EXISTS lexem (
 CREATE INDEX IF NOT EXISTS idx_lexem_sammlung ON lexem(sammlung_id);
 CREATE INDEX IF NOT EXISTS idx_lexem_lektion  ON lexem(lektion_id);
 CREATE INDEX IF NOT EXISTS idx_lexem_lemma    ON lexem(sammlung_id, lemma);
-CREATE INDEX IF NOT EXISTS idx_lexem_folge    ON lexem(sammlung_id, lektion_id, reihenfolge);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_lexem_kennung
-    ON lexem(sammlung_id, kennung) WHERE kennung IS NOT NULL;
+-- idx_lexem_folge und idx_lexem_kennung ebenfalls in der Wanderung.
 
 -- Eine Wortform mit ihrem Merkmalsbündel.
 -- quelle/geprueft: generierte oder von der KI ergänzte Formen werden erst

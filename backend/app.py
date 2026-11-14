@@ -559,7 +559,15 @@ def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
                -- soll nicht je Sammlung einen Rundlauf brauchen, nur um
                -- den Freigabeknopf zeigen zu können.
                (SELECT COUNT(*) FROM form f JOIN lexem l ON l.id = f.lexem_id
-                 WHERE l.sammlung_id = s.id AND f.geprueft = 0) AS offene_formen
+                 WHERE l.sammlung_id = s.id AND f.geprueft = 0) AS offene_formen,
+               -- Übungen und Regeln zählen hier mit, sonst bleibt der
+               -- Freigabeknopf unsichtbar, solange nur sie warten. Genau
+               -- das ist beim ersten Eintragen einer Regel passiert: sie
+               -- lag in der Freigabe, aber kein Weg führte hin.
+               (SELECT COUNT(*) FROM text t
+                 WHERE t.sammlung_id = s.id AND t.geprueft = 0) AS offene_uebungen,
+               (SELECT COUNT(*) FROM regel r
+                 WHERE r.sammlung_id = s.id AND r.geprueft = 0) AS offene_regeln
           FROM sammlung s
          WHERE s.besitzer_id = ?
             OR s.id IN (SELECT sammlung_id FROM freigabe WHERE benutzer_id = ?)

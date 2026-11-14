@@ -208,3 +208,26 @@ def test_eine_regel_laesst_sich_loeschen(bestand, klient):
     r = _regel(klient, s)
     assert klient.delete(f"/api/regeln/{r['id']}").status_code == 204
     assert klient.get(f"/api/regeln/{r['id']}").status_code == 404
+
+
+def test_eine_wartende_regel_macht_den_freigabeweg_sichtbar(bestand, klient):
+    """Der Knopf zur Freigabe hing nur an den offenen FORMEN.
+
+    Beim ersten Eintragen einer Regel fiel es auf: sie lag in der
+    Freigabe, aber in der Übersicht führte kein Weg dorthin, weil alle
+    Formen längst freigegeben waren. Eine Freigabe, die man nicht
+    erreicht, ist keine.
+    """
+    b, s = bestand
+    klient.post(f"/api/sammlungen/{s['id']}/freigabe", json={"lektion_nr": 1})
+    liste = klient.get("/api/sammlungen",
+                       params={"benutzer_id": b["id"]}).json()
+    eintrag = next(x for x in liste if x["id"] == s["id"])
+    assert eintrag["offene_formen"] == 0, "Vorbedingung: alles freigegeben"
+    assert eintrag["offene_regeln"] == 0
+
+    _regel(klient, s)
+    liste = klient.get("/api/sammlungen",
+                       params={"benutzer_id": b["id"]}).json()
+    eintrag = next(x for x in liste if x["id"] == s["id"])
+    assert eintrag["offene_regeln"] == 1

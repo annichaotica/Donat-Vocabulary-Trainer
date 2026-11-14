@@ -51,6 +51,22 @@ export async function zeichnenProfile(behaelter, zurueckNach = null) {
       }, 'Anlegen'))));
 }
 
+/* Was in dieser Sammlung auf Freigabe wartet, als lesbare Teile.
+ *
+ * Alle drei Arten zählen: Formen, Übungen und Grammatikregeln. Hinge
+ * der Knopf nur an den Formen, bliebe er unsichtbar, sobald allein eine
+ * Regel wartet — und die läge dann unerreichbar in der Freigabe.
+ */
+function wartendes(s) {
+  const teile = [];
+  if (s.offene_formen) teile.push(`${s.offene_formen} Formen`);
+  if (s.offene_uebungen) teile.push(`${s.offene_uebungen} Übungen`);
+  if (s.offene_regeln) {
+    teile.push(`${s.offene_regeln} ${s.offene_regeln === 1 ? 'Regel' : 'Regeln'}`);
+  }
+  return teile;
+}
+
 export async function zeichnen(behaelter) {
   const el = leeren(behaelter);
   const [sammlungen, sprachen] = await Promise.all([
@@ -129,10 +145,14 @@ export async function zeichnen(behaelter) {
       // Ungeprüfte Formen werden nicht abgefragt. Wer das nicht weiß, sucht
       // vergeblich nach den Wörtern, die die KI gerade eingetragen hat —
       // darum steht es hier und nicht in einem Untermenü.
-      s.offene_formen
+      // Was auf Freigabe wartet, in einer Zeile. Ungeprüftes wird nicht
+      // abgefragt und nicht gezeigt — wer das nicht weiß, sucht
+      // vergeblich nach dem, was die KI gerade eingetragen hat. Darum
+      // steht es hier und nicht in einem Untermenü.
+      wartendes(s).length
         ? h('p', { class: 'leise', style: 'margin:.3rem 0 0' },
             h('span', { class: 'marke warnung',
-              text: `${s.offene_formen} Formen warten auf Freigabe` }))
+              text: wartendes(s).join(', ') + ' warten auf Freigabe' }))
         : null,
       h('div', { class: 'zahlen' },
         zahlKasten(stand.faellig, 'fällig', 'faellig'),
@@ -152,7 +172,7 @@ export async function zeichnen(behaelter) {
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/import'; },
         }, 'Einlesen'),
-        s.offene_formen
+        wartendes(s).length
           ? h('button', {
               onclick: () => {
                 merken({ sammlungId: s.id });

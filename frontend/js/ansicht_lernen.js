@@ -145,13 +145,28 @@ export class Sitzung {
     // stünde morgen wieder dieselbe Zahl da und niemand wüsste, warum.
     const rueckstand = (!this.ohneGrenze && p.tagesdosis)
       ? (p.rueckstand || 0) : 0;
+    // Auch wenn nichts im Rückstand ist: wer gerade erst angefangen hat
+    // und auf die Tagesgrenze läuft, braucht den Weg vorbei.
     const geschafft = Boolean(p.tagesdosis)
       && p.heute_erledigt >= p.tagesdosis;
+    // Der Fall, der ratlos macht: Pensum voll, aber in DIESER Sitzung
+    // war noch nichts. Dann ist »Tagespensum geschafft« zwar wahr,
+    // beantwortet aber die falsche Frage — man hat ja gerade erst
+    // angefangen. Und »welches Tagespensum« ist berechtigt: die Dosis
+    // zählt über alle Sammlungen zusammen, nicht je Lernziel.
+    const fremdVoll = geschafft && !gesamt;
     leeren(this.behaelter).append(
       h('div', { class: 'karte' },
-        h('h1', { text: geschafft ? 'Tagespensum geschafft'
-                                  : (gesamt ? 'Fertig für heute'
-                                            : 'Nichts zu tun') }),
+        h('h1', { text: fremdVoll ? 'Für heute ist Schluss'
+                 : geschafft ? 'Tagespensum geschafft'
+                 : (gesamt ? 'Fertig für heute' : 'Nichts zu tun') }),
+        fremdVoll
+          ? h('p', {},
+              `Dein Tagespensum von ${p.tagesdosis} Fragen ist voll. `
+              + 'Es zählt über alle Sammlungen und Lernziele zusammen — '
+              + 'hier warst du heute zwar noch nicht dran, anderswo aber '
+              + `schon ${p.heute_erledigt} Mal.`)
+          : null,
         gesamt
           ? h('div', {},
               h('p', { text: `${gesamt} ${gesamt === 1 ? 'Aufgabe' : 'Aufgaben'} bearbeitet.` }),
@@ -159,7 +174,9 @@ export class Sitzung {
                 h('div', { class: 'zahl' }, h('b', { text: String(richtig) }), h('span', { text: 'richtig' })),
                 h('div', { class: 'zahl' }, h('b', { text: String(fast) }), h('span', { text: 'fast richtig' })),
                 h('div', { class: 'zahl' }, h('b', { text: String(falsch) }), h('span', { text: 'nicht gewusst' }))))
-          : h('p', { text: 'Es ist gerade nichts fällig. Freies Üben geht trotzdem jederzeit.' }),
+          : (fremdVoll ? null
+             : h('p', { text: 'Es ist gerade nichts fällig. Freies Üben geht '
+                            + 'trotzdem jederzeit.' })),
         rueckstand
           ? h('p', { class: 'leise' },
               `Es warten noch ${rueckstand} `
@@ -169,7 +186,7 @@ export class Sitzung {
           : null,
         h('div', { class: 'frage-werkzeuge' },
           h('button', { class: 'wichtig', onclick: () => { location.hash = '#/uebersicht'; } }, 'Zur Übersicht'),
-          rueckstand
+          (rueckstand || fremdVoll)
             ? h('button', {
                 onclick: () => {
                   // Die Grenze ist ein Vorschlag, kein Schloss.

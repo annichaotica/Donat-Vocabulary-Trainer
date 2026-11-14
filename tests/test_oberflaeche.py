@@ -304,3 +304,17 @@ def test_die_merktafel_stiehlt_dem_antwortfeld_nicht_den_fokus():
     # Und sie merkt sich, ob sie offen war — sonst klappt man sie bei
     # jeder Vokabel neu auf.
     assert "merktafelMerken" in quelle
+
+
+def test_die_freigabe_laesst_sich_ohne_maus_durchgehen():
+    """Beim Prüfen von dreißig Wörtern ist Scrollen der falsche Weg: nach
+    dem Freigeben muss die nächste Karte an dieselbe Stelle nachrücken,
+    und die Tastatur muss reichen."""
+    quelle = (WURZEL / "frontend" / "js" / "ansicht_freigabe.js").read_text()
+    assert "function hervorheben" in quelle
+    assert "scrollIntoView" in quelle
+    assert "'Enter'" in quelle and "ArrowDown" in quelle
+    # Der Behandler muss sich abmelden, wenn die Seite gewechselt wird —
+    # sonst reagiert er noch in der Abfrage auf Enter.
+    assert "el.isConnected" in quelle
+    assert "removeEventListener('keydown', aufTaste)" in quelle

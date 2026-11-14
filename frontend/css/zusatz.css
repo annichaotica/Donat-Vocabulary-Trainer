@@ -440,3 +440,18 @@ input[type="file"] { max-width: 100%; }
 }
 .frage-pronomen .leise { font-weight: 400; font-size: .82em; }
 .zeilenpronomen { font-weight: 600; }
+
+
+/* Die Karte, die gerade dran ist. Beim Durchgehen von dreißig Wörtern
+   muss man sehen, wo man steht, ohne zu suchen. */
+.karte.dran {
+  border-color: var(--akzent);
+  box-shadow: 0 0 0 2px var(--akzent-grund, rgba(107, 127, 215, .25));
+}
+.karte.dran > .freigabe-kopf h2::before {
+  content: '▸ ';
+  color: var(--akzent);
+}
+/* Platz unter der letzten Karte, damit auch sie nach oben rollen kann. */
+.freigabe-liste { scroll-margin-top: 4rem; }
+.freigabe-liste > .karte { scroll-margin-top: 4.5rem; }

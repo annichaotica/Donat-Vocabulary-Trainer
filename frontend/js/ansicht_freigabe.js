@@ -103,12 +103,15 @@ export async function zeichnenLektion(behaelter, lektion) {
 
   const titel = h('h1', { text: nr === null ? 'Ohne Lektion' : `Lektion ${nr}` });
   const stand = h('p', { class: 'leise' });
+  const tastenhinweis = h('p', { class: 'leise', style: 'margin:.2rem 0 .8rem' },
+    h('kbd', { text: 'Enter' }), ' gibt das markierte Wort frei, ',
+    h('kbd', { text: '↓' }), ' und ', h('kbd', { text: '↑' }), ' gehen durch.');
   const liste = h('div', {
     class: 'freigabe-liste',
     style: 'display:flex;flex-direction:column;gap:1rem',
   });
   const fussleiste = h('div', { class: 'freigabe-leiste' });
-  el.append(titel, stand, liste, fussleiste);
+  el.append(titel, stand, tastenhinweis, liste, fussleiste);
 
   let ab = 0;
   let offenGesamt = 0;
@@ -118,6 +121,11 @@ export async function zeichnenLektion(behaelter, lektion) {
   let sprache = null;
 
   let uebungenOffen = 0;
+  /** Die Karte, die gerade dran ist. Beim Durchgehen zum Prüfen will man
+   *  nicht scrollen, sondern weiterdrücken — also wird immer eine
+   *  hervorgehoben, und nach dem Freigeben rückt die nächste nach. */
+  let karten = [];
+  let dran = 0;
   const standSetzen = () => {
     const abgezogen = abgewaehlt.size + abgewaehlteUebungen.size;
     stand.textContent = `${woerterGesamt} Wörter, ${offenGesamt} Formen offen`
@@ -133,7 +141,7 @@ export async function zeichnenLektion(behaelter, lektion) {
     woerterGesamt = daten.gesamt;
     uebungenOffen = daten.uebungen_gesamt || 0;
     sprache = daten.sprache;
-    if (!anfuegen) leeren(liste);
+    if (!anfuegen) { leeren(liste); karten = []; dran = 0; }
     if (!daten.woerter.length && !uebungenOffen && !anfuegen) {
       liste.append(h('div', { class: 'leer' },
         h('p', { text: 'Hier ist alles freigegeben.' }),
@@ -143,7 +151,12 @@ export async function zeichnenLektion(behaelter, lektion) {
       standSetzen();
       return;
     }
-    for (const wort of daten.woerter) liste.append(wortkarte(wort));
+    for (const wort of daten.woerter) {
+      const karte = wortkarte(wort);
+      karten.push(karte);
+      liste.append(karte);
+    }
+    hervorheben(anfuegen ? dran : 0);
     if (!anfuegen && daten.uebungen && daten.uebungen.length) {
       liste.append(uebungskarte(daten.uebungen, daten.uebungen_gesamt));
     }
@@ -242,6 +255,25 @@ export async function zeichnenLektion(behaelter, lektion) {
     return karte;
   }
 
+  /** Hebt eine Karte hervor und rollt sie in den Blick. */
+  function hervorheben(i, rollen = false) {
+    karten = karten.filter((k) => k.isConnected);
+    if (!karten.length) { dran = 0; return; }
+    dran = Math.max(0, Math.min(i, karten.length - 1));
+    for (const [j, k] of karten.entries()) {
+      k.classList.toggle('dran', j === dran);
+    }
+    if (rollen) {
+      karten[dran].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  /** Nach dem Freigeben rückt die nächste Karte an dieselbe Stelle. */
+  function weiter() {
+    hervorheben(dran, true);
+    standSetzen();
+  }
+
   function wortkarte(wort) {
     const karte = h('div', { class: 'karte', dataset: { lexem: wort.lexem_id } });
     karte.append(h('div', { class: 'freigabe-kopf' },
@@ -288,22 +320,30 @@ export async function zeichnenLektion(behaelter, lektion) {
       }))));
     }
 
+    karte.inOrdnung = async () => {
+      const ergebnis = await api.freigabeSetzen(sammlungId, {
+        lexem_ids: [wort.lexem_id], ausser: [...abgewaehlt],
+      });
+      meldung(`${wort.lemma}: ${ergebnis.gesetzt} Formen freigegeben.`);
+      const stelle = karten.indexOf(karte);
+      karte.remove();
+      // Was WIRKLICH gesetzt wurde, nicht was offen war: die abgewählten
+      // Formen bleiben offen und müssen weiter zählen.
+      offenGesamt -= ergebnis.gesetzt;
+      karten = karten.filter((k) => k.isConnected);
+      // An dieselbe Stelle rückt die nächste Karte nach.
+      hervorheben(Math.max(0, stelle), true);
+      standSetzen();
+      if (!karten.length) await nachladen();
+    };
     karte.append(h('div', { class: 'freigabe-knoepfe' },
+      h('button', { class: 'wichtig', onclick: () => karte.inOrdnung() },
+        'Alles in Ordnung'),
       h('button', {
-        class: 'wichtig',
-        onclick: async () => {
-          const ergebnis = await api.freigabeSetzen(sammlungId, {
-            lexem_ids: [wort.lexem_id], ausser: [...abgewaehlt],
-          });
-          meldung(`${wort.lemma}: ${ergebnis.gesetzt} Formen freigegeben.`);
-          karte.remove();
-          // Was WIRKLICH gesetzt wurde, nicht was offen war: die
-          // abgewählten Formen bleiben offen und müssen weiter zählen.
-          offenGesamt -= ergebnis.gesetzt;
-          standSetzen();
-        },
-      }, 'Alles in Ordnung'),
-      h('button', { onclick: () => { location.hash = `#/wort/${wort.lexem_id}`; } },
+        onclick: () => hervorheben(karten.indexOf(karte) + 1, true),
+      }, 'Später ansehen'),
+      h('button', { class: 'schlicht',
+                    onclick: () => { location.hash = `#/wort/${wort.lexem_id}`; } },
         'Bearbeiten')));
     return karte;
   }
@@ -370,6 +410,30 @@ export async function zeichnenLektion(behaelter, lektion) {
       h('td', {}, kasten));
     return zeile;
   }
+
+  // Tastatur: beim Durchgehen von dreißig Wörtern zählt jeder Griff zur
+  // Maus. Enter gibt frei, Pfeile gehen durch.
+  const aufTaste = (e) => {
+    // Der Wegweiser tauscht bei jedem Seitenwechsel den Inhaltsbereich
+    // aus. Ist unserer nicht mehr in der Seite, gehört der Behandler
+    // auch nicht mehr dorthin.
+    if (!el.isConnected) {
+      document.removeEventListener('keydown', aufTaste);
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(
+        document.activeElement?.tagName)) return;
+    const karte = karten[dran];
+    if (!karte) return;
+    if (e.key === 'Enter') { e.preventDefault(); karte.inOrdnung(); }
+    else if (e.key === 'ArrowDown' || e.key === 'j') {
+      e.preventDefault(); hervorheben(dran + 1, true);
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+      e.preventDefault(); hervorheben(dran - 1, true);
+    }
+  };
+  document.addEventListener('keydown', aufTaste);
 
   await nachladen();
 }

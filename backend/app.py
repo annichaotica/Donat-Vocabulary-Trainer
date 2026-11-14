@@ -38,6 +38,7 @@ import merkmale as mk
 import qualitaet
 import sammelimport
 import sprachen
+import uebungen
 import wache
 import zugang
 from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
@@ -49,7 +50,9 @@ from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
                      SammlungEinstellungen, SpracheAnlegen,
-                     SprachprofilSetzen, UebersetzungEingabe)
+                     SprachprofilSetzen, TextPruefenEingabe,
+                     UebersetzungEingabe, UebungAendern, UebungAntwort,
+                     UebungEingabe, UebungenImportEingabe)
 
 OBERFLAECHE = pathlib.Path(__file__).resolve().parent.parent / "frontend"
 
@@ -539,6 +542,117 @@ def vokabeln_importieren(sammlung_id: int, eingabe: SammelimportEingabe,
                                         eingabe.nur_pruefen, eingabe.quelle)
     except (sammelimport.ImportFehler, mk.MerkmalFehler) as fehler:
         raise HTTPException(400, str(fehler))
+
+
+# ============================================================ Übungen
+
+def _uebung(db: sqlite3.Connection, uebung_id: int) -> dict:
+    try:
+        return uebungen.lesen(db, uebung_id)
+    except uebungen.UebungFehler as fehler:
+        raise HTTPException(404, str(fehler))
+
+
+@app.get("/api/sammlungen/{sammlung_id}/uebungen")
+def uebungen_auflisten(sammlung_id: int, lektion_nr: int | None = None,
+                       bis_lektion: int | None = None,
+                       typ: str | None = None, nur_ungepruefte: bool = False,
+                       ab: int = 0, anzahl: int = Query(default=50, le=500),
+                       db: sqlite3.Connection = DB):
+    _holen(db, "sammlung", sammlung_id)
+    return uebungen.auflisten(db, sammlung_id, lektion_nr, typ, bis_lektion,
+                              nur_ungepruefte, ab, anzahl)
+
+
+@app.post("/api/sammlungen/{sammlung_id}/uebungen", status_code=201)
+def uebung_anlegen(sammlung_id: int, eingabe: UebungEingabe,
+                   request: Request = None, db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    _holen(db, "sammlung", sammlung_id)
+    try:
+        return uebungen.anlegen(db, sammlung_id,
+                                eingabe.model_dump(exclude_none=True))
+    except uebungen.UebungFehler as fehler:
+        raise HTTPException(400, str(fehler))
+
+
+@app.post("/api/sammlungen/{sammlung_id}/import/uebungen")
+def uebungen_importieren(sammlung_id: int, eingabe: UebungenImportEingabe,
+                         request: Request = None,
+                         db: sqlite3.Connection = DB):
+    """Viele Übungen in einem Aufruf — mit Probelauf und wiederholbar."""
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    _holen(db, "sammlung", sammlung_id)
+    try:
+        return uebungen.importieren(db, sammlung_id, eingabe.eintraege,
+                                    eingabe.nur_pruefen)
+    except uebungen.UebungFehler as fehler:
+        raise HTTPException(400, str(fehler))
+
+
+@app.post("/api/sammlungen/{sammlung_id}/text/pruefen")
+def text_deckung(sammlung_id: int, eingabe: TextPruefenEingabe,
+                 db: sqlite3.Connection = DB):
+    """Welche Wörter eines Textes stehen bis zu dieser Lektion noch nicht da?
+
+    Damit lässt sich ein Text VORHER auf die Stufe zuschneiden, statt ihn
+    hinterher zu verwerfen.
+    """
+    _holen(db, "sammlung", sammlung_id)
+    try:
+        return uebungen.text_pruefen(db, sammlung_id, eingabe.text,
+                                     eingabe.bis_lektion)
+    except uebungen.UebungFehler as fehler:
+        raise HTTPException(404, str(fehler))
+
+
+@app.get("/api/uebungen/{uebung_id}")
+def uebung_lesen(uebung_id: int, db: sqlite3.Connection = DB):
+    return _uebung(db, uebung_id)
+
+
+@app.patch("/api/uebungen/{uebung_id}")
+def uebung_aendern(uebung_id: int, eingabe: UebungAendern,
+                   request: Request = None, db: sqlite3.Connection = DB):
+    _uebung(db, uebung_id)
+    _wache_rumpf(db, request)
+    try:
+        return uebungen.aendern(db, uebung_id,
+                                eingabe.model_dump(exclude_unset=True))
+    except uebungen.UebungFehler as fehler:
+        raise HTTPException(400, str(fehler))
+
+
+@app.post("/api/uebungen/{uebung_id}/freigabe")
+def uebung_freigeben(uebung_id: int, geprueft: bool = True,
+                     request: Request = None, db: sqlite3.Connection = DB):
+    """Die Freigabe bleibt beim Menschen — darum ein eigener Aufruf."""
+    _uebung(db, uebung_id)
+    _wache_rumpf(db, request)
+    return uebungen.freigeben(db, uebung_id, geprueft)
+
+
+@app.delete("/api/uebungen/{uebung_id}", status_code=204)
+def uebung_loeschen(uebung_id: int, request: Request = None,
+                    db: sqlite3.Connection = DB):
+    _uebung(db, uebung_id)
+    _wache_rumpf(db, request)
+    uebungen.loeschen(db, uebung_id)
+    return Response(status_code=204)
+
+
+@app.post("/api/textaufgaben/{textaufgabe_id}/pruefen")
+def textaufgabe_pruefen(textaufgabe_id: int, eingabe: UebungAntwort,
+                        db: sqlite3.Connection = DB):
+    """Bewertet eine freie Übersetzung Wort für Wort.
+
+    Bei längeren Blöcken ist `zaehlt` falsch: dort bleibt die Einschätzung
+    beim Menschen, der Vergleich ist nur Hilfestellung.
+    """
+    try:
+        return uebungen.bewerten(db, textaufgabe_id, eingabe.antwort)
+    except uebungen.UebungFehler as fehler:
+        raise HTTPException(404, str(fehler))
 
 
 # ============================================================ Wortschatz

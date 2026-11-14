@@ -272,8 +272,9 @@ GRIECHISCH = {
     # Zerlegung in Stamm und Endung zeigte das θα als Teil des Wortstamms.
     "partikeln": ["θα", "να", "ας", "δεν", "μην"],
     "formgruppen_standard": {
+        # Dieselben drei Stammformen, einmal aktiv und einmal passiv.
         "verb": ["enestotas", "aoristos", "mellontas_stigmiaios",
-                 "enestotas_pass", "aoristos_pass"],
+                 "enestotas_pass", "aoristos_pass", "mellontas_pass"],
         "substantiv": ["subst_nom_sg", "subst_gen_sg", "subst_akk_sg",
                        "subst_nom_pl", "subst_gen_pl", "subst_akk_pl"],
         "adjektiv": "alle",

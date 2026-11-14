@@ -169,6 +169,19 @@ def test_wanderung_aus_einer_alten_datenbank():
             merkmale TEXT NOT NULL DEFAULT '{}', notiz TEXT,
             angelegt TEXT NOT NULL DEFAULT (datetime('now')),
             geaendert TEXT NOT NULL DEFAULT (datetime('now')));
+        -- Die Texttabelle gab es schon, aber ohne die Übungsspalten. Genau
+        -- so steht sie auf dem Familienserver — CREATE TABLE IF NOT EXISTS
+        -- rührt sie nicht an, die Spalten müssen von der Wanderung kommen.
+        CREATE TABLE text (id INTEGER PRIMARY KEY, sammlung_id INTEGER NOT NULL,
+            lektion_id INTEGER, titel TEXT NOT NULL, sprache TEXT NOT NULL,
+            inhalt TEXT NOT NULL, uebersetzung TEXT, niveau TEXT,
+            quelle TEXT NOT NULL DEFAULT 'manuell', notiz TEXT,
+            angelegt TEXT NOT NULL DEFAULT (datetime('now')));
+        CREATE TABLE textabschnitt (id INTEGER PRIMARY KEY,
+            text_id INTEGER NOT NULL, reihenfolge INTEGER NOT NULL DEFAULT 0,
+            original TEXT NOT NULL, referenz TEXT, notiz TEXT);
+        INSERT INTO text (sammlung_id, titel, sprache, inhalt)
+            VALUES (1, 'Alter Text', 'el', 'Καλημέρα.');
         INSERT INTO benutzer (name) VALUES ('Alt');
         INSERT INTO sammlung (besitzer_id, name, sprache) VALUES (1, 'Alt', 'el');
         INSERT INTO lektion (sammlung_id, name) VALUES (1, 'Erste');
@@ -190,6 +203,13 @@ def test_wanderung_aus_einer_alten_datenbank():
         "SELECT name FROM sqlite_master WHERE type='index'")}
     assert "idx_lektion_nr" in indizes
     assert "idx_lexem_kennung" in indizes
+    # Dasselbe für die Übungen: Spalten UND der Index auf einer von ihnen.
+    assert {"typ", "richtungen", "geprueft", "kennung",
+            "verweis_url"} <= dbm.spalten(db, "text")
+    assert {"varianten", "referenz_varianten"} <= dbm.spalten(db, "textabschnitt")
+    assert "idx_text_kennung" in indizes
+    assert dbm.wert(db, "SELECT titel FROM text") == "Alter Text"
+    assert dbm.wert(db, "SELECT typ FROM text") == "text"
     # Zweimal einrichten muss ebenfalls gehen
     dbm.einrichten(db)
     db.close()

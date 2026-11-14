@@ -39,7 +39,10 @@ ANLEITUNG = (
     "formgruppen_zeigen für die Sprache, dann eintragen. Vollständige "
     "Paradigmen liefern — der Trainer erzeugt daraus die Aufgaben und leitet "
     "den Wortstamm ab. Eingetragene Formen bleiben ungeprüft, bis ein Mensch "
-    "sie freigibt."
+    "sie freigibt.\n\n"
+    "Für Übungssätze und Texte: zuerst text_pruefen, damit der Text zur "
+    "Stufe passt, dann uebungen_importieren. Fremde Texte werden verlinkt, "
+    "nicht abgeschrieben."
 )
 
 
@@ -173,6 +176,85 @@ def vokabeln_importieren(db: sqlite3.Connection, person: dict, sammlung_id: int,
         raise WerkzeugFehler(str(f)) from f
 
 
+# ------------------------------------------------------- Sätze und Texte
+
+def uebung_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                   **eintrag):
+    """Einen Übungssatz oder Text anlegen."""
+    import uebungen
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+    try:
+        ergebnis = uebungen.anlegen(db, sammlung_id, eintrag)
+    except Exception as f:
+        raise WerkzeugFehler(str(f)) from f
+    return {"uebung_id": ergebnis["id"], "typ": ergebnis["typ"],
+            "titel": ergebnis["titel"],
+            "abschnitte": len(ergebnis["abschnitte"]),
+            "aufgaben": [{"id": a["id"], "typ": a["typ"],
+                          "bewertung_art": a["bewertung_art"]}
+                         for a in ergebnis["aufgaben"] if a["aktiv"]],
+            "hinweis": "Die Übung bleibt ungeprüft, bis ein Mensch sie "
+                       "freigibt — wie eine eingetragene Form."}
+
+
+def uebungen_importieren(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                         eintraege: list, nur_pruefen: bool = False):
+    """Viele Übungen in einem Aufruf — mit Probelauf und wiederholbar."""
+    import uebungen
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+    try:
+        return uebungen.importieren(db, sammlung_id, eintraege, nur_pruefen)
+    except Exception as f:
+        raise WerkzeugFehler(str(f)) from f
+
+
+def uebungen_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                       lektion_nr: int | None = None,
+                       bis_lektion: int | None = None,
+                       typ: str | None = None,
+                       nur_ungepruefte: bool = False,
+                       seite: int = 1, anzahl: int = 50):
+    import uebungen
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id)
+    anzahl = max(1, min(int(anzahl), 200))
+    ab = max(0, (max(1, int(seite)) - 1) * anzahl)
+    try:
+        return uebungen.auflisten(db, sammlung_id, lektion_nr, typ,
+                                  bis_lektion, nur_ungepruefte, ab, anzahl)
+    except Exception as f:
+        raise WerkzeugFehler(str(f)) from f
+
+
+def uebung_aendern(db: sqlite3.Connection, person: dict, uebung_id: int,
+                   **aenderung):
+    """Eine Übung berichtigen. Geänderter Inhalt fällt auf ungeprüft zurück."""
+    import uebungen
+    t = dbm.zeile(db, "SELECT sammlung_id FROM text WHERE id = ?", (uebung_id,))
+    if t is None:
+        raise WerkzeugFehler(f"Übung {uebung_id} gibt es nicht")
+    zugang.sammlung_pruefen(db, person["id"], t["sammlung_id"], schreiben=True)
+    if not aenderung:
+        raise WerkzeugFehler("Nichts zu ändern angegeben")
+    try:
+        ergebnis = uebungen.aendern(db, uebung_id, aenderung)
+    except Exception as f:
+        raise WerkzeugFehler(str(f)) from f
+    return {"uebung_id": ergebnis["id"], "titel": ergebnis["titel"],
+            "geprueft": ergebnis["geprueft"],
+            "abschnitte": len(ergebnis["abschnitte"])}
+
+
+def text_pruefen(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                 text: str, bis_lektion: int | None = None):
+    """Welche Wörter des Textes stehen bis zu dieser Lektion noch nicht da?"""
+    import uebungen
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id)
+    try:
+        return uebungen.text_pruefen(db, sammlung_id, text, bis_lektion)
+    except Exception as f:
+        raise WerkzeugFehler(str(f)) from f
+
+
 def lektion_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
                     nr: int, titel: str | None = None,
                     beschreibung: str | None = None):
@@ -295,6 +377,8 @@ def _s(typ, beschreibung, **rest):
     return {"type": typ, "description": beschreibung, **rest}
 
 
+_TYPEN = ("satz", "text", "dialog", "brief", "zeitungsstil")
+
 MERKMALSHINWEIS = (
     "Formen tragen Merkmalsbündel, keine Spaltennamen: "
     '{"modus":"indikativ","tempus":"praesens","person":"1","numerus":"sg"}. '
@@ -405,6 +489,140 @@ WERKZEUGE: list[dict] = [
                 "true: nichts schreiben, nur berichten. Zuerst immer so.")},
             "required": ["sammlung_id", "eintraege"]},
         "funktion": vokabeln_importieren,
+    },
+    {
+        "name": "uebung_anlegen",
+        "description":
+            "Einen Übungssatz oder Text anlegen. Satz und Text sind dasselbe "
+            "mit unterschiedlich vielen Abschnitten.\n\n"
+            "Aus `richtungen` entstehen die Aufgaben: \"el-de\" heißt aus der "
+            "Lernsprache in die Grundsprache, \"de-el\" umgekehrt. Bei typ "
+            "\"satz\" wird Wort für Wort gegen alle angegebenen Fassungen "
+            "verglichen und bewertet; bei allem Längeren bleibt die "
+            "Einschätzung beim Menschen und der Vergleich ist nur Hilfe.\n\n"
+            "Alternativen großzügig angeben — eine richtige Übersetzung darf "
+            "nicht daran scheitern, dass sie nicht die zuerst aufgeschriebene "
+            "ist.\n\n"
+            "**Fremde Texte werden verlinkt, nicht abgeschrieben.** Für einen "
+            "Zeitungsartikel quelle = {\"art\": \"verweis\", \"titel\": …, "
+            "\"url\": …} und eine eigene Fassung als Übung.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+            "typ": _s("string", "satz | text | dialog | brief | zeitungsstil",
+                      enum=list(_TYPEN)),
+            "titel": _s("string", "wahlweise; bei einem Satz unnötig"),
+            "zielsprache": _s("string", "der Satz oder Text in der Lernsprache"),
+            "grundsprache": _s("string", "die Referenzübersetzung"),
+            "alternativen_zielsprache": _s("array",
+                "weitere gültige Fassungen in der Lernsprache",
+                items={"type": "string"}),
+            "alternativen_grundsprache": _s("array",
+                "weitere gültige Fassungen in der Grundsprache",
+                items={"type": "string"}),
+            "abschnitte": _s("array",
+                "Bei mehreren Sätzen genauer als zielsprache/grundsprache: "
+                "je Abschnitt {zielsprache, grundsprache, "
+                "alternativen_zielsprache, alternativen_grundsprache}. Ohne "
+                "diese Liste wird nur geteilt, wenn beide Sprachen auf "
+                "gleich viele Sätze kommen.", items={"type": "object"}),
+            "richtungen": _s("array",
+                '["el-de", "de-el"] oder ["hin", "rueck"]. Ohne Angabe beide.',
+                items={"type": "string"}),
+            "lektion_nr": _s("integer", "Nummer im Lehrwerk"),
+            "lektion_titel": _s("string", "wahlweise"),
+            "reihenfolge": _s("integer", "Lernreihenfolge innerhalb der Lektion"),
+            "niveau": _s("string", "A1 … C2, frei"),
+            "kennung": _s("string",
+                "eigener Schlüssel; damit ein zweiter Lauf aktualisiert "
+                "statt zu verdoppeln"),
+            "notiz": _s("string", "freier Vermerk"),
+            "quelle": _s("object",
+                '{"art": "ki" | "eigen" | "verweis", "titel": …, "url": …}. '
+                "Bei \"verweis\" ist Titel oder Adresse nötig."),
+        }, "required": ["sammlung_id", "zielsprache"]},
+        "funktion": uebung_anlegen,
+    },
+    {
+        "name": "uebungen_importieren",
+        "description":
+            "Viele Übungen in EINEM Aufruf. Dieselben drei Zusagen wie bei "
+            "vokabeln_importieren: Probelauf mit nur_pruefen, wiederholbar "
+            "über kennung (sonst über den Zieltext selbst), und eine "
+            "freigegebene Übung wird nie überschrieben — die Abweichung wird "
+            "gemeldet.\n\n"
+            "Berichtet wird knapp: nur Einträge, zu denen es etwas zu sagen "
+            "gibt. Vor dem Schreiben lohnt text_pruefen, damit die Sätze zur "
+            "Stufe passen.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+            "eintraege": _s("array",
+                "Liste von Übungen, je Eintrag im Format von uebung_anlegen "
+                "(ohne sammlung_id).", items={"type": "object"}),
+            "nur_pruefen": _s("boolean",
+                "true: nichts schreiben, nur berichten. Zuerst immer so."),
+        }, "required": ["sammlung_id", "eintraege"]},
+        "funktion": uebungen_importieren,
+    },
+    {
+        "name": "uebungen_auflisten",
+        "description": "Welche Übungen gibt es? Nach Lektion, bis zu einer "
+                       "Lektion, nach Typ, wahlweise nur die noch nicht "
+                       "freigegebenen.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", ""),
+            "lektion_nr": _s("integer", "genau diese Lektion"),
+            "bis_lektion": _s("integer", "alles bis einschließlich dieser"),
+            "typ": _s("string", "satz | text | dialog | brief | zeitungsstil",
+                      enum=list(_TYPEN)),
+            "nur_ungepruefte": _s("boolean", "nur noch nicht freigegebene"),
+            "seite": _s("integer", "ab 1"),
+            "anzahl": _s("integer", "je Seite, höchstens 200"),
+        }, "required": ["sammlung_id"]},
+        "funktion": uebungen_auflisten,
+    },
+    {
+        "name": "uebung_aendern",
+        "description": "Eine Übung berichtigen. Nur die genannten Felder "
+                       "ändern sich. Ändert sich der Inhalt, fällt die Übung "
+                       "auf ungeprüft zurück — wie eine geänderte Form. Die "
+                       "Freigabe nimmt dieses Werkzeug niemandem ab.",
+        "inputSchema": {"type": "object", "properties": {
+            "uebung_id": _s("integer", "aus uebungen_auflisten"),
+            "typ": _s("string", "", enum=list(_TYPEN)),
+            "titel": _s("string", ""),
+            "zielsprache": _s("string", ""),
+            "grundsprache": _s("string", ""),
+            "alternativen_zielsprache": _s("array", "", items={"type": "string"}),
+            "alternativen_grundsprache": _s("array", "", items={"type": "string"}),
+            "abschnitte": _s("array", "", items={"type": "object"}),
+            "richtungen": _s("array", "", items={"type": "string"}),
+            "lektion_nr": _s("integer", ""),
+            "reihenfolge": _s("integer", ""),
+            "niveau": _s("string", ""),
+            "kennung": _s("string", ""),
+            "notiz": _s("string", ""),
+        }, "required": ["uebung_id"]},
+        "funktion": uebung_aendern,
+    },
+    {
+        "name": "text_pruefen",
+        "description":
+            "Welche Wörter eines Textes stehen im Bestand noch nicht da? "
+            "**Vor** dem Schreiben eines Übungstextes aufzurufen — damit er "
+            "zur Stufe passt, statt hinterher verworfen zu werden.\n\n"
+            "Nachgeschlagen wird über ALLE Formen, nicht nur die Lemmata: "
+            "wer έγραψαν liest, hat γράφω vor sich. Drei Listen kommen "
+            "zurück: bekannt, zu_spaet (steht da, kommt aber erst nach "
+            "dieser Lektion) und unbekannt (steht gar nicht da). Partikeln "
+            "der Sprache (θα, να, δεν) zählen nicht als unbekannt.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", ""),
+            "text": _s("string", "der Text, noch nicht eingetragen"),
+            "bis_lektion": _s("integer",
+                "Stufe, auf die der Text passen soll. Ohne Angabe gilt der "
+                "ganze Bestand als bekannt."),
+        }, "required": ["sammlung_id", "text"]},
+        "funktion": text_pruefen,
     },
     {
         "name": "lektion_anlegen",

@@ -275,6 +275,21 @@ CREATE INDEX IF NOT EXISTS idx_wiederholung_zeit
 -- Wortschatz schon lesen".
 -- ======================================================================
 
+-- Ein einzelner Übungssatz ist derselbe Gegenstand wie ein ganzer Text, nur
+-- mit einem Abschnitt. Darum keine zweite Tabelle daneben: der Lernstand
+-- soll nicht auf zwei Orte zerfallen, und text_lexem braucht auch der Satz.
+--
+-- typ           satz | text | dialog | brief | zeitungsstil
+-- richtungen    JSON-Liste, z. B. ["el-de", "de-el"]: in welche Richtungen
+--               geübt wird. Daraus entstehen die Textaufgaben.
+-- quelle        WER es geschrieben hat.
+-- verweis_*     WORAUF es sich stützt. Ein fremder Zeitungsartikel wird
+--               verlinkt und nicht abgeschrieben; beides ist unabhängig,
+--               ein KI-Text kann sich auf eine Quelle stützen.
+-- geprueft      wie bei den Formen: bis ein Mensch freigibt, wird nicht
+--               abgefragt.
+-- kennung       Schlüssel des Lehrwerks, damit ein erneuter Import
+--               aktualisiert statt zu verdoppeln.
 CREATE TABLE IF NOT EXISTS text (
     id            INTEGER PRIMARY KEY,
     sammlung_id   INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
@@ -292,6 +307,10 @@ CREATE TABLE IF NOT EXISTS text (
 CREATE INDEX IF NOT EXISTS idx_text_sammlung ON text(sammlung_id);
 
 -- Die Arbeitseinheit: ein Satz oder ein Absatz.
+-- varianten / referenz_varianten: weitere gültige Fassungen desselben
+-- Abschnitts (Εχθές neben Χθες, "bin ich gegangen" neben "ging ich").
+-- Jede zählt als richtig — sonst wäre eine richtige Übersetzung falsch,
+-- nur weil sie nicht die aufgeschriebene ist.
 CREATE TABLE IF NOT EXISTS textabschnitt (
     id            INTEGER PRIMARY KEY,
     text_id       INTEGER NOT NULL REFERENCES text(id) ON DELETE CASCADE,

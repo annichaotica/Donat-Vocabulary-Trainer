@@ -385,6 +385,83 @@ Stammformen, das Kernpensum: **Infinitiv – Präteritum – Partizip II**
 - Substantiv, `genus`: `m`, `f`, `n`
 
 
+## Übungssätze und Texte
+
+Ein Übungssatz und ein ganzer Text sind derselbe Gegenstand mit
+unterschiedlich vielen Abschnitten.
+
+```json
+{
+  "typ": "satz",
+  "lektion_nr": 39,
+  "zielsprache": "Χθες πήγα στο θέατρο.",
+  "grundsprache": "Gestern ging ich ins Theater.",
+  "alternativen_zielsprache": ["Εχθές πήγα στο θέατρο."],
+  "alternativen_grundsprache": ["Gestern bin ich ins Theater gegangen."],
+  "richtungen": ["el-de", "de-el"],
+  "quelle": {"art": "ki"}
+}
+```
+
+- **`typ`** — `satz`, `text`, `dialog`, `brief` oder `zeitungsstil`.
+- **`richtungen`** — in welche Richtungen geübt wird, als Sprachpaar
+  (`el-de` heißt aus der Lernsprache in die Grundsprache) oder als
+  `hin`/`rueck`. Daraus entstehen die Aufgaben; ohne Angabe beide.
+- **`alternativen_*`** — weitere gültige Fassungen. **Großzügig angeben.**
+  Eine richtige Übersetzung darf nicht daran scheitern, dass sie nicht die
+  zuerst aufgeschriebene ist.
+- **`quelle.art`** — `ki`, `eigen` oder `verweis`. Fremde Zeitungsartikel
+  werden **verlinkt, nicht abgeschrieben**: bei `verweis` gehören `titel`
+  und `url` dazu, und als Übung dient eine eigene Fassung.
+- **`kennung`** — eigener Schlüssel, damit ein zweiter Lauf aktualisiert
+  statt zu verdoppeln. Ohne sie dient der Zieltext selbst als Schlüssel.
+
+Bei mehreren Sätzen ist eine ausdrückliche Liste `abschnitte` genauer:
+
+```json
+{
+  "typ": "dialog",
+  "titel": "Στο ταμείο",
+  "abschnitte": [
+    {"zielsprache": "Καλημέρα!", "grundsprache": "Guten Morgen!",
+     "alternativen_grundsprache": ["Guten Tag!"]},
+    {"zielsprache": "Τι θα πάρετε;", "grundsprache": "Was nehmen Sie?"}
+  ],
+  "richtungen": ["el-de"]
+}
+```
+
+Ohne diese Liste wird nur dann in Sätze geteilt, wenn Zielsprache und
+Grundsprache auf dieselbe Zahl kommen. Eine geratene Zuordnung wäre
+schlimmer als ein ungeteilter Text — die Rückmeldung verglich dann mit dem
+falschen Satz.
+
+### Wie bewertet wird
+
+Wort für Wort gegen alle angegebenen Fassungen, nach den Prüfregeln der
+Sprache: Satzzeichen zählen nicht, Akzente sind ein Hinweis und kein
+Fehler, bis zu zwei Wörter mit Tippfehler gelten als „fast". Bei `typ:
+"satz"` zählt das Urteil. Bei allem Längeren bleibt die Einschätzung beim
+Menschen und der Vergleich ist nur Hilfestellung — dort passt eine
+wörtliche Übereinstimmung zu selten.
+
+Die Rückmeldung nennt die abweichenden Wörter einzeln (`σπίτι → θέατρο`,
+`fehlt: στο`). „Falsch" allein ist keine Auskunft.
+
+### Vorher die Deckung prüfen
+
+`text_pruefen(sammlung_id, text, bis_lektion)` sagt, welche Wörter eines
+Textes im Bestand noch nicht vorkommen — nachgeschlagen über **alle
+Formen**, nicht nur die Lemmata. Drei Listen kommen zurück: `bekannt`,
+`zu_spaet` (steht da, kommt aber erst nach dieser Lektion) und `unbekannt`.
+Partikeln der Sprache (`θα`, `να`, `δεν`) zählen nicht als unbekannt.
+
+Das gehört **vor** das Schreiben eines Übungstextes. Ein Text mit dreißig
+unbekannten Wörtern ist keine Übung, sondern eine Enttäuschung.
+
+Wie Formen bleiben Übungen **ungeprüft**, bis ein Mensch sie freigibt.
+
+
 ## Was später der MCP-Server übernimmt
 
 Alles davon. Der Server bekommt Werkzeuge wie `vokabel_anlegen`,

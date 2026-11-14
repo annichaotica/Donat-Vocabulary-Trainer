@@ -100,6 +100,70 @@ class SammelimportEingabe(BaseModel):
     quelle: Quelle = "ki"
 
 
+class UebungEingabe(BaseModel):
+    """Ein Übungssatz oder ein Text.
+
+    Der ganze Eintrag darf als `zielsprache`/`grundsprache` kommen; bei
+    mehreren Sätzen ist eine ausdrückliche Liste `abschnitte` genauer,
+    weil sich die Zuordnung dann nicht erraten muss.
+    """
+    typ: Literal["satz", "text", "dialog", "brief", "zeitungsstil"] = "satz"
+    titel: str | None = None
+    zielsprache: str | None = None
+    grundsprache: str | None = None
+    alternativen_zielsprache: list[str] = Field(default_factory=list)
+    alternativen_grundsprache: list[str] = Field(default_factory=list)
+    abschnitte: list[dict[str, Any]] | None = None
+    # ["hin", "rueck"] oder in Sprachpaaren: ["el-de", "de-el"]
+    richtungen: list[str] | None = None
+    lektion_nr: int | None = None
+    lektion_titel: str | None = None
+    niveau: str | None = None
+    reihenfolge: int = 0
+    kennung: str | None = None
+    notiz: str | None = None
+    quelle: dict[str, Any] | None = None
+    geprueft: bool = False
+
+
+class UebungAendern(BaseModel):
+    """Teiländerung. Was nicht genannt ist, bleibt wie es war.
+
+    Ändert sich der Inhalt, fällt die Übung auf ungeprüft zurück — wie
+    eine geänderte Form.
+    """
+    typ: Literal["satz", "text", "dialog", "brief", "zeitungsstil"] | None = None
+    titel: str | None = None
+    zielsprache: str | None = None
+    grundsprache: str | None = None
+    alternativen_zielsprache: list[str] | None = None
+    alternativen_grundsprache: list[str] | None = None
+    abschnitte: list[dict[str, Any]] | None = None
+    richtungen: list[str] | None = None
+    lektion_nr: int | None = None
+    niveau: str | None = None
+    reihenfolge: int | None = None
+    kennung: str | None = None
+    notiz: str | None = None
+    quelle: dict[str, Any] | None = None
+    geprueft: bool | None = None
+
+
+class UebungenImportEingabe(BaseModel):
+    eintraege: list[dict[str, Any]] = Field(min_length=1, max_length=1000)
+    nur_pruefen: bool = False
+
+
+class TextPruefenEingabe(BaseModel):
+    """Deckung eines Textes gegen den Bestand."""
+    text: str = Field(min_length=1, max_length=20000)
+    bis_lektion: int | None = None
+
+
+class UebungAntwort(BaseModel):
+    antwort: str = ""
+
+
 class FormEingabe(BaseModel):
     text: str = Field(min_length=1, max_length=200)
     merkmale: dict[str, Any] = Field(default_factory=dict)

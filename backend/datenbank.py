@@ -18,7 +18,7 @@ from typing import Any, Iterable
 
 import sprachen
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 _WURZEL = pathlib.Path(__file__).resolve().parent.parent
 PFAD = pathlib.Path(os.environ.get("VOKABEL_DB", _WURZEL / "daten" / "vokabeltrainer.db"))
@@ -79,6 +79,23 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
     "form": {
         "ist_variante": "INTEGER NOT NULL DEFAULT 0",
     },
+    "text": {
+        "typ": "TEXT NOT NULL DEFAULT 'text'",
+        "richtungen": "TEXT NOT NULL DEFAULT '[]'",
+        # Getrennt von `quelle`: die sagt, wer es geschrieben hat, dies,
+        # worauf es sich stützt. Ein fremder Artikel wird verlinkt, nicht
+        # abgeschrieben.
+        "verweis_titel": "TEXT",
+        "verweis_url": "TEXT",
+        "geprueft": "INTEGER NOT NULL DEFAULT 0",
+        "kennung": "TEXT",
+        "reihenfolge": "INTEGER NOT NULL DEFAULT 0",
+        "geaendert": "TEXT",
+    },
+    "textabschnitt": {
+        "varianten": "TEXT NOT NULL DEFAULT '[]'",
+        "referenz_varianten": "TEXT NOT NULL DEFAULT '[]'",
+    },
     "benutzer": {
         # Ohne UNIQUE: ALTER TABLE kann in SQLite keine eindeutige Spalte
         # nachrüsten. Der eindeutige Index steht darum eine Zeile tiefer.
@@ -111,6 +128,10 @@ def wandern(db: sqlite3.Connection, von: int) -> None:
                     ON lexem(sammlung_id, kennung) WHERE kennung IS NOT NULL""")
     db.execute("""CREATE INDEX IF NOT EXISTS idx_lexem_folge
                     ON lexem(sammlung_id, lektion_id, reihenfolge)""")
+    db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_text_kennung
+                    ON text(sammlung_id, kennung) WHERE kennung IS NOT NULL""")
+    db.execute("""CREATE INDEX IF NOT EXISTS idx_text_folge
+                    ON text(sammlung_id, lektion_id, reihenfolge)""")
     # Gibt es noch keinen Verwalter, wird es die erste angelegte Person.
     # Ohne das stünde ein bestehender Bestand nach der Aktualisierung ohne
     # jemanden da, der Sprachprofile pflegen darf.

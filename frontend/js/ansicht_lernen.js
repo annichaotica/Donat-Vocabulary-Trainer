@@ -84,18 +84,25 @@ export class Sitzung {
     this.zeichneLade();
     let reihe;
     try {
+      const grenze = this.ohneGrenze ? { ohne_grenze: true } : {};
       reihe = await api.naechste(this.optionen.lernzielId
         ? { benutzer_id: zustand.benutzerId,
-            lernziel_id: this.optionen.lernzielId, anzahl: 1 }
+            lernziel_id: this.optionen.lernzielId, anzahl: 1, ...grenze }
         : { benutzer_id: zustand.benutzerId,
             sammlung_id: this.optionen.sammlungId ?? zustand.sammlungId,
             lektion_id: this.optionen.lektionId,
-            nur: this.optionen.nur, anzahl: 1 });
+            nur: this.optionen.nur, anzahl: 1, ...grenze });
     } catch (fehler) {
       this.zeichneFehler(fehler.message);
       return;
     }
     if (!reihe || !reihe.length) {
+      // Den Stand frisch holen: am Schluss zählt, was jetzt gilt, nicht
+      // was zu Beginn der Sitzung galt.
+      try {
+        this.pensum = await api.stand(zustand.benutzerId,
+                                      this.optionen.sammlungId || null);
+      } catch { /* dann eben mit dem alten Stand */ }
       this.zeichneFertig();
       return;
     }
@@ -132,9 +139,19 @@ export class Sitzung {
 
   zeichneFertig() {
     const { richtig, fast, falsch, gesamt } = this.gezaehlt;
+    const p = this.pensum || {};
+    // Der Rückstand wird genannt, nicht verschwiegen — aber als Zahl, die
+    // sinkt, nicht als Vorwurf. Verschwiegen wäre er schlimmer: dann
+    // stünde morgen wieder dieselbe Zahl da und niemand wüsste, warum.
+    const rueckstand = (!this.ohneGrenze && p.tagesdosis)
+      ? (p.rueckstand || 0) : 0;
+    const geschafft = Boolean(p.tagesdosis)
+      && p.heute_erledigt >= p.tagesdosis;
     leeren(this.behaelter).append(
       h('div', { class: 'karte' },
-        h('h1', { text: gesamt ? 'Fertig für heute' : 'Nichts zu tun' }),
+        h('h1', { text: geschafft ? 'Tagespensum geschafft'
+                                  : (gesamt ? 'Fertig für heute'
+                                            : 'Nichts zu tun') }),
         gesamt
           ? h('div', {},
               h('p', { text: `${gesamt} ${gesamt === 1 ? 'Aufgabe' : 'Aufgaben'} bearbeitet.` }),
@@ -143,8 +160,25 @@ export class Sitzung {
                 h('div', { class: 'zahl' }, h('b', { text: String(fast) }), h('span', { text: 'fast richtig' })),
                 h('div', { class: 'zahl' }, h('b', { text: String(falsch) }), h('span', { text: 'nicht gewusst' }))))
           : h('p', { text: 'Es ist gerade nichts fällig. Freies Üben geht trotzdem jederzeit.' }),
+        rueckstand
+          ? h('p', { class: 'leise' },
+              `Es warten noch ${rueckstand} `
+              + `${rueckstand === 1 ? 'Frage' : 'Fragen'}. Die holst du nach `
+              + 'und nach auf — jeder Tag, an dem du dein Pensum machst, '
+              + 'macht die Zahl kleiner.')
+          : null,
         h('div', { class: 'frage-werkzeuge' },
           h('button', { class: 'wichtig', onclick: () => { location.hash = '#/uebersicht'; } }, 'Zur Übersicht'),
+          rueckstand
+            ? h('button', {
+                onclick: () => {
+                  // Die Grenze ist ein Vorschlag, kein Schloss.
+                  this.ohneGrenze = true;
+                  this.gezaehlt = { richtig: 0, fast: 0, falsch: 0, gesamt: 0 };
+                  this.naechste();
+                },
+              }, 'Trotzdem weitermachen')
+            : null,
           h('button', { onclick: () => { this.gezaehlt = { richtig: 0, fast: 0, falsch: 0, gesamt: 0 }; this.optionen.nur = 'frei'; this.naechste(); } }, 'Frei weiterüben'))));
   }
 

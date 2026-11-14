@@ -399,6 +399,8 @@ def benutzer_aendern(benutzer_id: int, eingabe: BenutzerAendern,
         e["wunschretention"] = eingabe.wunschretention
     if eingabe.neu_je_sitzung is not None:
         e["neu_je_sitzung"] = eingabe.neu_je_sitzung
+    if eingabe.fragen_je_tag is not None:
+        e["fragen_je_tag"] = eingabe.fragen_je_tag
     if eingabe.neues_einstreuen is not None:
         e["neues_einstreuen"] = eingabe.neues_einstreuen
     if eingabe.beschriftung is not None:
@@ -1454,6 +1456,9 @@ def lern_naechste(benutzer_id: int, sammlung_id: int | None = None,
                   nur: str | None = None,
                   anzahl: int = Query(default=1, ge=1, le=50),
                   lernziel_id: int | None = None,
+                  ohne_grenze: bool = Query(
+                      default=False,
+                      description="über die Tagesdosis hinaus weitermachen"),
                   db: sqlite3.Connection = DB):
     """Die nächsten Aufgaben, mit Begründung und Terminvorschau.
 
@@ -1463,7 +1468,8 @@ def lern_naechste(benutzer_id: int, sammlung_id: int | None = None,
     if nur not in (None, "neu", "faellig", "fehler", "frei"):
         raise HTTPException(400, "nur muss neu, faellig, fehler oder frei sein")
     return lernmodul.naechste(db, benutzer_id, sammlung_id, lektion_id,
-                              typ, nur, anzahl, lernziel_id, bis_lektion)
+                              typ, nur, anzahl, lernziel_id, bis_lektion,
+                              ohne_grenze)
 
 
 @app.post("/api/lernen/pruefen")

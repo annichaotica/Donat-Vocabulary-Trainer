@@ -27,6 +27,8 @@ class BenutzerAendern(BaseModel):
     farbe: str | None = None
     wunschretention: float | None = Field(default=None, ge=0.70, le=0.99)
     neu_je_sitzung: int | None = Field(default=None, ge=0, le=500)
+    # Die Tagesdosis in Fragen; 0 heißt ausdrücklich ohne Grenze.
+    fragen_je_tag: int | None = Field(default=None, ge=0, le=2000)
     # Neues durchgehend untermischen statt erst nach allem Fälligen.
     neues_einstreuen: bool | None = None
     # Wie eine Form benannt wird: "Genitiv Singular", "wessen?, Einzahl"

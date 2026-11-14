@@ -24,6 +24,27 @@ import merkmale as mk
 #   neu       — Neues zuletzt, und mengenmäßig begrenzt
 NEU_JE_SITZUNG = 20
 
+# Wie viele Fragen ein Tag höchstens hat.
+#
+# Ohne Grenze ist die Tagesmenge einfach das, was der Terminplan ausspuckt
+# — bei tausend Wörtern dreistellig, und nach ein paar Tagen Pause steht
+# eine Mauer da, vor der man aufgibt. Mit Grenze ist der Tag immer
+# schaffbar, und was darüber hinaus liegt, ist kein Vorwurf, sondern eine
+# Zahl, die jeden Tag kleiner wird.
+#
+# Nichts geht dabei verloren: FSRS verträgt verspätete Wiederholungen,
+# die Stabilität wird aus dem tatsächlichen Abstand gerechnet.
+FRAGEN_JE_TAG = 80
+
+# Welcher Anteil des Tages dem Neuen offensteht.
+#
+# Ohne diese Reserve fräße ein Rückstand den ganzen Tag auf: Fälliges
+# steht in der Reihenfolge vorn, also käme Neues erst, wenn der Rückstand
+# abgearbeitet ist — bei vierhundert offenen Wiederholungen also wochenlang
+# nicht. Dann wäre die Grenze genau das, was sie verhindern soll: ein
+# Stillstand. Die Hälfte des Tages gehört darum dem Vorankommen.
+NEU_ANTEIL = 0.5
+
 # In welcher Folge Neues eingeführt wird: nach Lektion, dann nach der
 # Lernreihenfolge innerhalb der Lektion, dann nach Eingabedatum. Wörter
 # ohne Lektion kommen zuletzt — sie sind meist selbst nachgetragen.
@@ -86,10 +107,17 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
             retention = 0.95
         if lg.get("weniger_neues") and "neu_je_sitzung" not in e:
             neu = 8
+    # 0 heißt ausdrücklich "ohne Grenze" — wer das will, soll es haben.
+    dosis = e.get("fragen_je_tag")
+    dosis = FRAGEN_JE_TAG if dosis is None else max(0, int(dosis))
+    if lg["aktiv"] and lg.get("weniger_neues") and "fragen_je_tag" not in e:
+        dosis = min(dosis, 40) if dosis else 40
     stil = e.get("beschriftung", "fach")
     return {
         "wunschretention": retention,
         "neu_je_sitzung": neu,
+        # Die Tagesdosis in Fragen. 0 = ohne Grenze.
+        "fragen_je_tag": dosis,
         "name": b["name"],
         "legasthenie": lg,
         # Neues durchgehend untermischen statt erst nach allem Fälligen?
@@ -130,7 +158,9 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
     sammlungen = ([sammlung_id] if sammlung_id
                   else _zugaengliche_sammlungen(db, benutzer_id))
     if not sammlungen:
-        return {"faellig": 0, "neu": 0, "verlernt": 0, "reif": 0, "gesamt": 0}
+        return {"faellig": 0, "neu": 0, "verlernt": 0, "reif": 0, "gesamt": 0,
+                "heute_erledigt": 0, "heute_offen": 0, "heute_gesamt": 0,
+                "tagesdosis": 0, "rueckstand": 0, "neue_woerter_frei": 0}
     platzhalter = ",".join("?" * len(sammlungen))
     heute_text = heute().isoformat()
     grund = f"""
@@ -200,6 +230,15 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
             (benutzer_id, *begonnen)) or 0
 
     offen = faellig + verlernt + neu_offen
+    # Die Tagesdosis schneidet das Pensum zu. Angezeigt wird, was heute
+    # wirklich drankommt; was darüber hinaus wartet, steht daneben als
+    # Rückstand — eine Zahl, die kleiner wird, keine Mauer.
+    dosis = e["fragen_je_tag"]
+    heute_offen = offen
+    rueckstand = 0
+    if dosis:
+        heute_offen = max(0, min(offen, dosis - erledigt))
+        rueckstand = offen - heute_offen
     return {
         "gesamt": dbm.wert(db, f"SELECT COUNT(*) {grund}", werte) or 0,
         "neu": zahl("(z.zustand IS NULL OR z.zustand = 'neu')"),
@@ -210,8 +249,13 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
         # Das Tagespensum: wie viel heute schon erledigt ist und wie viel
         # noch kommt. Eine Abfrage endet, wenn beides aufgeht.
         "heute_erledigt": erledigt,
-        "heute_offen": offen,
-        "heute_gesamt": erledigt + offen,
+        "heute_offen": heute_offen,
+        "heute_gesamt": erledigt + heute_offen,
+        # Die Grenze selbst (0 = ohne) und was heute nicht mehr drankommt.
+        # Keine Schätzung, wie lange das Aufholen dauert: die hinge daran,
+        # wie viel täglich neu fällig wird, und wäre erfunden.
+        "tagesdosis": dosis,
+        "rueckstand": rueckstand,
         "neue_woerter_frei": max(0, e["neu_je_sitzung"] - len(begonnen)),
     }
 
@@ -233,6 +277,76 @@ def _schon_gefragt_heute(db: sqlite3.Connection, benutzer_id: int) -> int:
          WHERE benutzer_id = ? AND zeitpunkt >= ? AND zeitpunkt < ?""",
         (benutzer_id, heute().isoformat(),
          (heute() + dt.timedelta(days=1)).isoformat())) or 0
+
+
+def _tagesstand(db: sqlite3.Connection, benutzer_id: int) -> dict:
+    """Was heute schon gelaufen ist, getrennt nach Neuem und Wiederholung.
+
+    `stabilitaet_vor IS NULL` kennzeichnet die erste Begegnung mit einer
+    Aufgabe — daran hängt die Unterscheidung, und daran allein, denn der
+    Server hält keine Sitzung.
+    """
+    z = dbm.zeile(db, """
+        SELECT COUNT(*) AS gesamt,
+               SUM(CASE WHEN stabilitaet_vor IS NULL THEN 1 ELSE 0 END) AS neu
+          FROM wiederholung
+         WHERE benutzer_id = ? AND zeitpunkt >= ? AND zeitpunkt < ?""",
+        (benutzer_id, heute().isoformat(),
+         (heute() + dt.timedelta(days=1)).isoformat()))
+    gesamt = (z["gesamt"] if z else 0) or 0
+    neu = (z["neu"] if z else 0) or 0
+    return {"gesamt": gesamt, "neu": neu, "wiederholung": gesamt - neu}
+
+
+def _dosis_rest(einstellungen: dict, tag: dict) -> dict | None:
+    """Wie viel vom Tagespensum noch offen ist — None heißt: ohne Grenze.
+
+    Die beiden Teilbeträge sind keine festen Fächer. Was das eine nicht
+    braucht, darf das andere nehmen; begrenzt ist nur die Summe. Sonst
+    endete ein Tag ohne neues Material vorzeitig, obwohl noch Luft wäre.
+    """
+    dosis = einstellungen["fragen_je_tag"]
+    if not dosis:
+        return None
+    gesamt = max(0, dosis - tag["gesamt"])
+    fuer_neu = round(dosis * NEU_ANTEIL)
+    return {
+        "gesamt": gesamt,
+        "neu": min(gesamt, max(0, fuer_neu - tag["neu"])),
+        "wiederholung": min(gesamt, max(0, dosis - fuer_neu
+                                        - tag["wiederholung"])),
+    }
+
+
+def _vorzug(rest: dict | None) -> str | None:
+    """Welcher Topf an der Reihe ist: "neu", "wiederholung" oder keiner.
+
+    Hat das Fällige seinen Anteil verbraucht, kommt Neues dran, obwohl
+    noch Wiederholungen offen sind — genau darum geht es: auch bei
+    Rückstand jeden Tag ein Stück vorankommen.
+    """
+    if rest is None:
+        return None
+    if rest["neu"] <= 0 < rest["wiederholung"]:
+        return "wiederholung"
+    if rest["wiederholung"] <= 0 < rest["neu"]:
+        return "neu"
+    return None
+
+
+def _nach_vorzug_waehlen(reihe: list[dict], vorzug: str | None) -> list[dict]:
+    """Dasselbe als Sieb — für eine Reihe, die schon fertig gestellt ist.
+
+    Taugt nur, wo die Auswahl ohnehin vollständig vorliegt (Lernzielblock).
+    Beim Abruf aus der Datenbank wäre es falsch: dort umfasst das Fenster
+    nur wenige Zeilen, und bei Rückstand stünde darin nie etwas Neues.
+    """
+    if vorzug is None:
+        return reihe
+    ist_neu = lambda r: r.get("zustand") in (None, "neu")
+    passend = [r for r in reihe
+               if ist_neu(r) == (vorzug == "neu")]
+    return passend or reihe
 
 
 def _zuletzt_gefragt(db: sqlite3.Connection, benutzer_id: int,
@@ -348,7 +462,9 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
              nur: str | None = None,
              anzahl: int = 1,
              lernziel_id: int | None = None,
-             bis_lektion: int | None = None) -> list[dict]:
+             bis_lektion: int | None = None,
+             ohne_grenze: bool = False,
+             _ohne_vorzug: bool = False) -> list[dict]:
     """Die nächsten Aufgaben.
 
     nur:  None       — planmäßig: verlernt, dann fällig, dann neu
@@ -356,6 +472,11 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
           "faellig"  — nur Fälliges, kein Neues
           "frei"     — freies Üben: alles, ohne Terminlogik
           "fehler"   — was zuletzt schiefging
+
+    Die Tagesdosis begrenzt nur die planmäßige Abfrage (nur=None) und den
+    Lernzielblock. Wer ausdrücklich "nur Fälliges" oder "freies Üben"
+    wählt, hat sich schon entschieden; dem redet die Grenze nicht herein.
+    `ohne_grenze` ist der Knopf "trotzdem weitermachen" am Tagesende.
     """
     # Ein Lernziel schneidet den Bestand zu — und zwar quer über Lektionen
     # und Sammlungen. Der Block entscheidet dann über die Reihenfolge.
@@ -364,10 +485,15 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         # Der Block wird in brauchbarer Größe gerechnet, auch wenn nur eine
         # Aufgabe abgeholt wird: bei Blockgröße 1 kann die Verschränkung
         # nichts verschränken und der Zuschnitt verliert seinen Sinn.
-        plan = lernziele.block(db, benutzer_id, lernziel_id, max(anzahl, 20))
         e = benutzer_einstellungen(db, benutzer_id)
+        rest = None if ohne_grenze else _dosis_rest(
+            e, _tagesstand(db, benutzer_id))
+        if rest is not None and rest["gesamt"] <= 0:
+            return []          # Tagespensum voll. Was fehlt, sagt stand().
+        plan = lernziele.block(db, benutzer_id, lernziel_id, max(anzahl, 20))
         ergebnis = []
-        gewaehlt = _abwechseln(plan["aufgaben"],
+        gewaehlt = _nach_vorzug_waehlen(plan["aufgaben"], _vorzug(rest))
+        gewaehlt = _abwechseln(gewaehlt,
                                _schon_gefragt_heute(db, benutzer_id))
         gewaehlt = _abstand_halten(gewaehlt,
                                    _zuletzt_gefragt(db, benutzer_id), anzahl)
@@ -390,6 +516,12 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     if not sammlungen:
         return []
     e = benutzer_einstellungen(db, benutzer_id)
+    rest = None
+    if nur is None and not ohne_grenze:
+        rest = _dosis_rest(e, _tagesstand(db, benutzer_id))
+        if rest is not None and rest["gesamt"] <= 0:
+            return []          # Tagespensum voll. Was fehlt, sagt stand().
+    vorzug = None if _ohne_vorzug else _vorzug(rest)
     heute_text = heute().isoformat()
 
     bedingungen = [f"l.sammlung_id IN ({','.join('?' * len(sammlungen))})",
@@ -431,13 +563,24 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         bedingungen.append("(z.zustand IS NULL OR z.zustand != 'ausgesetzt')")
         ordnung = "RANDOM()"
     else:
-        bedingungen.append("""(
-            z.zustand IS NULL
-            OR z.zustand = 'neu'
-            OR (z.zustand = 'verlernt')
-            OR (z.zustand IN ('lernen','reif') AND z.faellig <= ?)
-        )""")
-        werte.append(heute_text)
+        if vorzug == "neu":
+            # Der Tagesanteil fürs Fällige ist verbraucht; jetzt gehört
+            # der Rest dem Vorankommen.
+            bedingungen.append("(z.zustand IS NULL OR z.zustand = 'neu')")
+        elif vorzug == "wiederholung":
+            bedingungen.append("""(
+                z.zustand = 'verlernt'
+                OR (z.zustand IN ('lernen','reif') AND z.faellig <= ?)
+            )""")
+            werte.append(heute_text)
+        else:
+            bedingungen.append("""(
+                z.zustand IS NULL
+                OR z.zustand = 'neu'
+                OR (z.zustand = 'verlernt')
+                OR (z.zustand IN ('lernen','reif') AND z.faellig <= ?)
+            )""")
+            werte.append(heute_text)
         # verlernt zuerst, dann nach Fälligkeit, Neues zuletzt — und
         # innerhalb des Neuen von jedem Wort erst die erste Aufgabe.
         # Erst Verlerntes und Fälliges, dann Neues — und innerhalb des
@@ -520,9 +663,16 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # und unter gleich Dringendem abgewechselt wird.
     # Erst abwechseln, DANN Abstand halten: andersherum holte das
     # Abwechseln die eben zurückgestellten Wörter wieder nach vorn.
+    if not reihe and vorzug is not None:
+        # Der bevorzugte Topf ist leer — dann eben der andere. Eine halb
+        # ungenutzte Tagesdosis hilft niemandem.
+        return naechste(db, benutzer_id, sammlung_id, lektion_id, typen, nur,
+                        anzahl, lernziel_id, bis_lektion, ohne_grenze,
+                        _ohne_vorzug=True)
     zaehler = _schon_gefragt_heute(db, benutzer_id)
     nachschub = None
-    if nur is None and e["neues_einstreuen"]:
+    if (nur is None and e["neues_einstreuen"]
+            and (rest is None or rest["neu"] > 0)):
         # Eigene Abfrage nur für Neues — im normalen Fenster steht bei
         # großem Rückstand keines.
         nachschub = dbm.zeilen(db, f"""

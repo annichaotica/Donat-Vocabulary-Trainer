@@ -264,6 +264,8 @@ async function teilLernen(behaelter) {
   });
 
   const neu = h('input', { type: 'number', min: '0', max: '200', value: String(e.neu_je_sitzung) });
+  const dosis = h('input', { type: 'number', min: '0', max: '2000',
+                             value: String(e.fragen_je_tag ?? 80) });
 
   kasten.append(h('div', { class: 'regler' },
     h('label', { text: 'Wie sicher soll etwas sitzen, wenn es wieder dran ist?' }),
@@ -273,7 +275,19 @@ async function teilLernen(behaelter) {
         + 'Aufwand. 90 % ist der übliche Mittelweg; darunter wird es schnell lückig.' }));
 
   kasten.append(h('div', { class: 'regler' },
-    h('label', { text: 'Neue Aufgaben je Tag' }), h('span', {}), neu, h('span', {})));
+    h('label', { text: 'Neue Wörter je Tag' }), h('span', {}), neu, h('span', {})));
+  kasten.append(h('p', { class: 'leise',
+    text: 'Gezählt werden Wörter, nicht Fragen: ein Verb ist ein Wort, auch '
+        + 'wenn vierzig Formen daran hängen.' }));
+
+  kasten.append(h('div', { class: 'regler' },
+    h('label', { text: 'Fragen je Tag höchstens' }), h('span', {}), dosis,
+    h('span', {})));
+  kasten.append(h('p', { class: 'leise',
+    text: 'Die Obergrenze für einen Tag, damit das Pensum schaffbar bleibt — '
+        + 'auch nach einer Pause. Die Hälfte davon ist für Neues reserviert, '
+        + 'damit es trotz Rückstand vorangeht. Weitermachen darfst du immer. '
+        + '0 heißt: keine Grenze.' }));
 
   const einstreuen = h('input', {
     type: 'checkbox', checked: Boolean(e.neues_einstreuen),
@@ -309,6 +323,7 @@ async function teilLernen(behaelter) {
   // eingefroren, auch nach Abschalten des Modus. Darum wird nur gesendet,
   // was wirklich bewegt wurde.
   const ausgangswerte = { retention: e.wunschretention, neu: e.neu_je_sitzung,
+                          dosis: e.fragen_je_tag,
                           stil: e.beschriftung || 'fach',
                           einstreuen: Boolean(e.neues_einstreuen) };
   if (e.legasthenie?.aktiv) {
@@ -326,6 +341,9 @@ async function teilLernen(behaelter) {
       }
       if (Number(neu.value) !== ausgangswerte.neu) {
         aenderungen.neu_je_sitzung = Number(neu.value);
+      }
+      if (Number(dosis.value) !== ausgangswerte.dosis) {
+        aenderungen.fragen_je_tag = Number(dosis.value);
       }
       if (stil.value !== ausgangswerte.stil) {
         aenderungen.beschriftung = stil.value;

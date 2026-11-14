@@ -12,6 +12,7 @@ from __future__ import annotations
 import sqlite3
 
 import datenbank as dbm
+import legasthenie
 import merkmale as mk
 import sprachen
 from pruefung import Urteil, pruefen as text_pruefen
@@ -147,8 +148,11 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
 
     # Artikel: nur wo die Sprache überhaupt Artikel nach Geschlecht hat.
     artikel = sprachen.profil(code).get("artikel", {}).get("genus_artikel", {})
+    # "mf" steht nicht in der Artikeltabelle — es bedeutet ja gerade, dass
+    # zwei Artikel gelten. Die Aufgabe soll trotzdem entstehen.
     if ("genus" in e["typen"] and wortart == "substantiv"
-            and lex_merkmale.get("genus") in artikel):
+            and (lex_merkmale.get("genus") in artikel
+                 or (lex_merkmale.get("genus") == "mf" and artikel))):
         gewuenscht[_schluessel("genus", lexem_id, "lexem", "")] = \
             ("genus", "lexem", None)
 
@@ -228,6 +232,48 @@ def _verwechslungen(db: sqlite3.Connection, lexem: dict, code: str,
     return liste
 
 
+def stamm_fuer_aufgabe(db: sqlite3.Connection, aufgabe_id: int) -> str:
+    """Der Wortstamm für die Zerlegung — in dieser Reihenfolge:
+
+    1. von Hand gesetzt (lexem.staemme je Formgruppe) — wo die Ableitung
+       nicht trägt, etwa bei Suppletion
+    2. abgeleitet aus den Geschwisterformen derselben Formgruppe,
+       ohne Varianten und ohne vorangestellte Partikel
+    """
+    a = dbm.zeile(db, """SELECT lexem_id, ziel_art, ziel_id FROM aufgabe
+                          WHERE id = ?""", (aufgabe_id,))
+    if a is None:
+        return ""
+    lexem = dbm.zeile(db, "SELECT * FROM lexem WHERE id = ?", (a["lexem_id"],))
+    if lexem is None:
+        return ""
+    sammlung = dbm.zeile(db, "SELECT sprache FROM sammlung WHERE id = ?",
+                         (lexem["sammlung_id"],))
+    code = sammlung["sprache"]
+    teilchen = sprachen.partikeln(code)
+
+    gruppe = None
+    if a["ziel_art"] == "form" and a["ziel_id"]:
+        f = dbm.zeile(db, "SELECT merkmale FROM form WHERE id = ?", (a["ziel_id"],))
+        if f is not None:
+            gruppe = _gruppe_der_form(code, lexem["wortart"],
+                                      dbm.j_lesen(f["merkmale"]))
+
+    von_hand = dbm.j_lesen(lexem["staemme"], {})
+    if gruppe and von_hand.get(gruppe["kennung"]):
+        return von_hand[gruppe["kennung"]]
+    if von_hand.get("*"):
+        return von_hand["*"]
+
+    if a["ziel_art"] == "form" and a["ziel_id"]:
+        geschwister = geschwisterformen(db, a["ziel_id"])
+    else:
+        geschwister = [z["text"] for z in dbm.zeilen(
+            db, "SELECT text FROM form WHERE lexem_id = ? AND ist_variante = 0",
+            (a["lexem_id"],))]
+    return legasthenie.stamm(geschwister, teilchen)
+
+
 def geschwisterformen(db: sqlite3.Connection, form_id: int) -> list[str]:
     """Die Formen derselben Formgruppe — also derselben Zeit beziehungsweise
     derselben Tabelle.
@@ -246,7 +292,11 @@ def geschwisterformen(db: sqlite3.Connection, form_id: int) -> list[str]:
                   (lexem["sammlung_id"],))
     fm = dbm.j_lesen(f["merkmale"])
     gruppe = _gruppe_der_form(s["sprache"], lexem["wortart"], fm)
-    alle = dbm.zeilen(db, "SELECT * FROM form WHERE lexem_id = ?", (f["lexem_id"],))
+    # Varianten bleiben draußen: μιλάω und μιλώ stehen in derselben Zelle,
+    # ihr gemeinsamer Anfang wäre kürzer als der wirkliche Stamm.
+    alle = dbm.zeilen(db, """SELECT * FROM form
+                              WHERE lexem_id = ? AND ist_variante = 0""",
+                      (f["lexem_id"],))
     if gruppe is None or len(gruppe["zellen"]) < 2:
         # Einzelform ohne Reihe: dann die ganze Zeitgruppe nach Zeit und Modus
         schluessel = {d: fm[d] for d in ("tempus", "modus", "aspekt", "kasus")
@@ -326,10 +376,13 @@ def frage(db: sqlite3.Connection, aufgabe_id: int) -> dict:
 
     if typ == "genus":
         artikel = sprachen.profil(code)["artikel"]["genus_artikel"]
+        gemeinsam = dbm.j_lesen(lexem["merkmale"]).get("genus") == "mf"
         return {**kopf,
                 "frage_text": lexem["lemma"],
                 "frage_sprache": code,
-                "frage_zusatz": "Welcher Artikel?",
+                "frage_zusatz": ("Welcher Artikel? (gemeinsames Geschlecht — "
+                                 "beide gelten)" if gemeinsam
+                                 else "Welcher Artikel?"),
                 "antwort_sprache": code,
                 "auswahl": [{"wert": g, "text": t} for g, t in artikel.items()],
                 "vorlesen": lexem["lemma"]}
@@ -421,6 +474,20 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
     if typ == "genus":
         artikel = sprachen.profil(code)["artikel"]["genus_artikel"]
         soll_genus = dbm.j_lesen(lexem["merkmale"]).get("genus")
+        if soll_genus == "mf":
+            # Gemeinsames Geschlecht: ο/η γιατρός. Beide Artikel gelten,
+            # je nachdem, wen man meint.
+            moeglich = [artikel[g] for g in ("m", "f") if g in artikel]
+            gegeben = str(eingabe).strip()
+            richtig = (gegeben in ("m", "f", "mf")
+                       or any(gegeben.casefold() == a.casefold()
+                              for a in moeglich))
+            text = " oder ".join(moeglich)
+            urteil = (Urteil("richtig", text) if richtig
+                      else Urteil("falsch", text,
+                                  f"Dieses Wort hat gemeinsames Geschlecht — "
+                                  f"richtig ist {text}.", ["genus"]))
+            return urteil, {"erwartet": moeglich, "genus": "mf"}
         soll_artikel = artikel.get(soll_genus)
         if soll_artikel is None:
             # Das Geschlecht wurde nachträglich entfernt. Dann ist die Aufgabe

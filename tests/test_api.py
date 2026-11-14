@@ -475,7 +475,9 @@ def test_stamm_wird_je_zeit_abgeleitet_nicht_ueber_alle_formen(klient):
         return gezeigt["zerlegung"]["stamm"]
 
     assert stamm_fuer("γράφουμε") == "γράφ"
-    assert stamm_fuer("θα γράψουμε") == "θα γράψ"
+    # Das θα gehört zur Form, aber nicht zum Stamm — es wird vorher
+    # abgetrennt, sonst zeigte die Zerlegung es als Teil des Wortstamms.
+    assert stamm_fuer("θα γράψουμε") == "γράψ"
     # Im Aorist wandert das Augment (έγραψα, aber γράψαμε) und mit ihm der
     # Akzent. Der Stamm ist trotzdem auffindbar.
     assert stamm_fuer("γράψαμε") == "γραψ"

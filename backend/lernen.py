@@ -366,13 +366,11 @@ def _zerlegung(db: sqlite3.Connection, aufgabe_id: int, urteil, aufloesung: dict
     ziel = urteil.treffer or next(iter(aufloesung.get("erwartet") or []), None)
     if not ziel:
         return None
-    formen = _stammformen(db, aufgabe_id)
+    st = aufgaben.stamm_fuer_aufgabe(db, aufgabe_id)
     ergebnis: dict = {}
-    if lg.get("stamm_hervorheben"):
-        st = legasthenie_modul.stamm(formen)
-        if st:
-            ergebnis["stamm"] = st
-            ergebnis["teile"] = legasthenie_modul.teilen(ziel, st)
+    if lg.get("stamm_hervorheben") and st:
+        ergebnis["stamm"] = st
+        ergebnis["teile"] = legasthenie_modul.teilen(ziel, st, _partikeln(db, aufgabe_id))
     if lg.get("silben_faerben"):
         ergebnis["silben"] = legasthenie_modul.silben(ziel)
     if lg.get("maske_stufe") is not None:
@@ -390,6 +388,16 @@ def _zeitmessung(einstellungen: dict) -> bool:
     """
     lg = einstellungen["legasthenie"]
     return not (lg.get("aktiv") and lg.get("keine_zeitmessung", True))
+
+
+def _partikeln(db: sqlite3.Connection, aufgabe_id: int) -> list[str]:
+    """Vorangestellte Wörtchen der Sprache dieser Aufgabe."""
+    import sprachen
+    code = dbm.wert(db, """SELECT s.sprache FROM aufgabe a
+                            JOIN lexem l ON l.id = a.lexem_id
+                            JOIN sammlung s ON s.id = l.sammlung_id
+                           WHERE a.id = ?""", (aufgabe_id,))
+    return sprachen.partikeln(code) if code else []
 
 
 def _stammformen(db: sqlite3.Connection, aufgabe_id: int) -> list[str]:
@@ -430,11 +438,12 @@ def aufdecken(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int) -> dict
     zerlegung = None
     if ziel and nur_text:
         lg = e["legasthenie"]
-        st = legasthenie_modul.stamm(_stammformen(db, aufgabe_id))
+        st = aufgaben.stamm_fuer_aufgabe(db, aufgabe_id)
         zerlegung = {
             "silben": legasthenie_modul.silben(ziel),
             "stamm": st or None,
-            "teile": legasthenie_modul.teilen(ziel, st) if st else [ziel],
+            "teile": (legasthenie_modul.teilen(ziel, st, _partikeln(db, aufgabe_id))
+                      if st else [ziel]),
             "maske": legasthenie_modul.maske(ziel, int(lg.get("maske_stufe", 2))),
         }
     return {"erwartet": erwartet, "aufloesung": aufloesung,

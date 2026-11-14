@@ -103,3 +103,10 @@ input.falsch, select.falsch {
   border-color: var(--falsch);
   background: var(--falsch-grund);
 }
+
+/* Vorangestelltes Wörtchen in der Zerlegung: griechisch »θα« bildet das
+ * Futur, gehört aber nicht zum Wortstamm. */
+.zerlegung .teil.vorsatz {
+  background: var(--grund-3);
+  color: var(--leise);
+}

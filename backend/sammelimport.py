@@ -107,6 +107,12 @@ def _eintrag_pruefen(code: str, eintrag: dict) -> list[str]:
         sprachen.pruefen_lexemmerkmale(code, wortart, eintrag.get("merkmale") or {})
     except mk.MerkmalFehler as f:
         fehler.append(str(f))
+    try:
+        mk.luecken_pruefen(eintrag.get("luecken"))
+    except mk.MerkmalFehler as f:
+        fehler.append(f"luecken: {f}")
+    if eintrag.get("staemme") is not None and not isinstance(eintrag["staemme"], dict):
+        fehler.append("staemme muss ein Objekt sein: Formgruppe -> Stamm")
     for i, f_ in enumerate(eintrag.get("formen") or []):
         if not (f_.get("text") or "").strip():
             fehler.append(f"Form {i + 1}: text fehlt")
@@ -146,7 +152,17 @@ def _formen_schreiben(db: sqlite3.Connection, lexem_id: int, formen: list,
 
     neu = geaendert = 0
     abweichungen: list[str] = []
+    # Nebenformen derselben Zelle werden als eigene Einträge geführt und
+    # gelten alle als richtig. Gefragt wird die Hauptform.
+    entfaltet = []
     for f in formen:
+        entfaltet.append({**f, "_variante": bool(f.get("ist_variante"))})
+        for v in f.get("varianten") or []:
+            text = v if isinstance(v, str) else (v or {}).get("text")
+            if text:
+                entfaltet.append({**f, "text": text, "varianten": None,
+                                  "ist_grundform": False, "_variante": True})
+    for f in entfaltet:
         merkmale = mk.pruefen(f.get("merkmale") or {})
         schluessel = _formschluessel(merkmale)
         text = f["text"].strip()
@@ -154,6 +170,16 @@ def _formen_schreiben(db: sqlite3.Connection, lexem_id: int, formen: list,
         gleich = next((a for a in alt_liste if a["text"] == text), None)
         if gleich is not None:
             continue                                   # schon genau so da
+        if f["_variante"]:
+            # Varianten ersetzen nie eine vorhandene Form, sie treten daneben.
+            db.execute("""INSERT INTO form (lexem_id, text, merkmale,
+                                            ist_grundform, ist_variante,
+                                            quelle, geprueft)
+                          VALUES (?, ?, ?, 0, 1, ?, ?)""",
+                       (lexem_id, text, dbm.j_schreiben(merkmale),
+                        f.get("quelle", quelle), int(f.get("geprueft", False))))
+            neu += 1
+            continue
         geprueft_alt = [a for a in alt_liste if a["geprueft"]]
         if geprueft_alt:
             # Ein Mensch hat hier schon entschieden. Nicht anrühren.
@@ -171,8 +197,9 @@ def _formen_schreiben(db: sqlite3.Connection, lexem_id: int, formen: list,
             geaendert += 1
             continue
         db.execute("""INSERT INTO form (lexem_id, text, merkmale, ist_grundform,
-                                        aussprache, quelle, geprueft, notiz)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                                        ist_variante, aussprache, quelle,
+                                        geprueft, notiz)
+                      VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)""",
                    (lexem_id, text, dbm.j_schreiben(merkmale),
                     int(f.get("ist_grundform", False)), f.get("aussprache"),
                     f.get("quelle", quelle), int(f.get("geprueft", False)),
@@ -270,13 +297,17 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
             if alt is None:
                 cur = db.execute("""INSERT INTO lexem
                                       (sammlung_id, lektion_id, lemma, wortart,
-                                       merkmale, notiz, reihenfolge, kennung)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                                       merkmale, notiz, reihenfolge, kennung,
+                                       luecken, staemme)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                                  (sammlung_id, lektion_id, eintrag["lemma"].strip(),
                                   wortart, dbm.j_schreiben(merkmale),
                                   eintrag.get("notiz"),
                                   int(eintrag.get("reihenfolge", 0)),
-                                  (eintrag.get("kennung") or "").strip() or None))
+                                  (eintrag.get("kennung") or "").strip() or None,
+                                  dbm.j_schreiben(
+                                      mk.luecken_pruefen(eintrag.get("luecken"))),
+                                  dbm.j_schreiben(eintrag.get("staemme") or {})))
                 lexem_id = cur.lastrowid
                 zustand = "angelegt"
                 ergebnis["angelegt"] += 1
@@ -286,12 +317,19 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
                                  SET lektion_id = COALESCE(?, lektion_id),
                                      merkmale = ?, reihenfolge = ?,
                                      notiz = COALESCE(?, notiz),
+                                     luecken = ?, staemme = ?,
                                      geaendert = datetime('now')
                                WHERE id = ?""",
                            (lektion_id, dbm.j_schreiben({**dbm.j_lesen(alt["merkmale"]),
                                                          **merkmale}),
                             int(eintrag.get("reihenfolge", alt["reihenfolge"])),
-                            eintrag.get("notiz"), lexem_id))
+                            eintrag.get("notiz"),
+                            dbm.j_schreiben(mk.luecken_pruefen(eintrag["luecken"])
+                                            if "luecken" in eintrag
+                                            else dbm.j_lesen(alt["luecken"], [])),
+                            dbm.j_schreiben(eintrag.get("staemme")
+                                            or dbm.j_lesen(alt["staemme"], {})),
+                            lexem_id))
                 zustand = "aktualisiert"
                 ergebnis["aktualisiert"] += 1
 

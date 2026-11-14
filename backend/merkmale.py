@@ -53,6 +53,10 @@ INVENTAR: dict[str, dict[str, tuple[str, str]]] = {
         "m": ("maskulin", "m"),
         "f": ("feminin", "f"),
         "n": ("neutrum", "n"),
+        # Wörter mit gemeinsamem Geschlecht: ο/η γιατρός, ο/η δικηγόρος.
+        # Die Form ist dieselbe, nur der Artikel richtet sich nach der
+        # gemeinten Person. Beide Artikel gelten dann als richtig.
+        "mf": ("maskulin oder feminin", "m/f"),
     },
     "kasus": {
         "nom": ("Nominativ", "Nom."),
@@ -214,3 +218,42 @@ def vergleichbar(text: str) -> str:
     (é als ein Zeichen oder als e + Akzent). Ohne das scheitert jeder
     Vergleich auf dem Mac gegen Daten aus dem Netz."""
     return unicodedata.normalize("NFC", text)
+
+
+# --------------------------------------------------------- Erklärte Lücken
+
+def passt_muster(muster: dict, zelle: dict) -> bool:
+    """Ist das Muster in dieser Zelle enthalten?
+
+    Das LEERE Muster passt überall — damit lässt sich "dieses Wort hat
+    überhaupt keine Formen" ausdrücken (το ταξί, μπλε).
+    """
+    return all(str(zelle.get(d)) == str(w) for d, w in (muster or {}).items())
+
+
+def ist_erklaerte_luecke(luecken, zelle: dict) -> bool:
+    """Wurde für diese Zelle erklärt, dass es sie nicht gibt?
+
+    Unpersönliche Verben haben keine 1. und 2. Person, είμαι hat keinen
+    Aorist, τα μεσάνυχτα keinen Singular. Das sind keine Mängel, sondern
+    Eigenschaften des Wortes — und sie dürfen weder als Fehler gemeldet
+    werden noch die Stammerkennung stören.
+    """
+    if not luecken:
+        return False
+    return any(passt_muster(m, zelle) for m in luecken if isinstance(m, dict))
+
+
+def luecken_pruefen(luecken) -> list[dict]:
+    """Prüft die Lückenmuster gegen das Inventar."""
+    if luecken is None:
+        return []
+    if not isinstance(luecken, list):
+        raise MerkmalFehler("luecken muss eine Liste von Merkmalsmustern sein")
+    sauber = []
+    for muster in luecken:
+        if not isinstance(muster, dict):
+            raise MerkmalFehler("Jedes Lückenmuster muss ein Objekt sein; das "
+                                "leere Objekt {} bedeutet: gar keine Formen")
+        sauber.append(pruefen(muster))
+    return sauber

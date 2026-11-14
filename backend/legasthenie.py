@@ -185,7 +185,21 @@ def _gemeinsamer_anfang(worte: list[str]) -> int:
     return laenge
 
 
-def stamm(formen: list[str]) -> str:
+def ohne_partikel(wort: str, partikeln: list[str]) -> str:
+    """Trennt ein vorangestelltes Wörtchen ab.
+
+    Griechisch bildet das Futur mit θα davor: θα γράψω. Ohne Abtrennung
+    ergäbe die Stammerkennung "θα γράψ" — und die Zerlegung zeigte das θα
+    als Teil des Wortstamms, was es nicht ist.
+    """
+    text = (wort or "").strip()
+    for p in sorted(partikeln or [], key=len, reverse=True):
+        if text.casefold().startswith(p.casefold() + " "):
+            return text[len(p):].strip()
+    return text
+
+
+def stamm(formen: list[str], partikeln: list[str] | None = None) -> str:
     """Der gemeinsame Stamm der Formen — aus dem Paradigma abgeleitet.
 
     Wer "parle, parles, parlons, parlez, parlent" beisammen hat, weiß ohne
@@ -201,7 +215,8 @@ def stamm(formen: list[str]) -> str:
       gemeinsamen Stamm aber sehr wohl. Darum wird jeder Form zugestanden,
       ein Zeichen davor zu haben.
     """
-    sauber = [f for f in formen if f and f.strip()]
+    sauber = [ohne_partikel(f, partikeln) for f in formen if f and f.strip()]
+    sauber = [f for f in sauber if f]
     if len(sauber) < 2:
         return ""
     gefaltet = [_falten(f) for f in sauber]
@@ -231,7 +246,8 @@ def _laengster_treffer(original: str, gefalteter_stamm: str) -> str:
     return original[:len(gefalteter_stamm)]
 
 
-def teilen(wort: str, stamm_text: str) -> list[str]:
+def teilen(wort: str, stamm_text: str,
+           partikeln: list[str] | None = None) -> list[str]:
     """Zerlegt eine Form in Stamm und Endung.
 
     Vergleicht ohne Betonungszeichen und lässt ein Augment davor zu, damit
@@ -239,13 +255,18 @@ def teilen(wort: str, stamm_text: str) -> list[str]:
     """
     if not wort or not stamm_text:
         return [wort] if wort else []
+    # Ein vorangestelltes Wörtchen bleibt als eigenes Stück stehen: das θα
+    # gehört zur Form, aber nicht zum Stamm.
+    rumpf = ohne_partikel(wort, partikeln)
+    vorsatz = wort[:len(wort) - len(rumpf)] if len(rumpf) < len(wort) else ""
     ziel = _falten(stamm_text)
-    gefaltet = _falten(wort)
+    gefaltet = _falten(rumpf)
     for versatz in (0, 1):
         if gefaltet[versatz:].startswith(ziel):
             schnitt = versatz + len(ziel)
-            rest = wort[schnitt:]
-            return [wort[:schnitt], rest] if rest else [wort]
+            rest = rumpf[schnitt:]
+            teile = [rumpf[:schnitt]] + ([rest] if rest else [])
+            return ([vorsatz.strip()] + teile) if vorsatz.strip() else teile
     return [wort]
 
 

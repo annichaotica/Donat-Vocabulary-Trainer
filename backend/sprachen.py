@@ -127,7 +127,9 @@ FRANZOESISCH = {
     "stammformen": ["infinitif", "participe_passe"],
     "lexemmerkmale": {
         "verb": {"hilfsverb": ["avoir", "être"], "klasse": ["er", "ir", "re", "unregelmäßig"]},
-        "substantiv": {"genus": ["m", "f"]},
+        # "mf": gemeinsames Geschlecht (un/une élève) — die Form ist
+        # dieselbe, nur der Artikel richtet sich nach der Person.
+        "substantiv": {"genus": ["m", "f", "mf"]},
     },
 }
 
@@ -197,7 +199,9 @@ SPANISCH = {
     "stammformen": ["infinitivo", "participio", "gerundio"],
     "lexemmerkmale": {
         "verb": {"klasse": ["ar", "er", "ir", "unregelmäßig"]},
-        "substantiv": {"genus": ["m", "f"]},
+        # "mf": gemeinsames Geschlecht (un/une élève) — die Form ist
+        # dieselbe, nur der Artikel richtet sich nach der Person.
+        "substantiv": {"genus": ["m", "f", "mf"]},
     },
 }
 
@@ -263,6 +267,10 @@ GRIECHISCH = {
     # Tastatur umständlich sind.
     "tastatur_empfohlen": True,
     "sonderzeichen": ["ά", "έ", "ή", "ί", "ό", "ύ", "ώ", "ϊ", "ϋ", "ΐ", "ΰ", "ς"],
+    # Vorangestellte Wörtchen, die nicht zum Stamm gehören. Ohne sie ergäbe
+    # die Stammerkennung beim Futur "θα γράψ" statt "γράψ" — und die
+    # Zerlegung in Stamm und Endung zeigte das θα als Teil des Wortstamms.
+    "partikeln": ["θα", "να", "ας", "δεν", "μην"],
     "formgruppen_standard": {
         "verb": ["enestotas", "aoristos", "mellontas_stigmiaios"],
         "substantiv": ["subst_nom_sg", "subst_gen_sg", "subst_akk_sg",
@@ -321,7 +329,7 @@ GRIECHISCH = {
     },
     "stammformen": ["enestotas", "aoristos", "mellontas_stigmiaios"],
     "lexemmerkmale": {
-        "substantiv": {"genus": ["m", "f", "n"]},
+        "substantiv": {"genus": ["m", "f", "n", "mf"]},
         "verb": {"klasse": ["Α-Konjugation", "Β1", "Β2", "unregelmäßig"]},
     },
 }
@@ -414,7 +422,7 @@ MITTELHOCHDEUTSCH = {
         "verb": {"klasse": ["stark I", "stark II", "stark III", "stark IV",
                             "stark V", "stark VI", "stark VII",
                             "schwach", "Präteritopräsens", "Wurzelverb"]},
-        "substantiv": {"genus": ["m", "f", "n"],
+        "substantiv": {"genus": ["m", "f", "n", "mf"],
                        "klasse": ["stark a", "stark i", "stark u",
                                   "schwach n", "Wurzelnomen"]},
     },
@@ -460,7 +468,7 @@ DEUTSCH = {
         ],
     },
     "stammformen": ["infinitiv", "praeteritum", "partizip_ii"],
-    "lexemmerkmale": {"substantiv": {"genus": ["m", "f", "n"]}},
+    "lexemmerkmale": {"substantiv": {"genus": ["m", "f", "n", "mf"]}},
 }
 
 PROFILE: dict[str, dict] = {
@@ -480,6 +488,7 @@ RUECKFALL = {
     "artikel": {"bestimmt": [], "unbestimmt": [], "regel": "ignorieren",
                 "genus_artikel": {}},
     "sonderzeichen": [],
+    "partikeln": [],
     "formgruppen": {},
     "formgruppen_standard": {},
     "stammformen": [],
@@ -636,7 +645,12 @@ def pruefen_lexemmerkmale(code: str, wortart: str, merkmale: dict) -> dict[str, 
 ERLAUBTE_SCHLUESSEL = {"name", "schrift", "stimme", "pruefung", "artikel",
                        "formgruppen", "formgruppen_standard", "stammformen",
                        "lexemmerkmale", "beschriftungen", "sonderzeichen",
-                       "tastatur_empfohlen"}
+                       "tastatur_empfohlen", "partikeln"}
+
+
+def partikeln(code: str) -> list[str]:
+    """Vorangestellte Wörtchen, die nicht zum Stamm gehören."""
+    return list(profil(code).get("partikeln", []))
 
 
 def tastatur_empfohlen(code: str) -> bool:

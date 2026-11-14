@@ -42,6 +42,7 @@ def pruefen(db: sqlite3.Connection, lexem_id: int) -> dict:
     formen = dbm.zeilen(db, "SELECT * FROM form WHERE lexem_id = ?", (lexem_id,))
     for f in formen:
         f["merkmale"] = dbm.j_lesen(f["merkmale"])
+    luecken = dbm.j_lesen(lexem["luecken"], [])
     bedeutungen = dbm.zeilen(db, "SELECT * FROM bedeutung WHERE lexem_id = ?",
                              (lexem_id,))
     uebersetzungen = []
@@ -54,8 +55,8 @@ def pruefen(db: sqlite3.Connection, lexem_id: int) -> dict:
     befunde: list[dict] = []
     befunde += _bedeutungen_pruefen(uebersetzungen, grund)
     befunde += _lemma_pruefen(db, lexem)
-    befunde += _formen_pruefen(formen, code, wortart, e)
-    befunde += _staemme_pruefen(formen, code, wortart)
+    befunde += _formen_pruefen(formen, code, wortart, e, luecken)
+    befunde += _staemme_pruefen(formen, code, wortart, luecken)
     befunde += _aufgaben_pruefen(aktive, formen, uebersetzungen)
 
     schwer = [b for b in befunde if b["schwere"] == "fehler"]
@@ -114,9 +115,14 @@ def _lemma_pruefen(db: sqlite3.Connection, lexem: dict) -> list[dict]:
 
 
 def _formen_pruefen(formen: list[dict], code: str, wortart: str,
-                    einstellungen: dict) -> list[dict]:
+                    einstellungen: dict, luecken: list | None = None) -> list[dict]:
+    luecken = luecken or []
     befunde = []
     if not formen:
+        # Für unveränderliche Wörter (το ταξί, μπλε) ist "keine Formen"
+        # die Wahrheit, kein Mangel.
+        if mk.ist_erklaerte_luecke(luecken, {}):
+            return []
         # Nur melden, wo es überhaupt Formen geben KANN. Adverbien,
         # Präpositionen, Konjunktionen und Wendungen haben keine — ein
         # Mangel wäre das nur, wenn die Sprache für diese Wortart
@@ -178,17 +184,24 @@ def _formen_pruefen(formen: list[dict], code: str, wortart: str,
             continue
         belegt = 0
         fehlende = []
+        erklaert = 0
         for zelle in gruppe["zellen"]:
+            if mk.ist_erklaerte_luecke(luecken, zelle):
+                erklaert += 1
+                continue
             if any(all(str(f["merkmale"].get(d)) == str(w) for d, w in zelle.items())
                    for f in formen):
                 belegt += 1
             else:
                 fehlende.append(sprachen.beschriften_form(code, wortart, zelle,
                                                           kurz=True))
+        if erklaert and not belegt and not fehlende:
+            continue                 # die ganze Gruppe gibt es bei diesem Wort nicht
         if belegt and fehlende:
             befunde.append(_befund(
                 "paradigma_lueckig", "hinweis",
-                f"{gruppe['name']}: {belegt} von {len(gruppe['zellen'])} Formen da.",
+                f"{gruppe['name']}: {belegt} von "
+                f"{len(gruppe['zellen']) - erklaert} Formen da.",
                 betrifft=fehlende,
                 rat=f"Es fehlen: {', '.join(fehlende)}. Fehlende Zellen bedeuten "
                     f"fehlende Aufgaben, und ein lückiges Paradigma verdirbt "
@@ -196,7 +209,8 @@ def _formen_pruefen(formen: list[dict], code: str, wortart: str,
     return befunde
 
 
-def _staemme_pruefen(formen: list[dict], code: str, wortart: str) -> list[dict]:
+def _staemme_pruefen(formen: list[dict], code: str, wortart: str,
+                     luecken: list | None = None) -> list[dict]:
     """Lässt sich der Stamm je Formgruppe ableiten?
 
     Davon hängt die Zerlegung in Stamm und Endung ab — die Hilfe, die der
@@ -207,11 +221,12 @@ def _staemme_pruefen(formen: list[dict], code: str, wortart: str) -> list[dict]:
         if len(gruppe["zellen"]) < 2:
             continue
         dazu = [f["text"] for f in formen
-                if all(str(f["merkmale"].get(d)) == str(w)
-                       for d, w in gruppe["merkmale"].items())]
+                if not f.get("ist_variante")
+                and all(str(f["merkmale"].get(d)) == str(w)
+                        for d, w in gruppe["merkmale"].items())]
         if len(dazu) < 2:
             continue
-        if not legasthenie.stamm(dazu):
+        if not legasthenie.stamm(dazu, sprachen.partikeln(code)):
             befunde.append(_befund(
                 "stamm_nicht_ableitbar", "hinweis",
                 f"{gruppe['name']}: die Formen haben keinen gemeinsamen Stamm.",

@@ -115,11 +115,23 @@ export function silbenZeigen(silben) {
 export function zerlegungZeigen(zerlegung) {
   if (!zerlegung) return null;
   const kasten = h('div', { class: 'zerlegung' });
-  if (zerlegung.teile && zerlegung.teile.length === 2) {
+  const teile = zerlegung.teile || [];
+  if (teile.length >= 2) {
+    // Bei drei Teilen steht vorn ein eigenes Wörtchen: griechisch »θα«
+    // bildet das Futur, gehört aber nicht zum Stamm.
+    const hatVorsatz = teile.length === 3;
+    if (hatVorsatz) {
+      kasten.append(h('span', { class: 'teil vorsatz', text: teile[0],
+                                title: 'eigenes Wörtchen' }));
+    }
     kasten.append(
-      h('span', { class: 'teil stamm', text: zerlegung.teile[0], title: 'Stamm' }),
-      h('span', { class: 'teil endung', text: zerlegung.teile[1], title: 'Endung' }),
-      h('span', { class: 'leise', text: 'Stamm und Endung' }),
+      h('span', { class: 'teil stamm', text: teile[hatVorsatz ? 1 : 0],
+                  title: 'Stamm' }),
+      h('span', { class: 'teil endung', text: teile[hatVorsatz ? 2 : 1],
+                  title: 'Endung' }),
+      h('span', { class: 'leise',
+                  text: hatVorsatz ? 'Wörtchen, Stamm und Endung'
+                                   : 'Stamm und Endung' }),
     );
   } else if (zerlegung.silben && zerlegung.silben.length > 1) {
     kasten.append(h('span', { class: 'teil' }, silbenZeigen(zerlegung.silben)),

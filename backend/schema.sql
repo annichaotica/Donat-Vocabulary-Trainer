@@ -108,6 +108,20 @@ CREATE TABLE IF NOT EXISTS lexem (
     -- Lernreihenfolge innerhalb der Lektion. Neues wird in dieser Folge
     -- eingeführt, nicht nach Zufall oder Eingabedatum.
     reihenfolge  INTEGER NOT NULL DEFAULT 0,
+    -- ERKLÄRTE LÜCKEN: Merkmalsmuster für Zellen, die es bei diesem Wort
+    -- nicht gibt. Eine Zelle gilt als erklärt leer, wenn eines der Muster
+    -- in ihr enthalten ist. Beispiele:
+    --   unpersönlich (πρέπει, βρέχει): [{"person":"1"},{"person":"2"}]
+    --   ohne Aorist (είμαι, ξέρω):     [{"tempus":"aorist"}]
+    --   nur Plural (τα μεσάνυχτα):     [{"numerus":"sg"}]
+    --   unveränderlich (το ταξί, μπλε): [{}]  — das leere Muster passt überall
+    -- Erklärte Lücken gelten nicht als Mangel und stören die Stammerkennung
+    -- nicht. Ohne sie meldete der Trainer bei jedem dritten griechischen
+    -- Wort einen Fehler, den es nicht gibt.
+    luecken      TEXT NOT NULL DEFAULT '[]',
+    -- Stamm je Formgruppe, von Hand gesetzt. Überschreibt die Ableitung
+    -- aus den Formen — nötig, wo die nicht trägt.
+    staemme      TEXT NOT NULL DEFAULT '{}',
     -- Kennung aus der Quelle, falls es eine gibt. Sie entscheidet beim
     -- wiederholten Import, ob ein Eintrag derselbe ist. Ohne sie dient
     -- lemma + wortart als Schlüssel — was bei Gleichlautern (φορά "Mal"
@@ -134,6 +148,10 @@ CREATE TABLE IF NOT EXISTS form (
     text          TEXT NOT NULL,
     merkmale      TEXT NOT NULL DEFAULT '{}',
     ist_grundform INTEGER NOT NULL DEFAULT 0,
+    -- Nebenform derselben Zelle: μιλάω neben μιλώ, είστε neben είσαστε.
+    -- Beide gelten als richtig; gefragt und für die Stammerkennung benutzt
+    -- wird die Hauptform.
+    ist_variante  INTEGER NOT NULL DEFAULT 0,
     aussprache    TEXT,                       -- IPA
     audio         TEXT,                       -- Dateipfad eigener Aufnahme
     quelle        TEXT NOT NULL DEFAULT 'manuell'

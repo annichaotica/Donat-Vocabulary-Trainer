@@ -640,12 +640,20 @@ def lexem_anlegen(eingabe: LexemEingabe, request: Request = None,
 
     db.execute("BEGIN")
     try:
+        lektion_id = eingabe.lektion_id
+        if lektion_id is None and eingabe.lektion_nr is not None:
+            lektion_id = sammelimport.lektion_sichern(db, eingabe.sammlung_id,
+                                                      eingabe.lektion_nr)
         cur = db.execute("""INSERT INTO lexem
-                              (sammlung_id, lektion_id, lemma, wortart, merkmale, notiz)
-                            VALUES (?, ?, ?, ?, ?, ?)""",
-                         (eingabe.sammlung_id, eingabe.lektion_id, eingabe.lemma,
+                              (sammlung_id, lektion_id, lemma, wortart, merkmale,
+                               notiz, reihenfolge, kennung, luecken, staemme)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                         (eingabe.sammlung_id, lektion_id, eingabe.lemma,
                           eingabe.wortart, dbm.j_schreiben(lex_merkmale),
-                          eingabe.notiz))
+                          eingabe.notiz, eingabe.reihenfolge,
+                          (eingabe.kennung or "").strip() or None,
+                          dbm.j_schreiben(eingabe.luecken),
+                          dbm.j_schreiben(eingabe.staemme)))
         lexem_id = cur.lastrowid
         for f in eingabe.formen:
             _form_einfuegen(db, lexem_id, f)
@@ -667,13 +675,23 @@ def lexem_anlegen(eingabe: LexemEingabe, request: Request = None,
 
 def _form_einfuegen(db: sqlite3.Connection, lexem_id: int, f: FormEingabe) -> int:
     cur = db.execute("""INSERT INTO form
-                          (lexem_id, text, merkmale, ist_grundform, aussprache,
-                           quelle, geprueft, notiz)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                          (lexem_id, text, merkmale, ist_grundform, ist_variante,
+                           aussprache, quelle, geprueft, notiz)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                      (lexem_id, f.text, dbm.j_schreiben(f.merkmale),
-                      int(f.ist_grundform), f.aussprache, f.quelle,
-                      int(f.geprueft), f.notiz))
-    return cur.lastrowid
+                      int(f.ist_grundform), int(f.ist_variante), f.aussprache,
+                      f.quelle, int(f.geprueft), f.notiz))
+    haupt = cur.lastrowid
+    # Nebenformen derselben Zelle daneben eintragen, nicht statt dessen.
+    for text in f.varianten:
+        if not (text or "").strip():
+            continue
+        db.execute("""INSERT INTO form (lexem_id, text, merkmale, ist_grundform,
+                                        ist_variante, quelle, geprueft)
+                      VALUES (?, ?, ?, 0, 1, ?, ?)""",
+                   (lexem_id, text.strip(), dbm.j_schreiben(f.merkmale),
+                    f.quelle, int(f.geprueft)))
+    return haupt
 
 
 def _bedeutung_einfuegen(db: sqlite3.Connection, lexem_id: int,

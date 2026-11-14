@@ -104,6 +104,10 @@ class FormEingabe(BaseModel):
     text: str = Field(min_length=1, max_length=200)
     merkmale: dict[str, Any] = Field(default_factory=dict)
     ist_grundform: bool = False
+    # Nebenformen derselben Zelle: μιλάω neben μιλώ. Beide gelten als
+    # richtig; gefragt wird die Hauptform.
+    varianten: list[str] = Field(default_factory=list)
+    ist_variante: bool = False
     aussprache: str | None = None
     quelle: Quelle = "manuell"
     geprueft: bool = True
@@ -150,6 +154,23 @@ class LexemEingabe(BaseModel):
     formen: list[FormEingabe] = Field(default_factory=list)
     bedeutungen: list[BedeutungEingabe] = Field(default_factory=list)
     beispiele: list[BeispielEingabe] = Field(default_factory=list)
+    # Lektion und Lernreihenfolge
+    lektion_nr: int | None = Field(default=None, ge=0, le=9999)
+    reihenfolge: int = 0
+    kennung: str | None = Field(default=None, max_length=120)
+    # Merkmalsmuster für Zellen, die es bei diesem Wort nicht gibt.
+    # [{}] bedeutet: gar keine Formen (unveränderliche Wörter).
+    luecken: list[dict[str, Any]] = Field(default_factory=list)
+    # Stamm je Formgruppe, von Hand gesetzt; "*" gilt für alle.
+    staemme: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("luecken")
+    @classmethod
+    def luecken_pruefen(cls, wert: list) -> list:
+        try:
+            return mk.luecken_pruefen(wert)
+        except mk.MerkmalFehler as fehler:
+            raise ValueError(str(fehler)) from fehler
 
     @field_validator("wortart")
     @classmethod

@@ -18,7 +18,7 @@ from typing import Any, Iterable
 
 import sprachen
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 _WURZEL = pathlib.Path(__file__).resolve().parent.parent
 PFAD = pathlib.Path(os.environ.get("VOKABEL_DB", _WURZEL / "daten" / "vokabeltrainer.db"))
@@ -73,6 +73,11 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
     "lexem": {
         "reihenfolge": "INTEGER NOT NULL DEFAULT 0",
         "kennung": "TEXT",
+        "luecken": "TEXT NOT NULL DEFAULT '[]'",
+        "staemme": "TEXT NOT NULL DEFAULT '{}'",
+    },
+    "form": {
+        "ist_variante": "INTEGER NOT NULL DEFAULT 0",
     },
     "benutzer": {
         # Ohne UNIQUE: ALTER TABLE kann in SQLite keine eindeutige Spalte

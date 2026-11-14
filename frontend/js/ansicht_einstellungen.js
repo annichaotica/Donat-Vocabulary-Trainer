@@ -17,6 +17,7 @@ export async function zeichnen(behaelter) {
       text: 'Keine Sammlung gewählt — die Einstellungen zu Formgruppen und '
           + 'Aufgabentypen gelten je Sammlung. Über die Übersicht eine auswählen.' }));
   }
+  if (zustand.sammlungId) el.append(await teilZugriff(behaelter));
   el.append(await teilLernen(behaelter));
   el.append(await teilLegasthenie(behaelter));
   el.append(await teilZugaenge(behaelter));
@@ -35,6 +36,99 @@ export async function zeichnen(behaelter) {
         onclick: () => { location.hash = '#/tastatur'; },
       }, 'Fremde Schrift: wo liegt welcher Buchstabe?'))));
 }
+
+/* --------------------------------------------- Wer darf mitlernen */
+
+const RECHTE = {
+  lesen: 'mitlernen',
+  schreiben: 'mitlernen und pflegen',
+};
+
+async function teilZugriff(behaelter) {
+  const [z, leute] = await Promise.all([
+    api.zugriff(zustand.sammlungId), api.benutzer(),
+  ]);
+  const kasten = h('div', { class: 'karte' });
+  kasten.append(h('h2', { style: 'margin-top:0', text: 'Wer darf mitlernen' }));
+  kasten.append(h('p', { class: 'leise' },
+    'Der Lernstand hängt an der Person, nicht an der Sammlung: wer '
+    + 'mitlernt, fängt mit seinem eigenen Fortschritt an. ',
+    h('b', { text: 'Pflegen' }), ' heißt zusätzlich, Wörter ändern und '
+    + 'freigeben zu dürfen.'));
+
+  const neu = async () => zeichnen(behaelter);
+
+  kasten.append(h('p', { style: 'margin:.6rem 0 .2rem' },
+    h('b', { text: z.besitzer.name }),
+    h('span', { class: 'marke', text: 'gehört ihr' })));
+
+  for (const m of z.mitlernende) {
+    kasten.append(h('div', { class: 'zugriffszeile' },
+      h('span', {}, m.name,
+        h('span', { class: 'marke', text: RECHTE[m.recht] || m.recht })),
+      h('div', { class: 'durchsicht-knoepfe' },
+        h('button', {
+          onclick: async () => {
+            await api.zugriffSetzen(zustand.sammlungId, {
+              benutzer_id: m.id,
+              recht: m.recht === 'lesen' ? 'schreiben' : 'lesen',
+            });
+            meldung('Geändert.');
+            neu();
+          },
+        }, m.recht === 'lesen' ? 'auch pflegen lassen' : 'nur mitlernen'),
+        h('button', {
+          class: 'schlicht gefahr',
+          onclick: async () => {
+            if (!confirm(`${m.name} den Zugriff entziehen?\n\n`
+                       + 'Der Lernstand bleibt erhalten, falls du es dir '
+                       + 'anders überlegst.')) return;
+            await api.zugriffSetzen(zustand.sammlungId,
+                                    { benutzer_id: m.id, recht: null });
+            meldung('Zugriff entzogen.');
+            neu();
+          },
+        }, 'entziehen'),
+        h('button', {
+          class: 'schlicht',
+          onclick: async () => {
+            if (!confirm(`Die Sammlung an ${m.name} übertragen?\n\n`
+                       + `${m.name} wird Besitzerin. Du behältst `
+                       + 'Schreibzugriff, kannst also weiter pflegen.')) return;
+            await api.besitzUebertragen(zustand.sammlungId, {
+              benutzer_id: m.id, bisherige_behaelt_zugriff: true });
+            meldung('Übertragen.');
+            neu();
+          },
+        }, 'Besitz übertragen'))));
+  }
+
+  const schon = new Set([z.besitzer.id, ...z.mitlernende.map((m) => m.id)]);
+  const offen = leute.filter((p) => !schon.has(p.id));
+  if (offen.length) {
+    const wahl = h('select', {}, offen.map(
+      (p) => h('option', { value: p.id, text: p.name })));
+    const recht = h('select', {},
+      h('option', { value: 'lesen', text: 'mitlernen' }),
+      h('option', { value: 'schreiben', text: 'mitlernen und pflegen' }));
+    kasten.append(h('div', { class: 'zugriffszeile', style: 'margin-top:.8rem' },
+      wahl, recht,
+      h('button', {
+        onclick: async () => {
+          await api.zugriffSetzen(zustand.sammlungId, {
+            benutzer_id: Number(wahl.value), recht: recht.value });
+          meldung('Freigegeben.');
+          neu();
+        },
+      }, 'Dazunehmen')));
+  } else if (!z.mitlernende.length) {
+    kasten.append(h('p', { class: 'leise',
+      text: 'Es gibt noch kein weiteres Profil. Über den Profilknopf oben '
+          + 'rechts lässt sich eines anlegen.' }));
+  }
+  return kasten;
+}
+
 
 /* ------------------------------------------------- Sammlung: was abfragen */
 

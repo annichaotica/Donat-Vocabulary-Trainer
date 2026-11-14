@@ -106,6 +106,22 @@ class SammelimportEingabe(BaseModel):
     quelle: Quelle = "ki"
 
 
+class ZugriffSetzen(BaseModel):
+    """Wer darf eine Sammlung mitbenutzen?
+
+    "lesen" heißt mitlernen — mit eigenem Lernstand, denn der hängt an der
+    Person. "schreiben" heißt auch pflegen. null nimmt den Zugriff zurück.
+    """
+    benutzer_id: int
+    recht: Literal["lesen", "schreiben"] | None = None
+
+
+class BesitzUebertragen(BaseModel):
+    benutzer_id: int
+    # Sonst könnte, wer die Vokabeln pflegt, sie hinterher nicht mehr ändern.
+    bisherige_behaelt_zugriff: bool = True
+
+
 class FreigabeEingabe(BaseModel):
     """Was soll freigegeben werden?
 

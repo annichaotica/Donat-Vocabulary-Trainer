@@ -68,6 +68,11 @@ export const api = {
   sammlungAnlegen: (daten) => ruf('/sammlungen', { methode: 'POST', daten }),
   sammlungAendern: (id, daten) => ruf(`/sammlungen/${id}`, { methode: 'PATCH', daten }),
   sammlungLoeschen: (id) => ruf(`/sammlungen/${id}`, { methode: 'DELETE' }),
+  zugriff: (id) => ruf(`/sammlungen/${id}/zugriff`),
+  zugriffSetzen: (id, daten) => ruf(`/sammlungen/${id}/zugriff`, { methode: 'PUT', daten }),
+  besitzUebertragen: (id, daten) =>
+    ruf(`/sammlungen/${id}/besitz`, { methode: 'POST', daten }),
+
   sammlungEinstellungen: (id) => ruf(`/sammlungen/${id}/einstellungen`),
   sammlungEinstellungenSetzen: (id, daten) =>
     ruf(`/sammlungen/${id}/einstellungen`, { methode: 'PUT', daten }),

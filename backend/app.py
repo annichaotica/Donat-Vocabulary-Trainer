@@ -53,7 +53,8 @@ from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
                      SammlungEinstellungen, SpracheAnlegen,
-                     SprachprofilSetzen, TextPruefenEingabe,
+                     SprachprofilSetzen, TextPruefenEingabe, ZugriffSetzen,
+                     BesitzUebertragen,
                      UebersetzungEingabe, UebungAendern, UebungAntwort,
                      UebungBewertenEingabe, UebungEingabe,
                      UebungPruefenEingabe, UebungenImportEingabe)
@@ -491,6 +492,87 @@ def sammlung_aendern(sammlung_id: int, eingabe: SammlungAendern,
 def sammlung_loeschen(sammlung_id: int, db: sqlite3.Connection = DB):
     _holen(db, "sammlung", sammlung_id)
     db.execute("DELETE FROM sammlung WHERE id = ?", (sammlung_id,))
+
+
+# ------------------------------------------------- Wer darf mitlernen
+#
+# Nicht zu verwechseln mit der Freigabe von FORMEN. Hier geht es um
+# Menschen: wer eine Sammlung benutzen darf und wer sie pflegen darf.
+#
+# Der Lernstand hängt an der Person, nicht an der Sammlung. Wer eine
+# Sammlung mitbenutzt, fängt mit seinem eigenen Fortschritt an — das ist
+# der Sinn der Sache: die Mutter pflegt die Vokabeln, das Kind lernt sie.
+
+@app.get("/api/sammlungen/{sammlung_id}/zugriff")
+def zugriff_lesen(sammlung_id: int, db: sqlite3.Connection = DB):
+    """Wem gehört die Sammlung, und wer darf mit?"""
+    s = _holen(db, "sammlung", sammlung_id)
+    return {
+        "sammlung_id": sammlung_id,
+        "besitzer": dbm.zeile(db, "SELECT id, name, farbe FROM benutzer WHERE id = ?",
+                              (s["besitzer_id"],)),
+        "mitlernende": dbm.zeilen(db, """
+            SELECT b.id, b.name, b.farbe, f.recht
+              FROM freigabe f JOIN benutzer b ON b.id = f.benutzer_id
+             WHERE f.sammlung_id = ?
+             ORDER BY b.name""", (sammlung_id,)),
+    }
+
+
+@app.put("/api/sammlungen/{sammlung_id}/zugriff")
+def zugriff_setzen(sammlung_id: int, eingabe: ZugriffSetzen,
+                   request: Request = None, db: sqlite3.Connection = DB):
+    """Gibt einer Person Zugriff oder nimmt ihn zurück.
+
+    `recht`: "lesen" (mitlernen), "schreiben" (auch pflegen) oder null
+    (Zugriff entziehen).
+    """
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    s = _holen(db, "sammlung", sammlung_id)
+    _holen(db, "benutzer", eingabe.benutzer_id)
+    if eingabe.benutzer_id == s["besitzer_id"]:
+        raise HTTPException(
+            400, "Der Besitzerin muss man nichts freigeben — sie darf ohnehin "
+                 "alles. Zum Weitergeben den Besitz übertragen.")
+    if eingabe.recht is None:
+        db.execute("DELETE FROM freigabe WHERE sammlung_id = ? AND benutzer_id = ?",
+                   (sammlung_id, eingabe.benutzer_id))
+    else:
+        db.execute("""INSERT INTO freigabe (sammlung_id, benutzer_id, recht)
+                      VALUES (?, ?, ?)
+                      ON CONFLICT(sammlung_id, benutzer_id)
+                      DO UPDATE SET recht = excluded.recht""",
+                   (sammlung_id, eingabe.benutzer_id, eingabe.recht))
+    return zugriff_lesen(sammlung_id, db)
+
+
+@app.post("/api/sammlungen/{sammlung_id}/besitz")
+def besitz_uebertragen(sammlung_id: int, eingabe: BesitzUebertragen,
+                       request: Request = None, db: sqlite3.Connection = DB):
+    """Überträgt die Sammlung an eine andere Person.
+
+    Die bisherige Besitzerin behält auf Wunsch Schreibzugriff — sonst
+    könnte sie die Vokabeln, die sie pflegt, hinterher nicht mehr ändern.
+    Der Lernstand bleibt bei allen, wie er ist: er hängt an der Person.
+    """
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    s = _holen(db, "sammlung", sammlung_id)
+    neu = _holen(db, "benutzer", eingabe.benutzer_id)
+    if neu["id"] == s["besitzer_id"]:
+        raise HTTPException(400, f"{neu['name']} ist schon Besitzerin.")
+    bisher = s["besitzer_id"]
+    db.execute("UPDATE sammlung SET besitzer_id = ? WHERE id = ?",
+               (neu["id"], sammlung_id))
+    # Die neue Besitzerin braucht keine Freigabe mehr.
+    db.execute("DELETE FROM freigabe WHERE sammlung_id = ? AND benutzer_id = ?",
+               (sammlung_id, neu["id"]))
+    if eingabe.bisherige_behaelt_zugriff:
+        db.execute("""INSERT INTO freigabe (sammlung_id, benutzer_id, recht)
+                      VALUES (?, ?, 'schreiben')
+                      ON CONFLICT(sammlung_id, benutzer_id)
+                      DO UPDATE SET recht = 'schreiben'""",
+                   (sammlung_id, bisher))
+    return zugriff_lesen(sammlung_id, db)
 
 
 @app.get("/api/sammlungen/{sammlung_id}/einstellungen")

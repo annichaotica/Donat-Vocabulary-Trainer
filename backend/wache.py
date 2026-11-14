@@ -14,6 +14,21 @@ abgewiesen.
 dort wählt man sein Profil aus einer Liste — das ist gewollt und ändert
 sich nicht. Die Wache wirkt nur, wenn Cloudflare Access eine Mailadresse
 mitgeschickt hat.
+
+**Der Haken daran, teuer gelernt (14.11.2026):** »keine Mailadresse«
+hieß »also Heimnetz, also vertrauenswürdig«. Das stimmt nur, solange vor
+JEDEM Weg von außen ein Access steht. Vor der MCP-Adresse stand keines —
+dort kann keines stehen, der Konnektor bringt dessen Kopfzeilen nicht
+durch. Dieselbe Anlage lieferte unter diesem Namen aber auch die ganze
+Oberfläche aus. Anfragen aus dem Internet kamen also ohne Mailadresse an,
+galten als Heimnetz, und die Wache sah gar nicht erst hin: Lesen und
+Schreiben auf alle Profile und Sammlungen, ohne jedes Merkmal.
+
+Darum wird jetzt umgekehrt geschlossen: Wer über Cloudflare kommt
+(erkennbar an `cf-ray`, das die Kante selbst setzt und niemand von außen
+entfernen kann) und KEINE geprüfte Identität mitbringt, wird abgewiesen.
+Der Weg über den Tunnel ist dann nur noch so weit offen, wie Access ihn
+öffnet — unabhängig davon, was in einer Routingtabelle steht.
 """
 
 from __future__ import annotations
@@ -98,6 +113,16 @@ def _pruefen(db, person: dict, pfad: str, methode: str):
     return None
 
 
+# Setzt die Cloudflare-Kante selbst, bei jeder Anfrage, die sie
+# durchreicht. Von außen lässt sie sich nicht entfernen — und gefälscht
+# im Heimnetz schadet sie nicht: sie schränkt nur weiter ein.
+CLOUDFLARE_KOPFZEILE = "cf-ray"
+
+
+def _ueber_cloudflare(kopfzeilen) -> bool:
+    return bool((kopfzeilen.get(CLOUDFLARE_KOPFZEILE) or "").strip())
+
+
 def _benutzer_id_aus_anfrage(request) -> int | None:
     wert = request.query_params.get("benutzer_id")
     if wert is None:
@@ -118,6 +143,12 @@ async def wache(request, weiter):
     try:
         mail = identitaet.mail_aus_anfrage(request.headers)
         if not mail:
+            if _ueber_cloudflare(request.headers):
+                # Von außen, aber ohne geprüfte Identität. Das ist kein
+                # Heimnetz, sondern ein Weg, vor dem kein Access steht.
+                return _abweisen(
+                    "Von außen geht es nur über die Anmeldung. Diese Adresse "
+                    "liefert die Oberfläche nicht aus.")
             # Heimnetz: keine geprüfte Identität, keine Wache.
             return await weiter(request)
         person = identitaet.profil_fuer_mail(db, mail)

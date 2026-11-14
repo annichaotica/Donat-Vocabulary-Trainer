@@ -164,3 +164,47 @@ def test_ohne_teamkennung_wird_die_kopfzeile_ignoriert(klient):
     jemand die Kopfzeile selbst mitschicken und sich ausgeben."""
     d = klient.get("/api/ich", headers=als("fremd@example.de")).json()
     assert d["gebunden"] is False and d["benutzer"] is None
+
+
+# ------------------------------------------------ Von außen ohne Access
+
+def ueber_cloudflare(**weitere):
+    """Wie eine Anfrage aussieht, die durch den Tunnel kam."""
+    return {"Cf-Ray": "a5a8b240482509e5-IAD", **weitere}
+
+
+def test_von_aussen_ohne_identitaet_wird_abgewiesen(klient, mit_access):
+    """Der Fehler vom 14.11.2026: Die MCP-Adresse lieferte ohne Access die
+    ganze Oberfläche aus. Ohne Mailadresse galt das als Heimnetz."""
+    a = klient.post("/api/benutzer", json={"name": "A"}).json()
+    klient.post("/api/sammlungen", json={
+        "besitzer_id": a["id"], "name": "As Sammlung", "sprache": "fr"})
+
+    for pfad in ("/api/benutzer", "/api/sammlungen"):
+        antwort = klient.get(pfad, headers=ueber_cloudflare())
+        assert antwort.status_code == 403, f"{pfad} stand offen"
+
+    # Und schreiben erst recht nicht.
+    antwort = klient.post("/api/benutzer", json={"name": "Fremder"},
+                          headers=ueber_cloudflare())
+    assert antwort.status_code == 403
+
+
+def test_von_aussen_mit_identitaet_geht_weiter(klient, mit_access):
+    """Die Absage trifft nur, wem die geprüfte Adresse fehlt."""
+    antwort = klient.get("/api/benutzer", headers=ueber_cloudflare(
+        **als("erika.muster@example.de")))
+    assert antwort.status_code == 200
+
+
+def test_im_heimnetz_bleibt_es_wie_es_war(klient, mit_access):
+    """Ohne cf-ray ist es das Heimnetz — dort wird nichts enger."""
+    assert klient.get("/api/benutzer").status_code == 200
+
+
+def test_stammdaten_bleiben_auch_von_aussen_offen(klient, mit_access):
+    """Sonst käme die Anmeldeseite nicht einmal so weit, zu fragen,
+    wer man ist."""
+    for pfad in ("/api/zustand", "/api/sprachen", "/api/ich"):
+        antwort = klient.get(pfad, headers=ueber_cloudflare())
+        assert antwort.status_code == 200, pfad

@@ -317,6 +317,8 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
     e_genau = _genau(e_rest, profil)
 
     ziele = [(roh, v) for roh in erwartet for v in varianten(roh)]
+    # Was nebenbei zu sagen ist, ohne dass es gegen die Antwort zählt.
+    nebenbei: list[str] = []
 
     # ---- Schicht 1: Treffer, ggf. bis auf Diakritika oder Artikel
     bestes: Urteil | None = None
@@ -351,11 +353,23 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
                     if artikelregel == "verlangt":
                         abw.append("artikel_fehlt")
                         hinweise.append(f"Der Artikel fehlt: {_anzeige(soll)}")
+                    else:
+                        # Kein Fehler — aber mitzuschreiben ist die
+                        # bessere Gewohnheit, also wird er wenigstens
+                        # gezeigt. Der Hinweis zählt nicht gegen die
+                        # Bewertung, er steht nur daneben.
+                        nebenbei.append(f"Mit Artikel: {_anzeige(soll)} "
+                                        f"{_anzeige(anzeige)}")
                 elif e_artikel.casefold() != soll.casefold():
                     abw.append("artikel_falsch")
                     hinweise.append(
                         f"Falscher Artikel: {_anzeige(soll)}, nicht {_anzeige(e_artikel)}")
-            elif e_artikel is not None:
+            elif e_artikel is not None and artikel_verlangt is None:
+                # Nur wo wirklich keiner hingehört. Steht die erwartete
+                # Form ohne Artikel da, heißt das noch lange nicht, dass
+                # keiner davorgehört — die Formentabelle führt sie eben
+                # ohne. Darum zählt das nur, wenn die Aufgabe ausdrücklich
+                # sagt, dass hier keiner steht.
                 abw.append("artikel_ueberfluessig")
                 hinweise.append("Hier gehört kein Artikel davor.")
 
@@ -364,7 +378,8 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
             hinweise = [h for h in hinweise if not h.startswith("Fast")]
 
         if not abw:
-            return Urteil("richtig", anzeige)
+            return Urteil("richtig", anzeige,
+                          " ".join(nebenbei) or None)
 
         schwer = ("artikel_falsch" in abw
                   or ("diakritika" in abw and diakritika == "streng"))

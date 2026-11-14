@@ -230,3 +230,54 @@ def test_neues_einstreuen_holt_neues_vor_das_faellige(klient):
     assert "neu" in an, f"mit Schalter muss Neues dazwischenkommen: {an}"
     # Aber nicht überhandnehmen — das Fällige bleibt in der Mehrzahl.
     assert an.count("neu") <= len(an) // 2, an
+
+
+def test_ein_wort_mit_vielen_formen_bleibt_nicht_fuer_immer_vorn(klient):
+    """Der Fehler, der im Betrieb auffiel und den ich selbst eingebaut
+    hatte: der Rang INNERHALB eines Wortes zählt nur die übrigen Aufgaben.
+    Nach jeder Antwort werden sie neu durchnummeriert — es gibt also
+    immer wieder eine mit Rang 1, und ein Verb mit vierzig Formen stand
+    für immer vorn. Im echten Protokoll kreisten drei Wörter, während
+    1.280 andere nie drankamen.
+
+    Jetzt zählt, wie viel von einem Wort schon dran WAR.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Kreisende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    # Ein Verb mit vielen Formen und zehn magere Wörter daneben.
+    eintraege = [{
+        "lemma": "γράφω", "wortart": "verb", "lektion_nr": 1, "reihenfolge": 0,
+        "bedeutungen": [{"uebersetzungen": ["schreiben", "aufschreiben"]}],
+        "formen": [{"text": "γράφ" + e, "merkmale": {
+            "modus": "indikativ", "tempus": zeit, "person": p, "numerus": n}}
+            for zeit, endungen in (("praesens", ["ω", "εις", "ει", "ουμε",
+                                                 "ετε", "ουν"]),
+                                   ("imperfekt", ["α", "ες", "ε", "αμε",
+                                                  "ατε", "αν"]))
+            for e, (p, n) in zip(endungen, P)]}]
+    eintraege += [{"lemma": f"λέξη{i}", "wortart": "substantiv",
+                   "lektion_nr": 1, "reihenfolge": i + 1,
+                   "merkmale": {"genus": "f"},
+                   "bedeutungen": [{"uebersetzungen": [f"Wort {i}",
+                                                       f"Begriff {i}"]}]}
+                  for i in range(1, 11)]
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln",
+                json={"eintraege": eintraege})
+    klient.post(f"/api/sammlungen/{s['id']}/freigabe", json={"lektion_nr": 1})
+
+    folge = []
+    for _ in range(20):
+        liste = klient.get("/api/lernen/naechste", params={
+            "benutzer_id": b["id"], "sammlung_id": s["id"], "anzahl": 1}).json()
+        if not liste:
+            break
+        folge.append(liste[0]["lexem_id"])
+        klient.post("/api/lernen/bewerten", json={
+            "benutzer_id": b["id"], "aufgabe_id": liste[0]["aufgabe_id"],
+            "bewertung": 3})
+    # Vorher kamen hier zwei, drei Wörter heraus — das Verb blieb vorn.
+    assert len(set(folge)) >= 8, f"nur {len(set(folge))} Wörter: {folge}"
+    # Und das vielformige Verb nimmt nicht überhand.
+    haeufigstes = max(folge.count(x) for x in set(folge))
+    assert haeufigstes <= 4, f"ein Wort kam {haeufigstes}× in 20 Fragen"

@@ -107,6 +107,8 @@ FRANZOESISCH = {
         "schriftregeln": [],
     },
     "artikel": {
+        # Französisch beugt den Artikel nicht nach Fall, nur nach Zahl.
+        "tabelle": {"m|sg": "le", "f|sg": "la", "m|pl": "les", "f|pl": "les"},
         "bestimmt": ["le", "la", "les", "l'"],
         "unbestimmt": ["un", "une", "des"],
         "regel": "optional_aber_richtig",
@@ -179,6 +181,7 @@ SPANISCH = {
         "schriftregeln": [],
     },
     "artikel": {
+        "tabelle": {"m|sg": "el", "f|sg": "la", "m|pl": "los", "f|pl": "las"},
         "bestimmt": ["el", "la", "los", "las"],
         "unbestimmt": ["un", "una", "unos", "unas"],
         "regel": "optional_aber_richtig",
@@ -309,10 +312,24 @@ GRIECHISCH = {
         "schriftregeln": ["griechisch"],
     },
     "artikel": {
-        "bestimmt": ["ο", "η", "το", "οι", "τα"],
-        "unbestimmt": ["ένας", "μία", "ένα"],
+        # Vollständig, nicht nur der Nominativ: sonst gilt "του καρότου"
+        # als artikellos und der Artikel darin als Tippfehler.
+        "bestimmt": ["ο", "η", "το", "οι", "τα",
+                     "του", "της", "των", "τον", "την", "τους", "τις"],
+        "unbestimmt": ["ένας", "μία", "μια", "ένα", "ενός", "μιας", "έναν"],
         "regel": "optional_aber_richtig",
         "genus_artikel": {"m": "ο", "f": "η", "n": "το"},
+        # Welcher Artikel zu welcher Zelle gehört. Damit lässt sich beim
+        # Üben nicht nur dulden, dass jemand ihn mitschreibt, sondern auch
+        # sagen, WELCHER es gewesen wäre.
+        "tabelle": {
+            "m|nom|sg": "ο",   "f|nom|sg": "η",   "n|nom|sg": "το",
+            "m|gen|sg": "του", "f|gen|sg": "της", "n|gen|sg": "του",
+            "m|akk|sg": "τον", "f|akk|sg": "την", "n|akk|sg": "το",
+            "m|nom|pl": "οι",  "f|nom|pl": "οι",  "n|nom|pl": "τα",
+            "m|gen|pl": "των", "f|gen|pl": "των", "n|gen|pl": "των",
+            "m|akk|pl": "τους", "f|akk|pl": "τις", "n|akk|pl": "τα",
+        },
     },
     "formgruppen": {
         "verb": [
@@ -440,10 +457,21 @@ MITTELHOCHDEUTSCH = {
         "schriftregeln": ["mittelhochdeutsch"],
     },
     "artikel": {
-        "bestimmt": ["der", "diu", "daz", "die"],
-        "unbestimmt": ["ein"],
+        "bestimmt": ["der", "diu", "daz", "die", "des", "dem", "den",
+                     "dër", "diz"],
+        "unbestimmt": ["ein", "eines", "einem", "einen", "einer"],
         "regel": "optional_aber_richtig",
         "genus_artikel": {"m": "der", "f": "diu", "n": "daz"},
+        "tabelle": {
+            "m|nom|sg": "der", "f|nom|sg": "diu", "n|nom|sg": "daz",
+            "m|gen|sg": "des", "f|gen|sg": "der", "n|gen|sg": "des",
+            "m|dat|sg": "dem", "f|dat|sg": "der", "n|dat|sg": "dem",
+            "m|akk|sg": "den", "f|akk|sg": "die", "n|akk|sg": "daz",
+            "m|nom|pl": "die", "f|nom|pl": "die", "n|nom|pl": "diu",
+            "m|gen|pl": "der", "f|gen|pl": "der", "n|gen|pl": "der",
+            "m|dat|pl": "den", "f|dat|pl": "den", "n|dat|pl": "den",
+            "m|akk|pl": "die", "f|akk|pl": "die", "n|akk|pl": "diu",
+        },
     },
     "formgruppen": {
         "verb": [
@@ -795,6 +823,32 @@ PERSONALPRONOMEN: dict[str, dict[str, list[str]]] = {
 # Im Griechischen steht es in Klammern — es wird nicht verlangt.
 PRONOMEN_PFLICHT = {"de": True, "en": True, "fr": True, "es": False,
                     "el": False, "gmh": False}
+
+
+def artikel_fuer(code: str, lexemmerkmale: dict, formmerkmale: dict) -> str | None:
+    """Welcher Artikel gehört vor diese Form?
+
+    Gebraucht, damit beim Üben nicht nur geduldet wird, dass jemand den
+    Artikel mitschreibt, sondern auch gesagt werden kann, WELCHER es
+    gewesen wäre — »τα καρότα«, nicht bloß »καρότα«. Den Artikel
+    mitzuschreiben ist die bessere Gewohnheit; wer ihn weglässt, soll ihn
+    wenigstens zu sehen bekommen.
+    """
+    a = profil(code).get("artikel", {}) or {}
+    tabelle = a.get("tabelle") or {}
+    genus = lexemmerkmale.get("genus")
+    if not genus or not tabelle:
+        return None
+    if genus == "mf":
+        genus = "m"            # ο/η γιατρός — einer muss gezeigt werden
+    kasus = formmerkmale.get("kasus")
+    numerus = formmerkmale.get("numerus", "sg")
+    if kasus == "vok":
+        return None            # im Vokativ steht keiner
+    for schluessel in (f"{genus}|{kasus}|{numerus}", f"{genus}|{numerus}"):
+        if schluessel in tabelle:
+            return tabelle[schluessel]
+    return None
 
 
 def personalpronomen(code: str, merkmale: dict) -> list[str]:

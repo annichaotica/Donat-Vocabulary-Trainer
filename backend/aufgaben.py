@@ -632,9 +632,14 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
                    if dbm.j_lesen(z["merkmale"]) == fm]
         vw = [(t, b) for t, b in _verwechslungen(db, lexem, code, None)
               if t not in gueltig]
+        # Den Artikel darf man mitschreiben — bei einem Hauptwort gehört
+        # er sogar dazu. Welcher es ist, weiß die Sprache aus Geschlecht,
+        # Fall und Zahl.
         urteil = text_pruefen(str(eingabe), gueltig, p_code, verwechslungen=vw,
                               fehler_benennen=fehler_benennen,
-                              vorsilben=sprachen.personalpronomen(code, fm))
+                              vorsilben=sprachen.personalpronomen(code, fm),
+                              artikel_verlangt=sprachen.artikel_fuer(
+                                  code, dbm.j_lesen(lexem["merkmale"]), fm))
         return urteil, {"erwartet": gueltig,
                         "beschriftung": sprachen.beschriften_form(
                             code, lexem["wortart"], fm)}
@@ -650,7 +655,10 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
             # melden wäre irreführend.
             einzel = text_pruefen(text, z["erwartet"], p_code,
                                   fehler_benennen=fehler_benennen,
-                                  vorsilben=z.get("pronomen"))
+                                  vorsilben=z.get("pronomen"),
+                                  artikel_verlangt=sprachen.artikel_fuer(
+                                      code, dbm.j_lesen(lexem["merkmale"]),
+                                      z["merkmale"]))
             ergebnisse.append({
                 "zelle": z["zelle"], "beschriftung": z["beschriftung"],
                 "urteil": einzel.urteil, "erwartet": z["erwartet"],

@@ -32,6 +32,24 @@ NEU_JE_SITZUNG = 20
 # außen danach sortiert werden kann.
 LERNREIHENFOLGE = ("lektion_nr IS NULL, lektion_nr, wort_folge, lexem_id, typ")
 
+# Wie viele Aufgaben dieses Wortes schon einmal dran waren.
+#
+# Ohne diese Zahl bleibt ein Wort mit vierzig Formen für immer vorn: der
+# Rang INNERHALB des Wortes zählt nur die übrigen Aufgaben, und die werden
+# nach jeder Antwort neu durchnummeriert — es gibt also immer wieder eine
+# mit Rang 1. Am echten Bestand sah man genau das: drei Wörter im Kreis,
+# während 1.280 andere nie drankamen.
+#
+# Als eigene Teilabfrage und nicht als Unterabfrage je Zeile: über zehn-
+# tausend Aufgaben müsste sie sonst zehntausendmal laufen, nur um zu
+# sortieren.
+SCHON_BEGONNEN = """
+    LEFT JOIN (SELECT a2.lexem_id, COUNT(*) AS n
+                 FROM aufgabe a2
+                 JOIN lernzustand z2 ON z2.aufgabe_id = a2.id
+                WHERE z2.benutzer_id = ? AND z2.zustand != 'neu'
+                GROUP BY a2.lexem_id) begonnen ON begonnen.lexem_id = l.id"""
+
 
 def heute() -> dt.date:
     return dt.date.today()
@@ -400,7 +418,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # vollständig und ist in der Oberfläche als "Warum jetzt?" nachlesbar.
     if nur == "neu":
         bedingungen.append("(z.zustand IS NULL OR z.zustand = 'neu')")
-        ordnung = f"rang_im_wort, {LERNREIHENFOLGE}"
+        ordnung = f"schon_begonnen, rang_im_wort, {LERNREIHENFOLGE}"
     elif nur == "faellig":
         bedingungen.append(
             "z.zustand IN ('lernen','reif','verlernt') AND z.faellig <= ?")
@@ -422,12 +440,15 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         werte.append(heute_text)
         # verlernt zuerst, dann nach Fälligkeit, Neues zuletzt — und
         # innerhalb des Neuen von jedem Wort erst die erste Aufgabe.
+        # Erst Verlerntes und Fälliges, dann Neues — und innerhalb des
+        # Neuen die Wörter zuerst, von denen noch am wenigsten dran war.
         ordnung = """
             CASE zustand WHEN 'verlernt' THEN 0
                          WHEN 'lernen' THEN 1
                          WHEN 'reif' THEN 1
                          ELSE 3 END,
             faellig,
+            schon_begonnen,
             rang_im_wort,
             """ + LERNREIHENFOLGE
 
@@ -442,6 +463,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                  l.sammlung_id, z.zustand, z.stabilitaet, z.schwierigkeit,
                  z.faellig, z.letzte_wiederholung, z.anzahl, z.anzahl_fehler,
                  l.reihenfolge AS wort_folge,
+                 COALESCE(begonnen.n, 0) AS schon_begonnen,
                  (SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id)
                      AS lektion_nr,
                  ROW_NUMBER() OVER (PARTITION BY l.id
@@ -450,11 +472,16 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
             JOIN lexem l ON l.id = a.lexem_id
             LEFT JOIN lernzustand z
                    ON z.aufgabe_id = a.id AND z.benutzer_id = ?
+            {SCHON_BEGONNEN}
            WHERE {' AND '.join(bedingungen)}
         )
          ORDER BY {ordnung}
          LIMIT ?"""
-    reihe = dbm.zeilen(db, sql, (*werte, anzahl * 4))
+    # Die Platzhalter in der Reihenfolge, in der sie im SQL stehen:
+    # erst der Lernzustand-Verbund, dann der Begonnen-Verbund, dann die
+    # Bedingungen, zuletzt die Grenze.
+    reihe = dbm.zeilen(db, sql,
+                       (werte[0], benutzer_id, *werte[1:], anzahl * 4))
 
     # Neue begrenzen, sonst überschwemmt ein frischer Import die Sitzung.
     #
@@ -504,6 +531,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                      l.sammlung_id, z.zustand, z.stabilitaet, z.schwierigkeit,
                      z.faellig, z.letzte_wiederholung, z.anzahl,
                      z.anzahl_fehler, l.reihenfolge AS wort_folge,
+                     COALESCE(begonnen.n, 0) AS schon_begonnen,
                      (SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id)
                          AS lektion_nr,
                      ROW_NUMBER() OVER (PARTITION BY l.id
@@ -512,11 +540,12 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                 JOIN lexem l ON l.id = a.lexem_id
                 LEFT JOIN lernzustand z
                        ON z.aufgabe_id = a.id AND z.benutzer_id = ?
+                {SCHON_BEGONNEN}
                WHERE {' AND '.join(grundbedingungen)}
                  AND (z.zustand IS NULL OR z.zustand = 'neu')
             )
-             ORDER BY rang_im_wort, {LERNREIHENFOLGE}
-             LIMIT 12""", (benutzer_id, *grundwerte))
+             ORDER BY schon_begonnen, rang_im_wort, {LERNREIHENFOLGE}
+             LIMIT 12""", (benutzer_id, benutzer_id, *grundwerte))
         nachschub = [r for r in nachschub
                      if r["lexem_id"] in dazu or len(dazu) < rest_neu]
     zuletzt = _zuletzt_gefragt(db, benutzer_id)

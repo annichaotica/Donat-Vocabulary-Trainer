@@ -277,3 +277,30 @@ def test_die_belegung_lernt_nur_zeichen_der_richtigen_schrift():
     # Und die deutsche Beschriftung, nicht die amerikanische: auf einer
     # deutschen Tastatur sind Y und Z vertauscht.
     assert "['KeyY', 'Z']" in quelle and "['KeyZ', 'Y']" in quelle
+
+
+def test_jede_javascript_datei_ist_syntaktisch_heil():
+    """Ohne Bauschritt bemerkt niemand eine kaputte Klammer, bis die Seite
+    weiß bleibt. `node --check` ist in zwei Sekunden durch; fehlt node,
+    wird der Test übersprungen statt grün zu lügen."""
+    import shutil
+    node = shutil.which("node")
+    if not node:
+        import pytest
+        pytest.skip("node ist nicht da")
+    for datei in JS:
+        ergebnis = subprocess.run([node, "--check", str(datei)],
+                                  capture_output=True, text=True)
+        assert ergebnis.returncode == 0, f"{datei.name}: {ergebnis.stderr}"
+
+
+def test_die_merktafel_stiehlt_dem_antwortfeld_nicht_den_fokus():
+    """Der Fall, auf den es hier ankommt: ein Klick auf die Tafel mitten in
+    der Eingabe darf die Einfügemarke nicht verlieren — sonst schreibt man
+    nach dem Nachsehen an der falschen Stelle weiter."""
+    quelle = (WURZEL / "frontend" / "js" / "tastatur.js").read_text()
+    # Sowohl der Aufklappknopf als auch die Tasten selbst.
+    assert quelle.count("onmousedown: (e) => e.preventDefault()") >= 3
+    # Und sie merkt sich, ob sie offen war — sonst klappt man sie bei
+    # jeder Vokabel neu auf.
+    assert "merktafelMerken" in quelle

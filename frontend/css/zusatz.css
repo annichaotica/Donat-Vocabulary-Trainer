@@ -295,3 +295,43 @@ input[type="file"] { max-width: 100%; }
   border-left: 2px solid var(--rand);
   font-size: .92em;
 }
+
+
+/* Merktafel beim Tippen: dieselbe Abbildung, nur klein und unauffällig.
+   Sie sitzt unter dem Antwortfeld und darf es nicht verdrängen. */
+.merktafel { margin-top: .5rem; }
+/* Als Knopf erkennbar bleiben: ohne Rand liest sich "Wo liegt welcher
+   Buchstabe?" wie eine Überschrift, und niemand klickt darauf. Das kleine
+   Dreieck sagt zusätzlich, dass sich etwas auf- und zuklappt. */
+.merktafel-knopf {
+  font-size: .85em;
+  padding: .3rem .7rem;
+  min-height: 0;
+  border-color: var(--rand);
+  color: var(--text);
+}
+.merktafel-knopf::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: .4em;
+  color: var(--leise);
+  transition: transform .15s;
+}
+.merktafel-knopf[aria-expanded="true"]::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .merktafel-knopf::before { transition: none; }
+}
+.tastaturbild.klein { gap: .2rem; margin: .5rem 0 .2rem; }
+.tastaturbild.klein .tastenreihe { gap: .2rem; }
+.tastaturbild.klein .taste {
+  /* Zwölf Tasten plus elf Lücken müssen in die Karte passen, sonst muss
+     man die Merktafel seitlich rollen — und dann sieht man beim
+     Nachschlagen nie die ganze Reihe. */
+  width: clamp(1.35rem, min(4.6vw, calc((100vw - 6rem) / 12)), 2.2rem);
+  height: clamp(1.9rem, 5.6vw, 2.5rem);
+  border-radius: .3rem;
+}
+.tastaturbild.klein .taste-zeichen { font-size: clamp(.78rem, 2.7vw, .95rem); }
+.tastaturbild.klein .taste-aufdruck { font-size: clamp(.46rem, 1.6vw, .56rem); }
+.merktafel-fuss { margin: .2rem 0 0; font-size: .82em; }
+.merktafel-fuss a { margin-left: .4rem; }

@@ -109,12 +109,49 @@ export function hatBelegung(code) {
   return Boolean(BELEGUNGEN[code]);
 }
 
+/** Nur die Tasten — Grundlage für die große Tafel und die kleine beim Tippen.
+ *
+ *  Gibt das Bild und die Tastenknöpfe zurück, damit der Aufrufer
+ *  hervorheben kann, ohne die Baumstruktur zu kennen.
+ */
+function tastenbild(code, { klein = false, beiKlick = null } = {}) {
+  const b = BELEGUNGEN[code];
+  const gemessen = gelernt(code);
+  const tasten = new Map();
+  const bild = h('div', { class: 'tastaturbild' + (klein ? ' klein' : '') });
+  for (const [i, reihe] of REIHEN.entries()) {
+    const zeile = h('div', {
+      class: 'tastenreihe',
+      style: `padding-left:${i * (klein ? 0.7 : 1.1)}rem`,
+    });
+    for (const [taste, aufdruck] of reihe) {
+      const zeichen = gemessen[taste] ?? b.tasten[taste] ?? '';
+      const knopf = h('button', {
+        class: 'taste' + (b.tot[taste] ? ' tot' : '') + (zeichen ? '' : ' leer'),
+        type: 'button',
+        title: b.tot[taste] ? b.tot[taste]
+                            : (zeichen ? `${zeichen} auf ${aufdruck}` : aufdruck),
+        // Kein Fokusverlust im Antwortfeld — sonst ist die Einfügemarke weg,
+        // und genau da wollte man ja weiterschreiben.
+        onmousedown: (e) => e.preventDefault(),
+        onclick: () => beiKlick && beiKlick(zeichen, taste),
+      },
+        h('span', { class: 'taste-zeichen', lang: code, text: zeichen || '·' }),
+        h('span', { class: 'taste-aufdruck', text: aufdruck }));
+      tasten.set(taste, knopf);
+      zeile.append(knopf);
+    }
+    bild.append(zeile);
+  }
+  return { bild, tasten, gemessen };
+}
+
+
 /** Die Abbildung samt Suche und Probefeld. */
 export function belegung(code) {
   const b = BELEGUNGEN[code];
   if (!b) return null;
   const el = h('div', { class: 'karte' });
-  const tasten = new Map();
   let gemessen = gelernt(code);
 
   el.append(h('h2', { style: 'margin-top:0' },
@@ -131,24 +168,9 @@ export function belegung(code) {
   });
   el.append(suche);
 
-  const bild = h('div', { class: 'tastaturbild' });
-  for (const [i, reihe] of REIHEN.entries()) {
-    const zeile = h('div', { class: 'tastenreihe', style: `padding-left:${i * 1.1}rem` });
-    for (const [taste, aufdruck] of reihe) {
-      const zeichen = gemessen[taste] ?? b.tasten[taste] ?? '';
-      const knopf = h('button', {
-        class: 'taste' + (b.tot[taste] ? ' tot' : '') + (zeichen ? '' : ' leer'),
-        type: 'button',
-        title: b.tot[taste] ? b.tot[taste] : (zeichen ? `${zeichen} auf ${aufdruck}` : aufdruck),
-        onclick: () => { suche.value = zeichen; hervorheben(zeichen); },
-      },
-        h('span', { class: 'taste-zeichen', lang: code, text: zeichen || '·' }),
-        h('span', { class: 'taste-aufdruck', text: aufdruck }));
-      tasten.set(taste, knopf);
-      zeile.append(knopf);
-    }
-    bild.append(zeile);
-  }
+  const { bild, tasten } = tastenbild(code, {
+    beiKlick: (zeichen) => { suche.value = zeichen; hervorheben(zeichen); },
+  });
   el.append(bild);
 
   function hervorheben(gesucht) {
@@ -230,10 +252,21 @@ function einfuegen(feld, zeichen, beiAenderung) {
   if (beiAenderung) beiAenderung(feld.value);
 }
 
+const MERKTAFEL_OFFEN = 'vokabeltrainer.merktafel';
+
+function merktafelOffen() {
+  try { return localStorage.getItem(MERKTAFEL_OFFEN) === 'ja'; } catch { return false; }
+}
+
+function merktafelMerken(offen) {
+  try { localStorage.setItem(MERKTAFEL_OFFEN, offen ? 'ja' : 'nein'); } catch { /* egal */ }
+}
+
 /** Die Leiste unter dem Antwortfeld. Gibt null zurück, wenn sie nichts nützt. */
 export function zeichenleiste(sprache, feldHolen, beiAenderung) {
   const zeichen = sprache?.sonderzeichen || [];
-  if (!zeichen.length && !sprache?.tastatur_empfohlen) return null;
+  const belegungDa = hatBelegung(sprache?.code);
+  if (!zeichen.length && !sprache?.tastatur_empfohlen && !belegungDa) return null;
 
   const kasten = h('div', {});
   if (zeichen.length) {
@@ -249,13 +282,50 @@ export function zeichenleiste(sprache, feldHolen, beiAenderung) {
     }
     kasten.append(leiste);
   }
-  if (sprache?.tastatur_empfohlen) {
+  // Die Merktafel beim Tippen: aufklappen, nachsehen, weiterschreiben.
+  // Der Umweg über eine eigene Seite kostet die halbe Sitzung — man käme
+  // mit der angefangenen Antwort nicht zurück.
+  if (belegungDa) {
+    const tafel = h('div', { hidden: !merktafelOffen() });
+    const knopf = h('button', {
+      type: 'button', class: 'schlicht merktafel-knopf',
+      'aria-expanded': String(merktafelOffen()),
+      // Ohne das verliert das Antwortfeld die Einfügemarke.
+      onmousedown: (e) => e.preventDefault(),
+      onclick: () => {
+        const offen = tafel.hidden;
+        tafel.hidden = !offen;
+        knopf.setAttribute('aria-expanded', String(offen));
+        knopf.textContent = offen ? 'Belegung ausblenden'
+                                  : 'Wo liegt welcher Buchstabe?';
+        merktafelMerken(offen);
+        const feld = feldHolen();
+        if (feld) feld.focus();
+      },
+    }, merktafelOffen() ? 'Belegung ausblenden'
+                        : 'Wo liegt welcher Buchstabe?');
+
+    // Ein Klick auf eine Taste schreibt das Zeichen. Gedacht ist die Tafel
+    // zum Nachsehen — aber wenn man schon hinzeigt, soll sie auch tippen.
+    const { bild } = tastenbild(sprache.code, {
+      klein: true,
+      beiKlick: (z) => {
+        if (z && z !== '·') einfuegen(feldHolen(), z, beiAenderung);
+      },
+    });
+    tafel.append(bild);
+    tafel.append(h('p', { class: 'leise merktafel-fuss' },
+      'Betonung: erst ', h('kbd', { text: 'Ö' }), ', dann den Vokal. ',
+      'Wortende-ς liegt auf ', h('kbd', { text: 'W' }), '. ',
+      h('a', { href: `#/tastatur/${sprache.code}`, text: 'Ganze Tafel' })));
+    kasten.append(h('div', { class: 'merktafel' }, knopf, tafel));
+  }
+
+  if (sprache?.tastatur_empfohlen && !belegungDa) {
     kasten.append(h('div', { class: 'tastaturhinweis' },
       h('span', { text: `Für ${sprache.name} lohnt ein eigenes Tastaturlayout — `
                       + 'die Leiste oben hilft nur bei den Betonungszeichen.' }),
-      h('a', { href: `#/tastatur/${sprache.code}`,
-               text: hatBelegung(sprache.code)
-                 ? 'Wo liegt welcher Buchstabe?' : 'Wie geht das?' })));
+      h('a', { href: `#/tastatur/${sprache.code}`, text: 'Wie geht das?' })));
   }
   return kasten;
 }

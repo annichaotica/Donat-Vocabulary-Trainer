@@ -69,6 +69,45 @@ app = FastAPI(title="Vokabeltrainer", version="0.2.0", lifespan=lebenslauf)
 app.middleware("http")(wache.wache)
 
 
+# Erlaubte Kopfzeilen und Verfahren für Anfragen von fremder Herkunft.
+# Nur für /mcp — NICHT für /api: dort gibt es im Heimnetz keine Anmeldung,
+# und eine beliebige Webseite könnte sonst den Vokabelbestand auslesen,
+# sobald jemand im Heimnetz sie öffnet.
+MCP_CORS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, GET, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers":
+        "Authorization, Content-Type, X-Account-Key, X-Vokabel-Token, "
+        "Mcp-Session-Id, Mcp-Protocol-Version, Accept",
+    "Access-Control-Expose-Headers": "Mcp-Session-Id",
+    "Access-Control-Max-Age": "86400",
+}
+
+
+@app.middleware("http")
+async def mcp_fremde_herkunft(request: Request, weiter):
+    """CORS für die MCP-Schnittstelle.
+
+    Ein Konnektor läuft im Browser und schickt vor dem eigentlichen Aufruf
+    eine Vorabanfrage (OPTIONS). Misslingt die, kommt die Anfrage nie
+    zustande — und der Client meldet nur "nicht erreichbar", ohne Grund.
+
+    `Allow-Origin: *` ist hier unbedenklich, weil die Anmeldung über eine
+    Kopfzeile läuft und nicht über ein Sitzungsplätzchen: eine fremde Seite
+    kennt das Zugangsmerkmal nicht und kann es auch nicht nebenbei
+    mitschicken lassen. Für /api gilt das NICHT, darum bleibt es dort aus.
+    """
+    if not request.url.path.startswith("/mcp"):
+        return await weiter(request)
+    if request.method == "OPTIONS":
+        # Die Vorabanfrage trägt nie Anmeldedaten — sie darf nicht an der
+        # Zugangsprüfung scheitern.
+        return Response(status_code=204, headers=MCP_CORS)
+    antwort = await weiter(request)
+    antwort.headers.update(MCP_CORS)
+    return antwort
+
+
 @app.middleware("http")
 async def frische_oberflaeche(request: Request, weiter):
     """Oberflächendateien immer gegenprüfen lassen.

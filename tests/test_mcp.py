@@ -432,3 +432,40 @@ def test_durchprobieren_wird_gesperrt(mcp):
         assert gut.status_code == 200
     finally:
         drossel.zuruecksetzen()
+
+
+# --------------------------------------------------- Fremde Herkunft (CORS)
+
+def test_vorabanfrage_wird_beantwortet(klient):
+    """Ein Konnektor läuft im Browser und schickt vor dem Aufruf eine
+    Vorabanfrage. Misslingt die, kommt die eigentliche Anfrage nie
+    zustande — der Client meldet nur »nicht erreichbar«, ohne Grund."""
+    antwort = klient.options("/mcp", headers={
+        "Origin": "https://claude.ai",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,x-account-key"})
+    assert antwort.status_code == 204
+    assert antwort.headers["access-control-allow-origin"] == "*"
+    erlaubt = antwort.headers["access-control-allow-headers"].lower()
+    assert "x-account-key" in erlaubt
+    assert "authorization" in erlaubt
+    assert "POST" in antwort.headers["access-control-allow-methods"]
+
+
+def test_vorabanfrage_braucht_keine_anmeldung(klient):
+    """Sie trägt nie Anmeldedaten mit — sie darf nicht an der Prüfung
+    scheitern."""
+    assert klient.options("/mcp").status_code == 204
+
+
+def test_antworten_tragen_die_cors_angaben(mcp):
+    antwort = ruf(mcp, "tools/list")
+    assert antwort.headers["access-control-allow-origin"] == "*"
+
+
+def test_die_api_bleibt_ohne_cors(klient):
+    """Im Heimnetz gibt es dort keine Anmeldung. Mit CORS könnte eine
+    beliebige Webseite den Vokabelbestand auslesen, sobald jemand im
+    Heimnetz sie öffnet."""
+    antwort = klient.get("/api/sprachen", headers={"Origin": "https://boese.example"})
+    assert "access-control-allow-origin" not in antwort.headers

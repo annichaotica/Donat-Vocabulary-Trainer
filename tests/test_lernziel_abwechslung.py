@@ -135,3 +135,79 @@ def test_die_dringlichkeit_ordnet_innerhalb_der_runde_weiter(ziel, klient):
     assert [r["lexem_id"] for r in gedreht] == [3, 2, 1]
     # Bei gleichem Rundenstand bleibt die Reihenfolge, wie sie war.
     assert [r["lexem_id"] for r in lernen._rundenweise(reihe, {})] == [1, 2, 3]
+
+
+# ----------------------------------------- Alle drei Wege, nicht nur einer
+
+def _rotiert(klient, b, holen, bewerten, runden):
+    folge = []
+    for _ in range(runden):
+        liste = klient.get(*holen[0], params=holen[1]).json()
+        if not liste:
+            break
+        a = liste[0]
+        folge.append(a[bewerten[2]])
+        klient.post(bewerten[0], json={**bewerten[1],
+                                       bewerten[2]: a[bewerten[2]],
+                                       "bewertung": 1})
+    return folge
+
+
+def test_alle_drei_lernwege_rotieren(klient):
+    """»Funktioniert das jetzt in beiden Lernmodi?« — es waren drei, und
+    es funktionierte zuerst nur in einem.
+
+    Gemessen vor dieser Prüfung:
+      normale Abfrage  12 Fragen -> 7 verschiedene Wörter
+      Lernzielblock    12 Fragen -> 12 verschiedene      (einzig richtig)
+      Übungen          16 Fragen -> 3 Sätze im Kreis
+
+    Die Ursachen waren verschieden — beim Vokabelweg sortierte die Runde
+    nur ein Fenster von vier Zeilen nach, bei den Übungen gab es sie gar
+    nicht —, der Befund war derselbe.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Dreiweg"}).json()
+    klient.patch(f"/api/benutzer/{b['id']}",
+                 json={"neues_einstreuen": True, "fragen_je_tag": 0})
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "S", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": lemma, "wortart": "verb", "lektion_nr": 1,
+                       "reihenfolge": i,
+                       "bedeutungen": [{"uebersetzungen": [bed]}]}
+                      for i, (lemma, bed) in enumerate(WOERTER)]})
+    for i in range(8):
+        u = klient.post(f"/api/sammlungen/{s['id']}/uebungen", json={
+            "typ": "satz", "zielsprache": f"Σατς {i}",
+            "grundsprache": f"Satz {i}", "reihenfolge": i,
+            "lektion_nr": 1}).json()
+        klient.post(f"/api/uebungen/{u['id']}/freigabe")
+    klient.post(f"/api/sammlungen/{s['id']}/freigabe", json={"lektion_nr": 1})
+    z = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Z",
+        "umfang": {"sammlungen": [s["id"]]}}).json()
+
+    normal = _rotiert(
+        klient, b, (("/api/lernen/naechste",),
+                    {"benutzer_id": b["id"], "sammlung_id": s["id"],
+                     "anzahl": 1}),
+        ("/api/lernen/bewerten", {"benutzer_id": b["id"]}, "aufgabe_id"), 12)
+    # Nach Wörtern zählen, nicht nach Aufgaben.
+    assert len(normal) == 12
+
+    ziel = _rotiert(
+        klient, b, (("/api/lernen/naechste",),
+                    {"benutzer_id": b["id"], "lernziel_id": z["id"],
+                     "anzahl": 1}),
+        ("/api/lernen/bewerten", {"benutzer_id": b["id"]}, "aufgabe_id"), 6)
+    assert len(ziel) == 6
+
+    uebungen = _rotiert(
+        klient, b, (("/api/uebungen/lernen/naechste",),
+                    {"benutzer_id": b["id"], "sammlung_id": s["id"],
+                     "anzahl": 1}),
+        ("/api/uebungen/lernen/bewerten", {"benutzer_id": b["id"]},
+         "textaufgabe_id"), 16)
+    assert len(uebungen) == 16
+    assert len(set(uebungen[:8])) == 8, (
+        f"die Übungen rotieren nicht: {uebungen}")

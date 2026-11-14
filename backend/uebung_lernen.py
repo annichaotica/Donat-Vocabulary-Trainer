@@ -136,6 +136,23 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
 ZULETZT_MEIDEN = 2
 
 
+def _rundenstand(db: sqlite3.Connection, benutzer_id: int) -> dict[int, int]:
+    """Wie oft jeder TEXT heute schon dran war.
+
+    Gezählt wird der Text, nicht die einzelne Aufgabe: hin und zurück
+    sind zwei Aufgaben zu demselben Satz, und zweimal denselben Satz
+    hintereinander will niemand.
+    """
+    heute = lernmodul.heute()
+    morgen = (heute + dt.timedelta(days=1)).isoformat()
+    return {z["text_id"]: z["n"] for z in dbm.zeilen(db, """
+        SELECT x.text_id, COUNT(*) AS n
+          FROM textbearbeitung b
+          JOIN textaufgabe x ON x.id = b.textaufgabe_id
+         WHERE b.benutzer_id = ? AND b.zeitpunkt >= ? AND b.zeitpunkt < ?
+         GROUP BY x.text_id""", (benutzer_id, heute.isoformat(), morgen))}
+
+
 def _zuletzt_gefragt(db: sqlite3.Connection, benutzer_id: int,
                      anzahl: int = ZULETZT_MEIDEN) -> list[int]:
     """Die Texte der zuletzt bearbeiteten Übungen dieser Person."""
@@ -229,6 +246,17 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # nichts übrig und der Rückfall nimmt doch wieder den alten Satz.
     meiden = ([] if nur in ("neu", "frei")
               else _zuletzt_gefragt(db, benutzer_id))
+    # Erst jeden Satz einmal, dann den zweiten Durchgang — dieselbe Regel
+    # wie bei den Vokabeln, und aus demselben Grund: »Nochmal« setzt den
+    # Satz auf verlernt und heute fällig, und verlernt steht in der
+    # Sortierung auf Rang 0. Gemessen waren es drei Sätze im Kreis,
+    # sechzehn Fragen lang, während fünf unberührte danebenlagen.
+    runde = ""
+    if nur not in ("neu", "frei"):
+        teile = " ".join(f"WHEN {int(t)} THEN {int(n)}"
+                         for t, n in _rundenstand(db, benutzer_id).items())
+        if teile:
+            runde = f"CASE t.id {teile} ELSE 0 END, "
     rumpf = f"""
         SELECT x.id AS textaufgabe_id, t.id AS text_id
           FROM textaufgabe x
@@ -242,13 +270,13 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     if meiden:
         reihe = dbm.zeilen(db, f"""{rumpf}
            AND t.id NOT IN ({','.join('?' * len(meiden))})
-         ORDER BY {ordnung}
+         ORDER BY {runde}{ordnung}
          LIMIT ?""", (*werte, *meiden, max(1, anzahl)))
     if not reihe:
         # Nichts anderes da — dann eben der zuletzt gefragte Satz. Mit
         # einer einzigen Übung ist jede Abfrage eine Wiederholung.
         reihe = dbm.zeilen(db, f"""{rumpf}
-         ORDER BY {ordnung}
+         ORDER BY {runde}{ordnung}
          LIMIT ?""", (*werte, max(1, anzahl)))
 
     ergebnis = []

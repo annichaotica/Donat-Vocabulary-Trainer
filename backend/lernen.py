@@ -299,6 +299,26 @@ def _rundenstand(db: sqlite3.Connection, benutzer_id: int) -> dict[int, int]:
         (benutzer_id, heute().isoformat(), morgen))}
 
 
+def _runden_sql(stand: dict[int, int], spalte: str = "lexem_id") -> str:
+    """Dieselbe Regel als Sortierausdruck für die Abfrage.
+
+    Nachträglich zu sortieren genügt hier nicht: das Fenster holt nur
+    `anzahl * 4` Zeilen, und darin stehen bei einer laufenden Sitzung
+    überwiegend schon gesehene Wörter. Gemessen: die ersten zwölf Fragen
+    brachten nur sieben verschiedene Wörter, obwohl zwölf bereitlagen.
+    Zum dritten Mal dieselbe Lehre — die Bedingung gehört in die Abfrage.
+
+    Die Werte stehen fest verdrahtet im Ausdruck, nicht als Platzhalter:
+    es sind Zahlen aus der eigenen Datenbank, keine Eingaben, und `int()`
+    lässt nichts anderes durch.
+    """
+    teile = " ".join(f"WHEN {int(lid)} THEN {int(n)}"
+                     for lid, n in (stand or {}).items() if lid is not None)
+    # Nicht "0" zurückgeben: eine nackte Zahl im ORDER BY ist in SQLite
+    # eine SPALTENNUMMER, kein Wert. Lieber nichts.
+    return f"CASE {spalte} {teile} ELSE 0 END" if teile else ""
+
+
 def _rundenweise(reihe: list[dict], stand: dict[int, int]) -> list[dict]:
     """Erst jedes Wort einmal, dann das zweite Mal.
 
@@ -602,6 +622,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # Bedingung, nicht hinterher ins Sieb (siehe tests/test_wortvorrat.py).
     # Und je Sammlung gezählt, genau wie in stand() — sonst meldet die
     # Übersicht für die zweite Sammlung offene Fragen, die nie kommen.
+    rundenstand = _rundenstand(db, benutzer_id)
     heute_begonnen: set[int] = set()
     rest_neu = e["neu_je_sitzung"]
     if nur is None:
@@ -712,6 +733,11 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # dann von jedem die zweite — statt vierzig Formen desselben Verbs
     # hintereinander. Blockweises Üben fühlt sich leichter an und behält
     # schlechter; verschränktes ist mühsamer und sitzt.
+    # Die Runde steht VOR allem anderen: erst jedes Wort einmal, dann
+    # das zweite Mal. Die Dringlichkeit ordnet innerhalb der Runde.
+    runde = _runden_sql(rundenstand)
+    if runde:
+        ordnung = f"{runde}, {ordnung}"
     sql = f"""
         SELECT * FROM (
           SELECT a.id AS aufgabe_id, a.typ, l.id AS lexem_id, l.lemma,
@@ -797,12 +823,13 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                WHERE {' AND '.join(grundbedingungen)}
                  AND (z.zustand IS NULL OR z.zustand = 'neu')
             )
-             ORDER BY schon_begonnen, rang_im_wort, {LERNREIHENFOLGE}
+             ORDER BY {runde + ", " if runde else ""}schon_begonnen,
+                      rang_im_wort, {LERNREIHENFOLGE}
              LIMIT 12""", (benutzer_id, benutzer_id, *grundwerte))
         nachschub = [r for r in nachschub
                      if r["lexem_id"] in dazu or len(dazu) < rest_neu]
     zuletzt = _zuletzt_gefragt(db, benutzer_id)
-    reihe = _rundenweise(reihe, _rundenstand(db, benutzer_id))
+    reihe = _rundenweise(reihe, rundenstand)
     reihe = _abwechseln(reihe, zaehler)
     reihe = _abstand_halten(reihe, zuletzt, anzahl)
     # Zuletzt, nicht zuerst: sonst schiebt das Abstandhalten das eben

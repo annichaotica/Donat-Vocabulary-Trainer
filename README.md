@@ -39,7 +39,7 @@ python3 -m venv .venv
 
 Dann <http://localhost:8030>. Tests: `.venv/bin/python -m pytest tests/ -q`
 
-### Auf dem Familienserver
+### Auf dem eigenen Server
 
 ```sh
 ssh <dein-server>

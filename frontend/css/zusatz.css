@@ -503,3 +503,17 @@ input[type="file"] { max-width: 100%; }
 .zugriff-zeile { display: flex; gap: .6rem; align-items: center;
                  flex-wrap: wrap; margin: .5rem 0; }
 .zugriff-zeile > b { min-width: 7rem; }
+
+
+/* Das »Warum ist das so?« an der Frage. Dieselbe Hülle wie beim
+   »Warum kommt das jetzt?«, nur abgesetzt — es ist die Erklärung zur
+   Sache, nicht zum Terminplan. */
+.warum.regel > summary { font-weight: 600; }
+.regel-titel { font-size: 1em; margin: .6rem 0 .2rem; }
+.regel-titel:first-of-type { margin-top: .3rem; }
+.regel-beispiele { margin: .3rem 0 .6rem; padding-left: 1.1rem; }
+.regel-beispiele li { margin: .15rem 0; }
+.regel-beispiele span { color: var(--leise); }
+
+.regel-pruefung { border-top: 1px solid var(--rand); padding-top: .7rem;
+                  margin-top: .7rem; }

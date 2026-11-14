@@ -42,7 +42,12 @@ export async function zeichnen(behaelter) {
 
   el.append(h('h1', { text: 'Freigabe' }));
   const uebersicht = await api.freigabeLektionen(sammlungId);
+  // Regeln hängen an keiner Lektion — sie gelten für die Sprache, nicht
+  // für ein Kapitel. Darum stehen sie hier oben und nicht in der Liste.
+  const offeneRegeln = await regelkasten(behaelter, sammlungId);
+  if (offeneRegeln) el.append(offeneRegeln);
   if (!uebersicht.offen_gesamt && !uebersicht.uebungen_offen_gesamt) {
+    if (offeneRegeln) return;
     el.append(h('div', { class: 'leer' },
       h('p', { text: 'Alles freigegeben — es wartet nichts.' }),
       h('p', { class: 'leise', text: 'Hier erscheinen Formen, die über die '
@@ -83,6 +88,78 @@ export async function zeichnen(behaelter) {
         : null));
   }
   el.append(liste);
+}
+
+/* --------------------------------------------- Regeln freigeben */
+
+/* Das »Warum ist das so?«, bevor es jemand zu sehen bekommt.
+ *
+ * Eine falsche Grammatikerklärung ist schlimmer als gar keine: man
+ * merkt sie sich, und sie klingt plausibel. Darum derselbe Weg wie bei
+ * Formen und Übungen — eingetragen wird ungeprüft, gezeigt wird erst
+ * nach einem Blick.
+ */
+async function regelkasten(behaelter, sammlungId) {
+  let offen = [];
+  try {
+    offen = await api.regeln(sammlungId, true);
+  } catch { return null; }
+  if (!offen.length) return null;
+
+  const kasten = h('div', { class: 'karte' },
+    h('h2', { text: `${offen.length} ${offen.length === 1 ? 'Regel wartet'
+                                                          : 'Regeln warten'}` }),
+    h('p', { class: 'leise',
+      text: 'Grammatikerklärungen, die beim Üben neben der Frage stehen '
+          + 'sollen. Eine falsche Erklärung merkt man sich — darum erst '
+          + 'lesen.' }));
+
+  for (const r of offen) {
+    const zeile = h('div', { class: 'regel-pruefung' });
+    zeile.append(h('h3', { class: 'regel-titel', text: r.titel }));
+    for (const absatz of String(r.text || '').split(/\n{2,}/)) {
+      if (absatz.trim()) zeile.append(h('p', { text: absatz.trim() }));
+    }
+    if (r.beispiele?.length) {
+      zeile.append(h('ul', { class: 'regel-beispiele' },
+        r.beispiele.map((b) => h('li', {},
+          h('b', { text: b.form || b.text || '' }),
+          b.bedeutung ? h('span', { text: ` — ${b.bedeutung}` }) : null))));
+    }
+    zeile.append(h('p', { class: 'leise',
+      text: 'Gilt für: ' + musterText(r.muster) }));
+    zeile.append(h('div', { class: 'frage-werkzeuge' },
+      h('button', {
+        class: 'wichtig',
+        onclick: async () => {
+          try {
+            await api.regelFreigeben(r.id);
+            zeile.remove();
+            meldung(`»${r.titel}« ist freigegeben.`);
+          } catch (fehler) { meldung(fehler.message, 'fehler'); }
+        },
+      }, 'In Ordnung'),
+      h('button', {
+        onclick: async () => {
+          try {
+            await api.regelLoeschen(r.id);
+            zeile.remove();
+            meldung(`»${r.titel}« ist gelöscht.`);
+          } catch (fehler) { meldung(fehler.message, 'fehler'); }
+        },
+      }, 'Löschen')));
+    kasten.append(zeile);
+  }
+  return kasten;
+}
+
+function musterText(muster) {
+  const m = muster || {};
+  const teile = [];
+  if (m.wortart) teile.push(m.wortart);
+  if (m.formgruppe) teile.push(m.formgruppe);
+  for (const [d, w] of Object.entries(m.merkmale || {})) teile.push(`${d}: ${w}`);
+  return teile.length ? teile.join(', ') : 'alles in dieser Sammlung';
 }
 
 /* ------------------------------------------------------ Prüfansicht */

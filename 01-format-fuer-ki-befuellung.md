@@ -559,3 +559,78 @@ Der Server deckt inzwischen alles von diesem Blatt ab. Die Regeln bleiben
 dieselben — er ist nur ein anderer Weg zur gleichen Schnittstelle und
 prüft dieselben Merkmale. Der erste Aufruf in jeder Sitzung ist
 `sammlungen_auflisten`, der zweite `formgruppen_zeigen` für die Sprache.
+
+---
+
+## Grammatikregeln — das »Warum ist das so?«
+
+Beim Üben steht neben jeder Frage die Regel, die gerade greift: beim
+Aorist die zum Aorist, beim Genitiv die zum Genitiv. Nicht als
+Grammatikbuch zum Durchlesen, sondern als Antwort auf die eine Frage,
+die man in dem Moment hat.
+
+**Werkzeuge:** `regeln_auflisten`, `regel_anlegen`.
+
+### Gefunden wird über ein Muster
+
+Eine Regel sagt, worauf sie zutrifft — nicht, zu welchen Wörtern sie
+gehört:
+
+```json
+{
+  "titel": "Aorist: der einmalige Vorgang",
+  "text": "Der Aorist erzählt, was einmal geschah und abgeschlossen ist.\n\nEr wird auf einem eigenen Stamm gebildet, nicht auf dem des Präsens: γράφω wird zu έγραψα.",
+  "muster": {"wortart": "verb", "merkmale": {"tempus": "aorist"}},
+  "beispiele": [
+    {"form": "έγραψα", "bedeutung": "ich schrieb (einmal, fertig)"},
+    {"form": "έγραφα", "bedeutung": "ich schrieb (immer wieder)"}
+  ],
+  "kennung": "el-aorist"
+}
+```
+
+Damit greift sie bei **jeder** Aoristform **jedes** Verbs — auch bei
+Wörtern, die es noch gar nicht gibt. Ein Muster darf nennen:
+
+| Feld | Bedeutung |
+|---|---|
+| `wortart` | `verb`, `substantiv`, … |
+| `formgruppe` | eine Kennung aus `formgruppen_zeigen` |
+| `merkmale` | ein Merkmalsbündel wie bei den Formen |
+
+Alles ist freigestellt. Ein **leeres** Muster gilt überall — brauchbar
+für einen allgemeinen Hinweis zur Sammlung, sonst selten richtig.
+
+### Was eine gute Regel ausmacht
+
+- **Je enger, desto eher wird sie gezeigt.** Es erscheinen höchstens
+  drei Regeln je Frage, die engste zuerst. Lieber mehrere genaue Regeln
+  als eine lange allgemeine.
+- **Schreib für jemanden, der mitten in einer Abfrage sitzt** und eine
+  Frage hat. Zwei, drei Sätze. Wer einen Grammatikbuchabschnitt
+  hinterlegt, bekommt ihn nicht gelesen.
+- **Beispiele helfen mehr als Begriffe.** Am besten eines, das den
+  Unterschied zeigt: έγραψα gegen έγραφα.
+- **Absätze mit Leerzeile trennen** — sie werden als Absätze gezeigt.
+
+### Berichtigen statt verdoppeln
+
+Mit `kennung` findet man dieselbe Regel wieder. Ein zweiter Aufruf mit
+derselben Kennung ändert sie, statt eine zweite anzulegen.
+
+**Jede inhaltliche Änderung setzt die Freigabe zurück.** Das ist
+Absicht: ein geänderter Text ist nicht mehr der, den jemand angesehen
+hat. Nur die Reihenfolge zu verschieben lässt die Freigabe stehen.
+
+### Freigabe
+
+Wie bei Formen und Übungen: Was eingetragen wird, ist **ungeprüft** und
+erscheint nirgends, bis ein Mensch es angesehen hat. Eine falsche
+Grammatikerklärung ist schlimmer als gar keine — man merkt sie sich, und
+sie klingt plausibel. Dafür gibt es bewusst kein Werkzeug.
+
+### Ein Tippfehler im Muster wird abgewiesen
+
+`{"merkmale": {"tempuss": "aorist"}}` ergibt einen Fehler statt einer
+Regel, die angelegt wird und nie erscheint. Unbekannte Merkmalsnamen und
+Wortarten werden beim Eintragen zurückgewiesen.

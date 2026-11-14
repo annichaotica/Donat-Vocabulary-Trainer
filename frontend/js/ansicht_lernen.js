@@ -243,6 +243,7 @@ export class Sitzung {
       this.ergebnis ? this.teilRueckmeldung() : null,
       this.ergebnis && this.phase === 'rueckmeldung' ? this.teilWertung() : null,
       this.ergebnis && this.phase === 'rueckmeldung' ? this.teilSignale() : null,
+      this.teilRegeln(),
       this.teilWarum(),
       this.teilEingriffe()));
     this.fokussieren();
@@ -629,6 +630,36 @@ export class Sitzung {
         + 'Eingabe — sonst würde Tippgeschwindigkeit mitgewertet. Und sie zählt '
         + 'nur im Verhältnis zu deiner eigenen üblichen Zeit.'
         : 'Die Zeit wird nicht gewertet. Bewertet wird allein, was herauskam.' }));
+    return kasten;
+  }
+
+  /* Das »Warum ist das so?« — die Grammatikregel, die gerade greift.
+   *
+   * Steht ÜBER dem »Warum kommt das jetzt?«: das eine beantwortet eine
+   * Frage, die man beim Lernen wirklich hat, das andere erklärt den
+   * Terminplan. Und zugeklappt, denn in der Abfrage will man zuerst
+   * antworten — wer nachsehen will, klappt auf.
+   */
+  teilRegeln() {
+    const regeln = this.aufgabe.regeln || [];
+    if (!regeln.length) return null;
+    const kasten = h('details', { class: 'warum regel' },
+      h('summary', { text: regeln.length === 1
+        ? 'Warum ist das so?'
+        : `Warum ist das so? (${regeln.length})` }));
+    for (const r of regeln) {
+      kasten.append(h('h3', { class: 'regel-titel', text: r.titel }));
+      // Absätze getrennt: eine Regel in einem Block ist unlesbar.
+      for (const absatz of String(r.text || '').split(/\n{2,}/)) {
+        if (absatz.trim()) kasten.append(h('p', { text: absatz.trim() }));
+      }
+      if (r.beispiele?.length) {
+        kasten.append(h('ul', { class: 'regel-beispiele' },
+          r.beispiele.map((b) => h('li', {},
+            h('b', { text: b.form || b.text || '' }),
+            b.bedeutung ? h('span', { text: ` — ${b.bedeutung}` }) : null))));
+      }
+    }
     return kasten;
   }
 

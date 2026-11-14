@@ -56,6 +56,7 @@ MUSTER = [
     # sind die Lernwege und die prüfen über sammlung_id.
     (re.compile(r"^/api/uebungen/(\d+)"), "uebung"),
     (re.compile(r"^/api/textaufgaben/(\d+)"), "textaufgabe"),
+    (re.compile(r"^/api/regeln/(\d+)"), "regel"),
 ]
 
 # Diese Pfade sind für alle offen: Stammdaten ohne persönlichen Bezug.
@@ -121,6 +122,12 @@ def _pruefen(db, person: dict, pfad: str, methode: str):
                 if s is None:
                     return None
                 zugang.sammlung_pruefen(db, ich, s, schreibend)
+            elif art == "regel":
+                s_id = dbm.wert(db, "SELECT sammlung_id FROM regel WHERE id = ?",
+                                (kennung,))
+                if s_id is None:
+                    return None
+                zugang.sammlung_pruefen(db, ich, s_id, schreibend)
             elif art == "mcp_token":
                 besitzer = dbm.wert(db, "SELECT benutzer_id FROM mcp_token WHERE id = ?",
                                     (kennung,))

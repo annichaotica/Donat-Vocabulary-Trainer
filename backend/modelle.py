@@ -486,3 +486,29 @@ class McpTokenAnlegen(BaseModel):
     """
     name: str = Field(min_length=1, max_length=80,
                       description="wofür, z.B. »Claude-App auf dem iPad«")
+
+
+class RegelEingabe(BaseModel):
+    """Eine Grammatikregel — das »Warum ist das so?« an der Frage."""
+    titel: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=4000)
+    # Worauf die Regel zutrifft. Alles freigestellt; leer heißt überall.
+    # {"wortart": "verb", "formgruppe": "aoristos",
+    #  "merkmale": {"tempus": "aorist"}}
+    muster: dict[str, Any] | None = None
+    # [{"form": "έγραψα", "bedeutung": "ich schrieb"}, …]
+    beispiele: list[dict[str, Any]] = Field(default_factory=list)
+    kennung: str | None = Field(default=None, max_length=120)
+    quelle: str | None = None
+    reihenfolge: int = 0
+
+
+class RegelAendern(BaseModel):
+    """Teiländerung. Was nicht genannt ist, bleibt wie es war."""
+    titel: str | None = Field(default=None, min_length=1, max_length=200)
+    text: str | None = Field(default=None, min_length=1, max_length=4000)
+    muster: dict[str, Any] | None = None
+    beispiele: list[dict[str, Any]] | None = None
+    kennung: str | None = Field(default=None, max_length=120)
+    quelle: str | None = None
+    reihenfolge: int | None = None

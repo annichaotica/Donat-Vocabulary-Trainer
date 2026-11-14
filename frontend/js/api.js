@@ -96,6 +96,14 @@ export const api = {
   // Merkmalsbündel-Dateien (das Format, das die KI liefert)
   vokabelnImportieren: (sammlungId, daten) =>
     ruf(`/sammlungen/${sammlungId}/import/vokabeln`, { methode: 'POST', daten }),
+  regeln: (sammlungId, nurUngepruefte = false) =>
+    ruf(`/sammlungen/${sammlungId}/regeln`,
+        { frage: { nur_ungepruefte: nurUngepruefte } }),
+  regelFreigeben: (id, geprueft = true) =>
+    ruf(`/regeln/${id}/freigabe`, { methode: 'POST', frage: { geprueft } }),
+  regelAendern: (id, daten) =>
+    ruf(`/regeln/${id}`, { methode: 'PATCH', daten }),
+  regelLoeschen: (id) => ruf(`/regeln/${id}`, { methode: 'DELETE' }),
   uebungenImportieren: (sammlungId, daten) =>
     ruf(`/sammlungen/${sammlungId}/import/uebungen`, { methode: 'POST', daten }),
   // Tabellen (CSV, Anki, Quizlet)

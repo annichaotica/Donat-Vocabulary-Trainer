@@ -16,6 +16,7 @@ import bewertung as bewertungsmodul
 import datenbank as dbm
 import fsrs
 import legasthenie as legasthenie_modul
+import regeln as regelmodul
 import merkmale as mk
 
 # Reihenfolge, in der fällige Aufgaben genommen werden.
@@ -763,6 +764,14 @@ def _aufgabe_ausbauen(db: sqlite3.Connection, r: dict, wunschretention: float,
         ziel = next(iter(aufloesung.get("erwartet") or []), None)
         if ziel:
             f["maske"] = legasthenie_modul.maske(ziel, int(lg["maske_stufe"]))
+    # Das »Warum ist das so?« — nur die freigegebenen Regeln, die zu
+    # dieser Frage passen, höchstens drei. Fehlt eine, fehlt sie still:
+    # eine Abfrage darf nicht daran scheitern, dass die Grammatik noch
+    # nicht geschrieben ist.
+    try:
+        f["regeln"] = regelmodul.fuer_aufgabe(db, r["aufgabe_id"])
+    except Exception:
+        f["regeln"] = []
     z = fsrs.Zustand(r["stabilitaet"], r["schwierigkeit"])
     verstrichen = _tage_seit(r["letzte_wiederholung"])
     vorschau = fsrs.vorschau(z, verstrichen, wunschretention)

@@ -334,6 +334,43 @@ def lernstand_lesen(db: sqlite3.Connection, person: dict, sammlung_id: int,
                            max(1, min(int(anzahl), 200)), db)
 
 
+# ----------------------------------------------------- Grammatikregeln
+
+def regel_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                  titel: str, text: str, muster: dict | None = None,
+                  beispiele: list | None = None, kennung: str | None = None,
+                  reihenfolge: int = 0):
+    """Eine Grammatikregel anlegen oder berichtigen."""
+    import regeln
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+    sammlung = dbm.zeile(db, "SELECT sprache FROM sammlung WHERE id = ?",
+                         (sammlung_id,))
+    if sammlung is None:
+        raise WerkzeugFehler(f"Sammlung {sammlung_id} gibt es nicht")
+    try:
+        r = regeln.anlegen(db, sammlung_id, titel, text, sammlung["sprache"],
+                           muster, beispiele, kennung, quelle="ki",
+                           reihenfolge=reihenfolge)
+    except Exception as f:
+        raise WerkzeugFehler(str(f)) from f
+    return {"regel_id": r["id"], "titel": r["titel"], "muster": r["muster"],
+            "hinweis": "Die Regel bleibt ungeprüft und wird nicht gezeigt, "
+                       "bis ein Mensch sie freigibt — wie eine eingetragene "
+                       "Vokabel."}
+
+
+def regeln_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                     nur_ungepruefte: bool = False):
+    """Welche Regeln es schon gibt — damit nichts doppelt geschrieben wird."""
+    import regeln
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=False)
+    liste = regeln.auflisten(db, sammlung_id, nur_ungepruefte)
+    return {"anzahl": len(liste),
+            "regeln": [{"id": r["id"], "kennung": r["kennung"],
+                        "titel": r["titel"], "muster": r["muster"],
+                        "geprueft": r["geprueft"]} for r in liste]}
+
+
 # ------------------------------------------------------- Sätze und Texte
 
 def uebung_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
@@ -761,6 +798,54 @@ WERKZEUGE: list[dict] = [
             "lemma": _s("string", "das vorhandene Lemma, zur Bestätigung"),
         }, "required": ["lexem_id", "lemma"]},
         "funktion": vokabel_loeschen,
+    },
+    {
+        "name": "regeln_auflisten",
+        "description":
+            "Welche Grammatikregeln diese Sammlung schon hat. Vor dem "
+            "Schreiben ansehen, sonst entstehen Dubletten.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+            "nur_ungepruefte": _s("boolean", "nur die noch nicht "
+                                             "freigegebenen"),
+        }, "required": ["sammlung_id"]},
+        "funktion": regeln_auflisten,
+    },
+    {
+        "name": "regel_anlegen",
+        "description":
+            "Eine Grammatikregel hinterlegen — das \"Warum ist das so?\", "
+            "das beim Üben neben der Frage steht.\n\n"
+            "Gefunden wird eine Regel über ihr MUSTER, nicht über eine "
+            "Zuordnung zu einzelnen Wörtern: {\"wortart\": \"verb\", "
+            "\"merkmale\": {\"tempus\": \"aorist\"}} greift bei jeder "
+            "Aoristform jedes Verbs — auch bei denen, die es noch gar nicht "
+            "gibt. Ein leeres Muster gilt überall.\n\n"
+            "Je enger das Muster, desto eher wird die Regel gezeigt; es "
+            "erscheinen höchstens drei je Frage. Also lieber mehrere enge "
+            "Regeln als eine lange allgemeine.\n\n"
+            "**Schreib für jemanden, der mitten in einer Abfrage sitzt** und "
+            "eine Frage hat — zwei, drei Sätze, kein Grammatikbuchabschnitt. "
+            "Beispiele helfen mehr als Begriffe.\n\n"
+            "Mit `kennung` findest du dieselbe Regel wieder und berichtigst "
+            "sie, statt eine zweite anzulegen. Jede Änderung setzt die "
+            "Freigabe zurück.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+            "titel": _s("string", "kurz, z. B. \"Aorist: der einmalige "
+                                  "Vorgang\""),
+            "text": _s("string", "die Erklärung selbst"),
+            "muster": _s("object",
+                "worauf die Regel zutrifft; alle Felder freigestellt. "
+                "wortart, formgruppe (Kennung aus formgruppen_auflisten), "
+                "merkmale (Merkmalsbündel wie bei den Formen)"),
+            "beispiele": _s("array",
+                "[{\"form\": \"έγραψα\", \"bedeutung\": \"ich schrieb\"}]",
+                items={"type": "object"}),
+            "kennung": _s("string", "stabile Kennung zum Wiederfinden"),
+            "reihenfolge": _s("integer", "unter gleich engen Regeln"),
+        }, "required": ["sammlung_id", "titel", "text"]},
+        "funktion": regel_anlegen,
     },
     {
         "name": "uebung_anlegen",

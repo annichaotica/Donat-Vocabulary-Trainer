@@ -37,13 +37,15 @@ import identitaet
 import mcp_dienst
 import merkmale as mk
 import qualitaet
+import regeln as regelmodul
 import sammelimport
 import sprachen
 import uebung_lernen
 import uebungen
 import wache
 import zugang
-from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
+from modelle import (RegelEingabe, RegelAendern,
+    BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
                      ImportEingabe, LernzielAendern, LernzielAnlegen,
@@ -970,6 +972,70 @@ def uebungen_bewerten(eingabe: UebungBewertenEingabe, request: Request,
         eingabe.textaufgabe_id, eingabe.urteil, eingabe.bewertung,
         eingabe.antwort, eingabe.dauer_ms, eingabe.aufgedeckt,
         eingabe.versuche, eingabe.rueckmeldung)
+
+
+# ======================================================= Grammatikregeln
+
+@app.get("/api/sammlungen/{sammlung_id}/regeln")
+def regeln_auflisten(sammlung_id: int, nur_ungepruefte: bool = False,
+                     db: sqlite3.Connection = DB):
+    """Alle Regeln dieser Sammlung — auch die noch ungeprüften."""
+    _holen(db, "sammlung", sammlung_id)
+    return regelmodul.auflisten(db, sammlung_id, nur_ungepruefte)
+
+
+@app.post("/api/sammlungen/{sammlung_id}/regeln", status_code=201)
+def regel_anlegen(sammlung_id: int, eingabe: RegelEingabe, request: Request,
+                  db: sqlite3.Connection = DB):
+    """Legt eine Regel an oder berichtigt die mit derselben Kennung.
+
+    Sie bleibt ungeprüft — wie eine eingetragene Vokabel.
+    """
+    sammlung = _holen(db, "sammlung", sammlung_id)
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    try:
+        return regelmodul.anlegen(
+            db, sammlung_id, eingabe.titel, eingabe.text, sammlung["sprache"],
+            eingabe.muster, eingabe.beispiele, eingabe.kennung,
+            eingabe.quelle, eingabe.reihenfolge)
+    except ValueError as fehler:
+        raise HTTPException(400, str(fehler))
+
+
+@app.get("/api/regeln/{regel_id}")
+def regel_lesen(regel_id: int, db: sqlite3.Connection = DB):
+    z = regelmodul.lesen(db, regel_id)
+    if z is None:
+        raise HTTPException(404, f"Regel {regel_id} gibt es nicht")
+    return z
+
+
+@app.patch("/api/regeln/{regel_id}")
+def regel_aendern(regel_id: int, eingabe: RegelAendern,
+                  db: sqlite3.Connection = DB):
+    r = _holen(db, "regel", regel_id)
+    sammlung = _holen(db, "sammlung", r["sammlung_id"])
+    try:
+        return regelmodul.aendern(db, regel_id, sammlung["sprache"],
+                                  **eingabe.model_dump(exclude_unset=True))
+    except (ValueError, KeyError) as fehler:
+        raise HTTPException(400, str(fehler))
+
+
+@app.post("/api/regeln/{regel_id}/freigabe")
+def regel_freigeben(regel_id: int, geprueft: bool = True,
+                    db: sqlite3.Connection = DB):
+    """Die Freigabe bleibt beim Menschen — es gibt dafür bewusst kein
+    MCP-Werkzeug."""
+    _holen(db, "regel", regel_id)
+    return regelmodul.freigeben(db, regel_id, geprueft)
+
+
+@app.delete("/api/regeln/{regel_id}", status_code=204)
+def regel_loeschen(regel_id: int, db: sqlite3.Connection = DB):
+    _holen(db, "regel", regel_id)
+    regelmodul.loeschen(db, regel_id)
+    return Response(status_code=204)
 
 
 # ============================================================ Wortschatz

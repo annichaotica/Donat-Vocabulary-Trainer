@@ -428,3 +428,51 @@ CREATE TABLE IF NOT EXISTS lernziel (
     angelegt      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_lernziel_benutzer ON lernziel(benutzer_id, aktiv);
+
+-- ======================================================================
+-- Grammatikregeln — das "Warum ist das so?" an der Frage.
+--
+-- Beim Üben steht die Regel zur Verfügung, die gerade greift: beim
+-- griechischen Aorist die Regel zum Aorist, beim Genitiv die zum
+-- Genitiv. Nicht als Grammatikbuch zum Durchlesen, sondern als Antwort
+-- auf die eine Frage, die man in dem Moment hat.
+--
+-- Gefunden wird eine Regel über ihr MUSTER, nicht über eine feste
+-- Zuordnung: {"wortart": "verb", "merkmale": {"tempus": "aorist"}}
+-- greift bei jeder Aoristform jedes Verbs. Das ist dieselbe Mechanik
+-- wie bei den erklärten Lücken (merkmale.passt_muster) und bei den
+-- Formgruppen — eine Regel muss nicht wissen, welche Wörter es gibt.
+--
+-- Die Regeln hängen an der SAMMLUNG, nicht an der Sprache. Grammatik
+-- ist zwar eine Eigenschaft der Sprache, aber die Sammlung ist überall
+-- sonst die Einheit für Besitz, Freigabe und Zugriff; an der Sprache
+-- hängend bräuchte es eine eigene Rechteregel, und Lernende 2s französische
+-- Erklärungen gingen Max etwas an. Der Preis ist, dass zwei Sammlungen
+-- derselben Sprache ihre Regeln doppelt pflegen.
+--
+-- `geprueft` wie überall: was ein Agent einträgt, wird nicht gezeigt,
+-- bevor ein Mensch es angesehen hat.
+CREATE TABLE IF NOT EXISTS regel (
+    id           INTEGER PRIMARY KEY,
+    sammlung_id  INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
+    -- Stabile Kennung, damit ein Agent dieselbe Regel wiederfindet und
+    -- berichtigt, statt eine zweite anzulegen.
+    kennung      TEXT,
+    titel        TEXT NOT NULL,
+    text         TEXT NOT NULL,
+    -- JSON-Liste: [{"form": "έγραψα", "bedeutung": "ich schrieb"}, …]
+    beispiele    TEXT NOT NULL DEFAULT '[]',
+    -- JSON: {"wortart": …, "formgruppe": …, "merkmale": {…}}
+    -- Alles freigestellt. Das leere Muster greift überall — brauchbar
+    -- für eine allgemeine Regel zur Sammlung.
+    muster       TEXT NOT NULL DEFAULT '{}',
+    reihenfolge  INTEGER NOT NULL DEFAULT 0,
+    geprueft     INTEGER NOT NULL DEFAULT 0,
+    quelle       TEXT,
+    angelegt     TEXT NOT NULL DEFAULT (datetime('now')),
+    geaendert    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_regel_sammlung
+    ON regel(sammlung_id, geprueft);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_regel_kennung
+    ON regel(sammlung_id, kennung) WHERE kennung IS NOT NULL;

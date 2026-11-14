@@ -260,6 +260,86 @@ PERSONENBEISPIEL = {
     ("2", "pl"): "ihr geht", ("3", "pl"): "sie gehen",
 }
 
+# ---------------------------------------------------------------------
+# »gehen« durch Person UND Zeit.
+#
+# Vorher gewann in der Beispielfolge die Person vor der Zeit, und das
+# Beispiel zur 1. Person Singular lautet nun einmal »ich gehe«. Damit
+# stand unter JEDER griechischen Zeit »wie bei: ich gehe« — auch unter
+# dem Futur und dem Aorist, wo es schlicht falsch ist. Die Person allein
+# erklärt die Form nicht, die Zeit allein auch nicht; gebraucht wird
+# beides in einem Ausdruck.
+#
+# Zusammengesetzt statt achtundvierzig Einträge: die meisten deutschen
+# Zeiten sind umschrieben, also genügt ein Hilfsverb und eine
+# unveränderliche Form.
+PRONOMEN_FOLGE = ("ich", "du", "er/sie/es", "wir", "ihr", "sie")
+_STELLE = {("1", "sg"): 0, ("2", "sg"): 1, ("3", "sg"): 2,
+           ("1", "pl"): 3, ("2", "pl"): 4, ("3", "pl"): 5}
+
+# Einfache Zeiten: die Vollverbformen selbst.
+_EINFACH = {
+    "praesens": ("gehe", "gehst", "geht", "gehen", "geht", "gehen"),
+    "praeteritum": ("ging", "gingst", "ging", "gingen", "gingt", "gingen"),
+}
+# Umschriebene Zeiten: Hilfsverb + unveränderlicher Teil.
+_UMSCHRIEBEN = {
+    "futur": (("werde", "wirst", "wird", "werden", "werdet", "werden"),
+              "gehen"),
+    "futur_ii": (("werde", "wirst", "wird", "werden", "werdet", "werden"),
+                 "gegangen sein"),
+    "futur_perfekt": (("werde", "wirst", "wird", "werden", "werdet",
+                       "werden"), "gegangen sein"),
+    "perfekt": (("bin", "bist", "ist", "sind", "seid", "sind"), "gegangen"),
+    "plusquamperfekt": (("war", "warst", "war", "waren", "wart", "waren"),
+                        "gegangen"),
+}
+# Was der Aorist und der Paratatikos im Deutschen unterscheiden: beides
+# ist Vergangenheit, der eine einmalig, der andere im Verlauf. Ohne den
+# Zusatz wären die Beispiele gleich und erklärten nichts.
+_ZUSATZ = {"aorist": " (einmal)", "imperfekt": " immer wieder"}
+_WIE_PRAETERITUM = ("aorist", "imperfekt", "praeteritum")
+
+
+def _verbbeispiel(merkmale: dict) -> str | None:
+    """»du wirst gehen« statt »du gehst« — Person und Zeit zusammen."""
+    stelle = _STELLE.get((str(merkmale.get("person")),
+                          str(merkmale.get("numerus", "sg"))))
+    if stelle is None:
+        return None
+    pron = PRONOMEN_FOLGE[stelle]
+    tempus = merkmale.get("tempus")
+    modus = merkmale.get("modus")
+
+    # Der Konditional ist im Deutschen umschrieben und sticht die Zeit.
+    if modus == "konditional":
+        wuerde = ("würde", "würdest", "würde", "würden", "würdet", "würden")
+        return f"{pron} {wuerde[stelle]} gehen"
+    if merkmale.get("genus_verbi") == "passiv":
+        # Nur Gegenwart und Vergangenheit — mehr braucht die Erklärung
+        # nicht, und erfundene Formen helfen niemandem.
+        if tempus in _WIE_PRAETERITUM:
+            wurde = ("wurde", "wurdest", "wurde", "wurden", "wurdet", "wurden")
+            return f"{pron} {wurde[stelle]} gesehen"
+        werde = ("werde", "wirst", "wird", "werden", "werdet", "werden")
+        return f"{pron} {werde[stelle]} gesehen"
+
+    if tempus in _UMSCHRIEBEN:
+        hilfs, rest = _UMSCHRIEBEN[tempus]
+        satz = f"{pron} {hilfs[stelle]} {rest}"
+    elif tempus in _WIE_PRAETERITUM:
+        satz = f"{pron} {_EINFACH['praeteritum'][stelle]}"
+    elif tempus in _EINFACH:
+        satz = f"{pron} {_EINFACH[tempus][stelle]}"
+    elif tempus is None:
+        satz = f"{pron} {_EINFACH['praesens'][stelle]}"
+    else:
+        return None                  # unbekannte Zeit: lieber nichts sagen
+    satz += _ZUSATZ.get(tempus, "")
+    if modus == "konjunktiv":
+        return f"dass {satz}"
+    return satz
+
 # In dieser Reihenfolge wird nach einem Beispiel gesucht. Erklärt wird
 # EINE Sache, nicht alle: "ich sehe den Hund, der Hund" wäre keine Hilfe.
 BEISPIELFOLGE = ("kasus", "nonfinit", "stufe", "person", "modus",
@@ -293,6 +373,11 @@ def beispiel(merkmale: dict) -> str | None:
     folge += [d for d in BEISPIELFOLGE if d in merkmale and d not in folge]
     for dimension in folge:
         if dimension == "person":
+            # Person UND Zeit, nicht nur die Person: sonst stand unter
+            # jeder griechischen Zeit »ich gehe«, auch unter dem Futur.
+            b = _verbbeispiel(merkmale)
+            if b:
+                return b
             b = PERSONENBEISPIEL.get((str(merkmale.get("person")),
                                       str(merkmale.get("numerus", "sg"))))
             if b:

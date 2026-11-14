@@ -281,9 +281,42 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
 
 
 # Wie viele zuletzt gefragte Wörter gemieden werden, solange es Auswahl
-# gibt. Zwei reichen: so entsteht weder eine Wiederholung noch ein
-# Hin und Her zwischen genau zwei Wörtern.
+# gibt. Zwei reichen hierfür: so entsteht weder eine unmittelbare
+# Wiederholung noch ein Hin und Her zwischen genau zweien. Gegen einen
+# Dreierkreis hilft nicht dieses Fenster, sondern die Runde darunter.
 ZULETZT_MEIDEN = 2
+
+
+def _rundenstand(db: sqlite3.Connection, benutzer_id: int) -> dict[int, int]:
+    """Wie oft jedes Wort heute schon dran war."""
+    morgen = (heute() + dt.timedelta(days=1)).isoformat()
+    return {z["lexem_id"]: z["n"] for z in dbm.zeilen(db, """
+        SELECT a.lexem_id, COUNT(*) AS n
+          FROM wiederholung w
+          JOIN aufgabe a ON a.id = w.aufgabe_id
+         WHERE w.benutzer_id = ? AND w.zeitpunkt >= ? AND w.zeitpunkt < ?
+         GROUP BY a.lexem_id""",
+        (benutzer_id, heute().isoformat(), morgen))}
+
+
+def _rundenweise(reihe: list[dict], stand: dict[int, int]) -> list[dict]:
+    """Erst jedes Wort einmal, dann das zweite Mal.
+
+    Der Einwand, der diese Regel gebracht hat: »wäre es denn nicht
+    sinnvoller, erstmal die 40 Begriffe durchzurotieren und dann die
+    schlecht beantworteten wieder zu bringen?«
+
+    Vorher entschied allein die Dringlichkeit — und die ist nach einem
+    »Nochmal« sofort wieder maximal. Drei Wörter genügten für einen
+    Kreis, aus dem achtunddreißig unberührte Wörter nicht hineinkamen.
+    Gegen so etwas hilft kein Meidefenster: man müsste es immer eins
+    größer machen als den Kreis, den es gerade gibt.
+
+    Sortiert wird STABIL, die bestehende Reihenfolge bleibt also
+    innerhalb einer Runde erhalten. Die Dringlichkeit ordnet damit noch
+    immer — nur nicht mehr über die Runde hinweg.
+    """
+    return sorted(reihe, key=lambda r: stand.get(r.get("lexem_id"), 0))
 
 
 def _schon_gefragt_heute(db: sqlite3.Connection, benutzer_id: int) -> int:
@@ -515,8 +548,28 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         gewaehlt = _nach_vorzug_waehlen(plan["aufgaben"], _vorzug(rest))
         gewaehlt = _abwechseln(gewaehlt,
                                _schon_gefragt_heute(db, benutzer_id))
-        gewaehlt = _abstand_halten(gewaehlt,
-                                   _zuletzt_gefragt(db, benutzer_id), anzahl)
+        meiden = _zuletzt_gefragt(db, benutzer_id)
+        gewaehlt = _rundenweise(gewaehlt, _rundenstand(db, benutzer_id))
+        gewaehlt = _abstand_halten(gewaehlt, meiden, anzahl)
+        # Auch hier Neues einstreuen, wenn der Schalter an ist.
+        #
+        # Er wirkte nur im normalen Weg — im Lernziel nicht, und genau
+        # dort fällt es auf: der Block stellt Verlerntes und Wackliges
+        # nach vorn, und wer eine Antwort mit »Nochmal« bewertet, macht
+        # das Wort sofort wieder zum dringendsten. Gemessen am
+        # Protokoll: 18 Antworten, drei Wörter, im Kreis — während
+        # achtunddreißig unberührte danebenlagen. Das Abstandhalten
+        # meidet nur die letzten zwei und ist gegen einen Dreierkreis
+        # machtlos.
+        if e["neues_einstreuen"]:
+            nachschub = [a for a in plan["aufgaben"]
+                         if a.get("zustand") in (None, "neu")]
+            if rest is not None and rest["neu"] <= 0:
+                nachschub = []          # Tagesanteil fürs Neue ist voll
+            if nachschub:
+                gewaehlt = _neues_einstreuen(
+                    gewaehlt, nachschub, _schon_gefragt_heute(db, benutzer_id),
+                    meiden)
         for eintrag in gewaehlt[:anzahl]:
             z = _zustand_sichern(db, eintrag["aufgabe_id"], benutzer_id)
             ergebnis.append({
@@ -749,6 +802,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         nachschub = [r for r in nachschub
                      if r["lexem_id"] in dazu or len(dazu) < rest_neu]
     zuletzt = _zuletzt_gefragt(db, benutzer_id)
+    reihe = _rundenweise(reihe, _rundenstand(db, benutzer_id))
     reihe = _abwechseln(reihe, zaehler)
     reihe = _abstand_halten(reihe, zuletzt, anzahl)
     # Zuletzt, nicht zuerst: sonst schiebt das Abstandhalten das eben

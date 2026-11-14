@@ -366,10 +366,18 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
       3. **Neues** — so viel, wie der Termin verlangt.
       4. Was dann noch frei ist, wird mit weiterem Wackligem und Neuem
          aufgefüllt.
+
+    Quer darüber liegt die RUNDE: innerhalb jeder dieser Gruppen kommen
+    zuerst die Wörter, die heute noch nicht dran waren. Ohne das füllten
+    nach zehn Antworten die zehn beantworteten Wörter den ganzen Block,
+    und die restlichen kamen nie hinein — die Reihenfolge weiter hinten
+    kann nur ordnen, was hier ausgewählt wurde.
     """
     ziel = lesen(db, lernziel_id)
     reihe = aufgaben_im_umfang(db, benutzer_id, ziel["umfang"])
     heute = _heute().isoformat()
+    import lernen as lernmodul
+    rundenstand = lernmodul._rundenstand(db, benutzer_id)
     stand = fortschritt(db, benutzer_id, lernziel_id, reihe, ziel)
 
     faellig, nicht_faellig, neu = [], [], []
@@ -406,6 +414,12 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
         for r in quelle[:max(0, min(hoechstens, platz))]:
             genommen.append((r, herkunft))
             platz -= 1
+
+    # Erst jedes Wort einmal, dann das zweite Mal — in jeder Gruppe.
+    faellig = lernmodul._rundenweise(faellig, rundenstand)
+    rest_wacklig_quelle = lernmodul._rundenweise(wacklig, rundenstand)
+    neu = lernmodul._rundenweise(neu, rundenstand)
+    wacklig = rest_wacklig_quelle
 
     nimm(faellig, platz, "faellig")
     # Der Wacklig-Anteil wird VOR dem Neuen reserviert — sonst bliebe er

@@ -58,9 +58,41 @@ function zielkarte(behaelter, z) {
         ? zahl(f.neu_taeglich_noetig, 'täglich neu nötig')
         : null),
 
-    eng ? h('p', { class: 'leise', style: 'color:var(--fast)',
-      text: 'Das wird eng — entweder den Termin verschieben oder den Umfang '
-          + 'kleiner schneiden.' }) : null,
+    // Nicht bloß »das wird eng«, sondern woran es liegt — in den
+    // Einheiten, in denen die Einstellungen stehen. Vorher verglich die
+    // Prüfung gegen eine fest eingebaute 40, die mit niemandes
+    // Einstellung etwas zu tun hatte.
+    eng
+      ? h('div', { class: 'befund hinweis', style: 'margin-top:.6rem' },
+          h('p', { style: 'margin:0 0 .3rem' },
+            h('b', { text: 'So reicht die Zeit nicht:' })),
+          h('ul', { style: 'margin:0 0 .5rem;padding-left:1.2rem' },
+            (f.huerden || []).map((t) => h('li', { text: t }))),
+          h('p', { class: 'leise', style: 'margin:0 0 .5rem' },
+            'Entweder den Termin verschieben, den Umfang kleiner '
+            + 'schneiden — oder mehr am Tag vornehmen.'),
+          f.pensum_noetig
+            ? h('button', {
+                onclick: async () => {
+                  // Die Einstellung still zu ändern wäre falsch. Erst
+                  // sagen, was es bedeutet, dann auf Knopfdruck tun.
+                  const frage = `Pensum auf ${f.pensum_noetig} Fragen und `
+                    + `${f.woerter_taeglich_noetig} neue Wörter am Tag `
+                    + 'setzen? Das gilt für alle Sammlungen, nicht nur für '
+                    + 'dieses Ziel.';
+                  if (!confirm(frage)) return;
+                  try {
+                    await api.benutzerAendern(zustand.benutzerId, {
+                      fragen_je_tag: f.pensum_noetig,
+                      neu_je_sitzung: f.woerter_taeglich_noetig,
+                    });
+                    meldung('Pensum angepasst.');
+                    zeichnen(behaelter);
+                  } catch (fehler) { meldung(fehler.message, 'fehler'); }
+                },
+              }, `Pensum auf ${f.pensum_noetig} Fragen am Tag setzen`)
+            : null)
+      : null,
 
     h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
       h('button', {

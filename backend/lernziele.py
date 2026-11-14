@@ -199,8 +199,17 @@ def fortschritt(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
     verlernt = sum(1 for r in reihe if r["zustand"] == "verlernt")
     offen = gesamt - geschafft
 
+    # Wie viele WÖRTER noch nicht angefangen sind. Das Ziel rechnet in
+    # Aufgaben, die Tageseinstellung in Wörtern — ohne diese Zahl
+    # verglich die Machbarkeitsprüfung Äpfel mit Birnen: »40 neue
+    # Aufgaben« sind bei einem griechischen Verb mit vierzig Formen ein
+    # einziges Wort.
+    neue_woerter = len({r["lexem_id"] for r in reihe
+                        if r["zustand"] in (None, "neu")})
+
     tage = None
     taeglich = None
+    woerter_taeglich = None
     lage = "ohne Termin"
     if ziel["termin"]:
         tage = (dt.date.fromisoformat(ziel["termin"]) - _heute()).days
@@ -209,14 +218,45 @@ def fortschritt(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
         elif tage == 0:
             lage = "heute fällig"
             taeglich = offen
+            woerter_taeglich = neue_woerter
         else:
             # Was täglich neu dazukommen muss, damit es bis zum Termin reicht.
             # Eine neue Aufgabe braucht erfahrungsgemäß mehrere Wiederholungen
             # bis zur Reife, darum ein Sicherheitsabstand von drei Tagen.
             spanne = max(1, tage - 3)
             taeglich = -(-neu // spanne)        # aufgerundet
+            woerter_taeglich = -(-neue_woerter // spanne)
             lage = (f"noch {tage} Tage — dafür täglich etwa {taeglich} neue "
                     f"Aufgaben")
+
+    # Ist das mit den EIGENEN Einstellungen zu schaffen?
+    #
+    # Hier stand `taeglich <= 40` — eine fest eingebaute Zahl, die mit
+    # niemandes Einstellung etwas zu tun hatte, und dazu in der falschen
+    # Einheit. Die Tagesdosis kam gar nicht vor: ein Ziel konnte
+    # »schaffbar« melden, während die Grenze es still unmöglich machte.
+    #
+    # Die Schranke fürs Neue ist exakt bekannt und nicht geschätzt: von
+    # der Tagesdosis ist der Anteil NEU_ANTEIL fürs Neue reserviert.
+    import lernen as lernmodul
+    e = lernmodul.benutzer_einstellungen(db, benutzer_id)
+    dosis = e["fragen_je_tag"]
+    grenze_neu = round(dosis * lernmodul.NEU_ANTEIL) if dosis else None
+    huerden = []
+    if taeglich is not None:
+        if woerter_taeglich > e["neu_je_sitzung"]:
+            huerden.append(
+                f"täglich {woerter_taeglich} neue Wörter nötig, eingestellt "
+                f"sind {e['neu_je_sitzung']}")
+        if grenze_neu is not None and taeglich > grenze_neu:
+            huerden.append(
+                f"täglich {taeglich} neue Aufgaben nötig, dein Pensum von "
+                f"{dosis} Fragen lässt {grenze_neu} zu")
+    # Welches Pensum nötig wäre, damit so viel Neues durchkommt. Keine
+    # Schätzung: es ist die Umkehrung der Reservierung.
+    pensum_noetig = (None if taeglich is None
+                     else max(dosis or 0,
+                              -(-taeglich * 100 // int(lernmodul.NEU_ANTEIL * 100))))
 
     return {
         "lernziel_id": lernziel_id,
@@ -234,7 +274,15 @@ def fortschritt(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
         "faellig": faellig,
         "verlernt": verlernt,
         "neu_taeglich_noetig": taeglich,
-        "schaffbar": (taeglich is None or taeglich <= 40),
+        "neue_woerter": neue_woerter,
+        "woerter_taeglich_noetig": woerter_taeglich,
+        # Was den Weg versperrt, im Klartext und in den eigenen Einheiten.
+        # Leer heißt: es geht sich aus.
+        "huerden": huerden,
+        "pensum_noetig": pensum_noetig,
+        "pensum_jetzt": dosis,
+        "neue_woerter_jetzt": e["neu_je_sitzung"],
+        "schaffbar": not huerden,
     }
 
 

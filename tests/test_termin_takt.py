@@ -157,3 +157,21 @@ def test_ein_termin_laesst_sich_auch_wieder_entfernen(bestand, klient):
     assert f["termin"] is None
     assert f["lage"] == "ohne Termin"
     assert f["schaffbar"] is True
+
+
+def test_ein_termin_in_fremdem_format_wird_abgewiesen(bestand, klient):
+    """`dt.date.fromisoformat` nimmt seit Python 3.11 auch "20261114".
+    Gespeichert würde der Rohtext — und `faellig <= '2026-11-14'` wäre
+    damit dauerhaft unwahr: die Aufgabe verschwände still aus dem
+    Terminplan, ohne dass jemand erführe, warum."""
+    b, s = bestand
+    aufgaben = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"], "anzahl": 1}).json()
+    kennung = aufgaben[0]["aufgabe_id"]
+    for falsch in ("20301231", "2030-W47-1"):
+        antwort = klient.post("/api/lernen/termin", json={
+            "benutzer_id": b["id"], "aufgabe_id": kennung, "datum": falsch})
+        assert antwort.status_code == 400, f"{falsch}: {antwort.text}"
+    gut = klient.post("/api/lernen/termin", json={
+        "benutzer_id": b["id"], "aufgabe_id": kennung, "datum": "2030-12-31"})
+    assert gut.status_code == 200

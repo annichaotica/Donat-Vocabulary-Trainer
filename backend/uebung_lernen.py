@@ -30,6 +30,7 @@ import sqlite3
 import bewertung as bewertungsmodul
 import datenbank as dbm
 import fsrs
+import lernkern
 import lernen as lernmodul
 import satzpruefung
 import sprachen
@@ -48,16 +49,8 @@ RICHTUNGSTEXT = {
 
 def _zustand_sichern(db: sqlite3.Connection, textaufgabe_id: int,
                      benutzer_id: int) -> dict:
-    z = dbm.zeile(db, """SELECT * FROM textlernzustand
-                          WHERE textaufgabe_id = ? AND benutzer_id = ?""",
-                  (textaufgabe_id, benutzer_id))
-    if z is None:
-        db.execute("""INSERT INTO textlernzustand (textaufgabe_id, benutzer_id)
-                      VALUES (?, ?)""", (textaufgabe_id, benutzer_id))
-        z = dbm.zeile(db, """SELECT * FROM textlernzustand
-                              WHERE textaufgabe_id = ? AND benutzer_id = ?""",
-                      (textaufgabe_id, benutzer_id))
-    return z
+    return lernkern.zustand_sichern(db, lernkern.UEBUNGEN, textaufgabe_id,
+                                    benutzer_id)
 
 
 def _sprachen(db: sqlite3.Connection, a: dict) -> tuple[str, str]:
@@ -140,34 +133,15 @@ def _rundenstand(db: sqlite3.Connection, benutzer_id: int) -> dict[int, int]:
     """Wie oft jeder TEXT heute schon dran war.
 
     Gezählt wird der Text, nicht die einzelne Aufgabe: hin und zurück
-    sind zwei Aufgaben zu demselben Satz, und zweimal denselben Satz
-    hintereinander will niemand.
+    sind zwei Aufgaben zu demselben Satz.
     """
-    heute = lernmodul.heute()
-    morgen = (heute + dt.timedelta(days=1)).isoformat()
-    return {z["text_id"]: z["n"] for z in dbm.zeilen(db, """
-        SELECT x.text_id, COUNT(*) AS n
-          FROM textbearbeitung b
-          JOIN textaufgabe x ON x.id = b.textaufgabe_id
-         WHERE b.benutzer_id = ? AND b.zeitpunkt >= ? AND b.zeitpunkt < ?
-         GROUP BY x.text_id""", (benutzer_id, heute.isoformat(), morgen))}
+    return lernkern.rundenstand(db, lernkern.UEBUNGEN, benutzer_id)
 
 
 def _zuletzt_gefragt(db: sqlite3.Connection, benutzer_id: int,
                      anzahl: int = ZULETZT_MEIDEN) -> list[int]:
     """Die Texte der zuletzt bearbeiteten Übungen dieser Person."""
-    # Nach der Protokollnummer, nicht nach dem Zeitstempel: der hat
-    # Sekundenauflösung, und wer zügig antwortet, erzeugt lauter
-    # gleiche Werte — dann ist "zuletzt" nicht entscheidbar und die
-    # Reihenfolge zufällig.
-    return [z["text_id"] for z in dbm.zeilen(db, """
-        SELECT x.text_id, MAX(b.id) AS zuletzt
-          FROM textbearbeitung b
-          JOIN textaufgabe x ON x.id = b.textaufgabe_id
-         WHERE b.benutzer_id = ?
-         GROUP BY x.text_id
-         ORDER BY zuletzt DESC
-         LIMIT ?""", (benutzer_id, anzahl))]
+    return lernkern.zuletzt_gefragt(db, lernkern.UEBUNGEN, benutzer_id, anzahl)
 
 
 def naechste(db: sqlite3.Connection, benutzer_id: int,
@@ -400,75 +374,25 @@ def bewerten(db: sqlite3.Connection, benutzer_id: int, textaufgabe_id: int,
     if bewertung not in fsrs.BEWERTUNGEN:
         raise UebungFehler("Bewertung muss 1 bis 4 sein")
 
-    z = _zustand_sichern(db, textaufgabe_id, benutzer_id)
-    vorher = fsrs.Zustand(z["stabilitaet"], z["schwierigkeit"])
-    verstrichen = lernmodul._tage_seit(z["letzte_wiederholung"])
-    ergebnis = fsrs.bewerten(
-        vorher, bewertung, verstrichen, e["wunschretention"],
-        saat=textaufgabe_id,
-        selber_tag=lernmodul._selber_tag(z["letzte_wiederholung"]))
-    faellig = (lernmodul.heute().isoformat() if bewertung == fsrs.NOCHMAL
-               else (lernmodul.heute()
-                     + dt.timedelta(days=round(ergebnis.intervall_tage))
-                     ).isoformat())
+    ergebnis = lernkern.fortschreiben(
+        db, lernkern.UEBUNGEN, textaufgabe_id, benutzer_id, bewertung,
+        e["wunschretention"],
+        {"antwort": antwort, "urteil": urteil, "dauer_ms": dauer_ms,
+         "versuche": versuche, "bewertung_quelle": quelle,
+         "aufgedeckt": int(bool(aufgedeckt)), "rueckmeldung": rueckmeldung})
 
-    db.execute("""UPDATE textlernzustand
-                     SET zustand = ?, stabilitaet = ?, schwierigkeit = ?,
-                         letzte_wiederholung = ?, faellig = ?,
-                         anzahl = anzahl + 1,
-                         anzahl_fehler = anzahl_fehler + ?
-                   WHERE textaufgabe_id = ? AND benutzer_id = ?""",
-               (ergebnis.zustand, ergebnis.stabilitaet, ergebnis.schwierigkeit,
-                lernmodul._jetzt(), faellig,
-                1 if bewertung == fsrs.NOCHMAL else 0,
-                textaufgabe_id, benutzer_id))
-    db.execute("""INSERT INTO textbearbeitung
-                    (textaufgabe_id, benutzer_id, zeitpunkt, antwort,
-                     bewertung, rueckmeldung, dauer_ms, urteil, versuche,
-                     bewertung_quelle, aufgedeckt, stabilitaet_vor,
-                     stabilitaet_nach, schwierigkeit_vor, schwierigkeit_nach,
-                     intervall_tage, verstrichen_tage)
-                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-               (textaufgabe_id, benutzer_id, lernmodul._jetzt(), antwort,
-                bewertung, rueckmeldung, dauer_ms, urteil, versuche, quelle,
-                int(bool(aufgedeckt)), vorher.stabilitaet, ergebnis.stabilitaet,
-                vorher.schwierigkeit, ergebnis.schwierigkeit,
-                ergebnis.intervall_tage, round(verstrichen, 4)))
-
-    return {
-        "bewertung": bewertung, "bewertung_quelle": quelle,
-        "einschaetzung": einschaetzung, "zustand": ergebnis.zustand,
-        "stabilitaet": ergebnis.stabilitaet,
-        "schwierigkeit": ergebnis.schwierigkeit,
-        "intervall_tage": ergebnis.intervall_tage, "faellig": faellig,
-        "termin_text": fsrs.tage_in_text(ergebnis.intervall_tage),
-    }
+    return {**ergebnis, "bewertung_quelle": quelle,
+            "einschaetzung": einschaetzung}
 
 
 def zuruecksetzen(db: sqlite3.Connection, benutzer_id: int,
                   textaufgabe_id: int) -> None:
-    db.execute("""UPDATE textlernzustand
-                     SET zustand = 'neu', stabilitaet = NULL,
-                         schwierigkeit = NULL, letzte_wiederholung = NULL,
-                         faellig = NULL, anzahl = 0, anzahl_fehler = 0
-                   WHERE textaufgabe_id = ? AND benutzer_id = ?""",
-               (textaufgabe_id, benutzer_id))
+    """Von vorn: Gedächtniszustand weg, Protokoll bleibt."""
+    lernkern.zuruecksetzen(db, lernkern.UEBUNGEN, textaufgabe_id, benutzer_id)
 
 
 def aussetzen(db: sqlite3.Connection, benutzer_id: int, textaufgabe_id: int,
               aussetzen_: bool = True) -> None:
-    _zustand_sichern(db, textaufgabe_id, benutzer_id)
-    if aussetzen_:
-        db.execute("""UPDATE textlernzustand SET zustand = 'ausgesetzt'
-                       WHERE textaufgabe_id = ? AND benutzer_id = ?""",
-                   (textaufgabe_id, benutzer_id))
-        return
-    # Zurück in den Verkehr — aber nicht als »neu«: wer schon geübt hat,
-    # hat eine Stabilität, und die rechnet FSRS weiter. Als »neu« zählte
-    # der Satz gegen den Tagesvorrat an Neuem und würde noch einmal
-    # eingeführt. Die Vokabelseite macht es seit je richtig.
-    db.execute("""UPDATE textlernzustand
-                     SET zustand = CASE WHEN stabilitaet IS NULL
-                                        THEN 'neu' ELSE 'lernen' END
-                   WHERE textaufgabe_id = ? AND benutzer_id = ?""",
-               (textaufgabe_id, benutzer_id))
+    """Aus der Abfrage nehmen — und wieder hinein."""
+    lernkern.aussetzen(db, lernkern.UEBUNGEN, textaufgabe_id, benutzer_id,
+                       aussetzen_)

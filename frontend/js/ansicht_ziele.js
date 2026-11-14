@@ -105,6 +105,10 @@ function zielkarte(behaelter, z) {
         onclick: () => zeigeBlock(behaelter, z),
       }, 'Was käme dran?'),
       h('button', {
+        class: 'schlicht',
+        onclick: () => bearbeiten(behaelter, z),
+      }, 'Bearbeiten'),
+      h('button', {
         class: 'schlicht gefahr',
         onclick: async () => {
           if (!confirm(`Lernziel „${z.name}" löschen? Der Lernstand bleibt.`)) return;
@@ -112,6 +116,56 @@ function zielkarte(behaelter, z) {
           zeichnen(behaelter);
         },
       }, 'Löschen')));
+}
+
+/* Ein Lernziel nachträglich ändern.
+ *
+ * Vor allem den Termin: dass eine Probe ansteht, weiß man oft erst
+ * später, und bis hierher ließ sich keiner nachtragen. Entfernen geht
+ * auch — ein leeres Feld heißt »ohne Termin«, und das Ziel steht dann
+ * nicht mehr unter Zeitdruck.
+ */
+function bearbeiten(behaelter, z) {
+  const name = h('input', { type: 'text', value: z.name || '' });
+  const termin = h('input', { type: 'date', value: z.termin || '' });
+  const ziel = h('select', {},
+    h('option', { value: 'reif', text: 'sitzt dauerhaft' }),
+    h('option', { value: 'einmal_richtig', text: 'einmal gekonnt' }));
+  ziel.value = z.ziel || 'reif';
+  const aktiv = h('input', { type: 'checkbox', checked: z.aktiv !== 0 });
+
+  const kasten = h('div', { class: 'karte' },
+    h('h2', { text: 'Lernziel bearbeiten' }),
+    h('label', { class: 'feldname', text: 'Name' }), name,
+    h('label', { class: 'feldname', style: 'margin-top:.6rem',
+                 text: 'Termin' }), termin,
+    h('p', { class: 'leise', style: 'margin:.2rem 0 .6rem',
+             text: 'Leer heißt: ohne Termin. Mit Termin rechnet der '
+                 + 'Trainer aus, wie viel täglich nötig wäre — und sagt '
+                 + 'dir, wenn dein Pensum dafür nicht reicht.' }),
+    h('label', { class: 'feldname', text: 'Geschafft ist es, wenn …' }), ziel,
+    h('label', { class: 'schalter', style: 'margin-top:.6rem' }, aktiv,
+      h('span', { class: 'schalter-text' }, h('b', { text: 'Aktiv' }))),
+    h('div', { class: 'frage-werkzeuge', style: 'margin-top:.8rem' },
+      h('button', {
+        class: 'wichtig',
+        onclick: async () => {
+          try {
+            await api.lernzielAendern(z.id, {
+              name: name.value.trim() || z.name,
+              // Leerer String heißt ausdrücklich »entfernen«; null
+              // hieße »nicht genannt« und ließe den Termin stehen.
+              termin: termin.value || '',
+              ziel: ziel.value,
+              aktiv: aktiv.checked,
+            });
+            meldung('Gespeichert.');
+            zeichnen(behaelter);
+          } catch (fehler) { meldung(fehler.message, 'fehler'); }
+        },
+      }, 'Speichern'),
+      h('button', { onclick: () => zeichnen(behaelter) }, 'Abbrechen')));
+  leeren(behaelter).append(kasten);
 }
 
 function zahl(wert, beschriftung, art) {

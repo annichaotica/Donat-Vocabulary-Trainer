@@ -16,6 +16,7 @@ import bewertung as bewertungsmodul
 import datenbank as dbm
 import fsrs
 import legasthenie as legasthenie_modul
+import lernkern
 import regeln as regelmodul
 import merkmale as mk
 
@@ -160,16 +161,8 @@ def _zugaengliche_sammlungen(db: sqlite3.Connection, benutzer_id: int) -> list[i
 def _zustand_sichern(db: sqlite3.Connection, aufgabe_id: int,
                      benutzer_id: int) -> dict:
     """Legt den Lernzustand an, falls er noch fehlt."""
-    z = dbm.zeile(db, """SELECT * FROM lernzustand
-                          WHERE aufgabe_id = ? AND benutzer_id = ?""",
-                  (aufgabe_id, benutzer_id))
-    if z is None:
-        db.execute("""INSERT INTO lernzustand (aufgabe_id, benutzer_id, zustand)
-                      VALUES (?, ?, 'neu')""", (aufgabe_id, benutzer_id))
-        z = dbm.zeile(db, """SELECT * FROM lernzustand
-                              WHERE aufgabe_id = ? AND benutzer_id = ?""",
-                      (aufgabe_id, benutzer_id))
-    return z
+    return lernkern.zustand_sichern(db, lernkern.VOKABELN, aufgabe_id,
+                                    benutzer_id)
 
 
 def stand(db: sqlite3.Connection, benutzer_id: int,
@@ -289,14 +282,7 @@ ZULETZT_MEIDEN = 2
 
 def _rundenstand(db: sqlite3.Connection, benutzer_id: int) -> dict[int, int]:
     """Wie oft jedes Wort heute schon dran war."""
-    morgen = (heute() + dt.timedelta(days=1)).isoformat()
-    return {z["lexem_id"]: z["n"] for z in dbm.zeilen(db, """
-        SELECT a.lexem_id, COUNT(*) AS n
-          FROM wiederholung w
-          JOIN aufgabe a ON a.id = w.aufgabe_id
-         WHERE w.benutzer_id = ? AND w.zeitpunkt >= ? AND w.zeitpunkt < ?
-         GROUP BY a.lexem_id""",
-        (benutzer_id, heute().isoformat(), morgen))}
+    return lernkern.rundenstand(db, lernkern.VOKABELN, benutzer_id)
 
 
 def _runden_sql(stand: dict[int, int], spalte: str = "lexem_id") -> str:
@@ -316,7 +302,7 @@ def _runden_sql(stand: dict[int, int], spalte: str = "lexem_id") -> str:
                      for lid, n in (stand or {}).items() if lid is not None)
     # Nicht "0" zurückgeben: eine nackte Zahl im ORDER BY ist in SQLite
     # eine SPALTENNUMMER, kein Wert. Lieber nichts.
-    return f"CASE {spalte} {teile} ELSE 0 END" if teile else ""
+    return lernkern.runden_sql(stand, spalte)
 
 
 def _rundenweise(reihe: list[dict], stand: dict[int, int]) -> list[dict]:
@@ -336,7 +322,7 @@ def _rundenweise(reihe: list[dict], stand: dict[int, int]) -> list[dict]:
     innerhalb einer Runde erhalten. Die Dringlichkeit ordnet damit noch
     immer — nur nicht mehr über die Runde hinweg.
     """
-    return sorted(reihe, key=lambda r: stand.get(r.get("lexem_id"), 0))
+    return lernkern.rundenweise(reihe, stand, "lexem_id")
 
 
 def _schon_gefragt_heute(db: sqlite3.Connection, benutzer_id: int) -> int:
@@ -1067,88 +1053,40 @@ def bewerten(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
         quelle = "automatisch"
     if bewertung not in fsrs.BEWERTUNGEN:
         raise ValueError("Bewertung muss 1 bis 4 sein")
-    z = _zustand_sichern(db, aufgabe_id, benutzer_id)
-    vorher = fsrs.Zustand(z["stabilitaet"], z["schwierigkeit"])
-    verstrichen = _tage_seit(z["letzte_wiederholung"])
+    ergebnis = lernkern.fortschreiben(
+        db, lernkern.VOKABELN, aufgabe_id, benutzer_id, bewertung,
+        e["wunschretention"],
+        {"antwort": antwort, "urteil": urteil, "dauer_ms": dauer_ms,
+         "denkzeit_ms": denkzeit_ms, "versuche": versuche,
+         "bewertung_quelle": quelle})
 
-    ergebnis = fsrs.bewerten(vorher, bewertung, verstrichen,
-                             e["wunschretention"], saat=aufgabe_id,
-                             selber_tag=_selber_tag(z["letzte_wiederholung"]))
-
-    if bewertung == fsrs.NOCHMAL:
-        faellig = heute().isoformat()          # bleibt heute dran
-    else:
-        faellig = (heute() + dt.timedelta(days=round(ergebnis.intervall_tage))
-                   ).isoformat()
-
-    db.execute("""UPDATE lernzustand
-                     SET zustand = ?, stabilitaet = ?, schwierigkeit = ?,
-                         letzte_wiederholung = ?, faellig = ?,
-                         anzahl = anzahl + 1,
-                         anzahl_fehler = anzahl_fehler + ?
-                   WHERE aufgabe_id = ? AND benutzer_id = ?""",
-               (ergebnis.zustand, ergebnis.stabilitaet, ergebnis.schwierigkeit,
-                _jetzt(), faellig, 1 if bewertung == fsrs.NOCHMAL else 0,
-                aufgabe_id, benutzer_id))
-
-    db.execute("""INSERT INTO wiederholung
-                    (aufgabe_id, benutzer_id, zeitpunkt, bewertung, antwort,
-                     urteil, dauer_ms, denkzeit_ms, versuche, bewertung_quelle,
-                     stabilitaet_vor, stabilitaet_nach,
-                     schwierigkeit_vor, schwierigkeit_nach, intervall_tage,
-                     verstrichen_tage)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-               (aufgabe_id, benutzer_id, _jetzt(), bewertung, antwort, urteil,
-                dauer_ms, denkzeit_ms, versuche, quelle,
-                vorher.stabilitaet, ergebnis.stabilitaet,
-                vorher.schwierigkeit, ergebnis.schwierigkeit,
-                ergebnis.intervall_tage, round(verstrichen, 4)))
-
-    return {
-        "bewertung": bewertung,
-        "bewertung_quelle": quelle,
-        "einschaetzung": einschaetzung,
-        "zustand": ergebnis.zustand,
-        "stabilitaet": ergebnis.stabilitaet,
-        "schwierigkeit": ergebnis.schwierigkeit,
-        "intervall_tage": ergebnis.intervall_tage,
-        "faellig": faellig,
-        "termin_text": fsrs.tage_in_text(ergebnis.intervall_tage),
-    }
+    return {**ergebnis, "bewertung_quelle": quelle,
+            "einschaetzung": einschaetzung}
 
 
 def aussetzen(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
               aussetzen_: bool = True) -> None:
-    """Von Hand aus dem Verkehr ziehen oder zurückholen."""
-    _zustand_sichern(db, aufgabe_id, benutzer_id)
-    if aussetzen_:
-        db.execute("""UPDATE lernzustand SET zustand = 'ausgesetzt'
-                       WHERE aufgabe_id = ? AND benutzer_id = ?""",
-                   (aufgabe_id, benutzer_id))
-    else:
-        db.execute("""UPDATE lernzustand
-                         SET zustand = CASE WHEN stabilitaet IS NULL THEN 'neu'
-                                            ELSE 'lernen' END
-                       WHERE aufgabe_id = ? AND benutzer_id = ?""",
-                   (aufgabe_id, benutzer_id))
+    """Aus der Abfrage nehmen — und wieder hinein."""
+    lernkern.aussetzen(db, lernkern.VOKABELN, aufgabe_id, benutzer_id,
+                       aussetzen_)
 
 
 def zuruecksetzen(db: sqlite3.Connection, benutzer_id: int,
                   aufgabe_id: int) -> None:
-    """Lernstand verwerfen, Aufgabe gilt wieder als neu.
-    Das Protokoll bleibt stehen."""
-    db.execute("""UPDATE lernzustand
-                     SET zustand = 'neu', stabilitaet = NULL,
-                         schwierigkeit = NULL, letzte_wiederholung = NULL,
-                         faellig = NULL, anzahl = 0, anzahl_fehler = 0
-                   WHERE aufgabe_id = ? AND benutzer_id = ?""",
-               (aufgabe_id, benutzer_id))
+    """Von vorn: Gedächtniszustand weg, Protokoll bleibt."""
+    lernkern.zuruecksetzen(db, lernkern.VOKABELN, aufgabe_id, benutzer_id)
 
 
 def termin_setzen(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
                   datum: str) -> None:
     """Termin selbst in die Hand nehmen."""
-    dt.date.fromisoformat(datum)               # prüft das Format
+    # Nicht nur fromisoformat: das nimmt seit Python 3.11 auch
+    # "20261114" und "2026-W47-1" an. Gespeichert würde der Rohtext, und
+    # der Vergleich `faellig <= '2026-11-14'` wäre dann dauerhaft
+    # unwahr — die Aufgabe verschwände still aus dem Terminplan.
+    geprueft = dt.date.fromisoformat(datum)
+    if datum != geprueft.isoformat():
+        raise ValueError("datum muss JJJJ-MM-TT sein")
     _zustand_sichern(db, aufgabe_id, benutzer_id)
     db.execute("""UPDATE lernzustand SET faellig = ?,
                          zustand = CASE WHEN zustand = 'neu' THEN 'lernen'

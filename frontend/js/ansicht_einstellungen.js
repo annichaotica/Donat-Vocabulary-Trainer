@@ -2,7 +2,7 @@
  * und der Legastheniemodus. */
 
 import { api } from './api.js';
-import { h, leeren, meldung, zahl } from './hilfen.js';
+import { datumText, h, leeren, meldung, zahl } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, darstellungSetzen } from './zustand.js';
 
@@ -19,6 +19,7 @@ export async function zeichnen(behaelter) {
   }
   el.append(await teilLernen(behaelter));
   el.append(await teilLegasthenie(behaelter));
+  el.append(await teilZugaenge(behaelter));
   el.append(h('details', { class: 'karte' },
     h('summary', { text: 'Tastatur' }),
     h('ul', {},
@@ -176,6 +177,94 @@ async function teilLernen(behaelter) {
     },
   }, 'Speichern'));
   return kasten;
+}
+
+/* ------------------------------------------------------- Zugangsmerkmale */
+
+async function teilZugaenge(behaelter) {
+  const kasten = h('details', { class: 'karte' },
+    h('summary', {}, h('strong', { text: 'Zugang für Claude (MCP)' })));
+  let liste = [];
+  try {
+    liste = await api.mcpToken(zustand.benutzerId);
+  } catch (fehler) {
+    kasten.append(h('p', { class: 'leise', text: fehler.message }));
+    return kasten;
+  }
+
+  kasten.append(h('p', { class: 'leise',
+    text: 'Damit kann Claude Vokabeln für dich eintragen — mit vollständigen '
+        + 'Paradigmen, was von Hand niemand tippt. Jedes Merkmal gehört zu '
+        + 'DEINEM Profil: alles, was darüber geschieht, geschieht in deinem '
+        + 'Namen und nur auf deinem Bestand. Je Gerät eines anlegen, dann '
+        + 'lässt sich einzeln zurücknehmen, was abhandenkommt.' }));
+
+  if (liste.length) {
+    const tafel = h('div', { class: 'liste' });
+    for (const t of liste) {
+      tafel.append(h('div', { class: 'eintrag' },
+        h('span', { class: 'lemma', text: t.name }),
+        h('span', { class: 'bedeutung',
+                    text: `${t.anfang}… · ${t.zuletzt_benutzt
+                      ? 'zuletzt ' + datumText(t.zuletzt_benutzt.slice(0, 10))
+                      : 'noch nie benutzt'}` }),
+        t.aktiv
+          ? h('button', {
+              class: 'schlicht gefahr',
+              onclick: async () => {
+                if (!confirm(`Zugang „${t.name}" zurücknehmen? Claude kann `
+                           + 'damit sofort nichts mehr eintragen.')) return;
+                await api.mcpTokenZuruecknehmen(t.id);
+                zeichnen(behaelter);
+              },
+            }, 'Zurücknehmen')
+          : h('span', { class: 'marke warnung', text: 'zurückgenommen' })));
+    }
+    kasten.append(tafel);
+  }
+
+  const name = h('input', { type: 'text', placeholder: 'z.B. Claude-App auf dem iPad' });
+  kasten.append(h('div', { style: 'display:grid;gap:.5rem;margin-top:.8rem' },
+    name,
+    h('button', {
+      class: 'wichtig',
+      onclick: async () => {
+        if (!name.value.trim()) { meldung('Wofür ist der Zugang?'); return; }
+        try {
+          const neu = await api.mcpTokenAnlegen(zustand.benutzerId,
+                                                { name: name.value.trim() });
+          zeigeToken(kasten, neu);
+          name.value = '';
+        } catch (fehler) { meldung(fehler.message); }
+      },
+    }, 'Zugang anlegen')));
+  return kasten;
+}
+
+/** Das Geheimnis wird nur dieses eine Mal angezeigt — danach steht es
+ *  nirgends mehr, nur sein Streuwert. */
+function zeigeToken(kasten, neu) {
+  const feld = h('input', {
+    type: 'text', value: neu.token, readonly: true,
+    onclick: (e) => e.target.select(),
+    style: 'font-family:ui-monospace,monospace;font-size:.9em',
+  });
+  kasten.append(h('div', { class: 'rueckmeldung fast', style: 'margin-top:.8rem' },
+    h('div', { class: 'rueckmeldung-kopf' },
+      h('span', { text: '!' }), h('span', { text: 'Nur jetzt sichtbar' })),
+    h('p', { text: 'Das Zugangsmerkmal wird nicht gespeichert, nur sein '
+                 + 'Streuwert. Jetzt kopieren — nachher ist es weg.' }),
+    feld,
+    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+      h('button', {
+        onclick: async () => {
+          try {
+            await navigator.clipboard.writeText(neu.token);
+            meldung('In die Zwischenablage gelegt.');
+          } catch { feld.select(); meldung('Bitte von Hand kopieren.'); }
+        },
+      }, 'Kopieren'))));
+  feld.scrollIntoView({ block: 'nearest' });
 }
 
 /* ---------------------------------------------------------- Legasthenie */

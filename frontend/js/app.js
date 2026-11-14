@@ -79,7 +79,8 @@ function verdrahten() {
     knopf.addEventListener('click', () => { location.hash = knopf.dataset.ziel; });
   }
   document.getElementById('knopf-profil').addEventListener('click', () => {
-    location.hash = '#/profile';
+    // Von außen gibt es nichts zu wechseln.
+    location.hash = identitaet?.gebunden ? '#/einstellungen' : '#/profile';
   });
   document.getElementById('zurueck').addEventListener('click', () => {
     if (history.length > 1) history.back(); else location.hash = '#/uebersicht';
@@ -87,15 +88,40 @@ function verdrahten() {
   window.addEventListener('hashchange', wegweisen);
 }
 
+/** Steht die Identität fest, weil die Anfrage durch Cloudflare Access kam?
+ *  Dann entfällt der Profilwähler — von außen handelt jeder als er selbst. */
+let identitaet = null;
+
+async function identitaetKlaeren() {
+  if (identitaet !== null) return identitaet;
+  try {
+    identitaet = await api.ich();
+  } catch {
+    identitaet = { gebunden: false, benutzer: null };
+  }
+  if (identitaet.gebunden && identitaet.benutzer) {
+    if (zustand.benutzerId !== identitaet.benutzer.id) {
+      merken({ benutzerId: identitaet.benutzer.id, sammlungId: null });
+    }
+  }
+  return identitaet;
+}
+
 async function wegweisen() {
   if (laufendeSitzung) { laufendeSitzung.beenden(); laufendeSitzung = null; }
   const weg = (location.hash || '#/').slice(1);
   const teile = weg.split('/').filter(Boolean);
 
+  await identitaetKlaeren();
   await darstellungAnwenden();
   await kopfzeile();
   inhalt.focus({ preventScroll: true });
 
+  // Von außen steht die Identität fest — der Profilwähler entfällt.
+  if (identitaet?.gebunden && teile[0] === 'profile') {
+    location.hash = '#/uebersicht';
+    return;
+  }
   // Ohne Profil geht nichts weiter.
   if (!zustand.benutzerId && teile[0] !== 'profile') {
     return uebersicht.zeichnenProfile(inhalt);

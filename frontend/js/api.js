@@ -52,7 +52,12 @@ export const api = {
   merkmale: () => ruf('/merkmale'),
   aufgabentypen: () => ruf('/aufgabentypen'),
 
+  ich: () => ruf('/ich'),
   benutzer: () => ruf('/benutzer'),
+  mcpToken: (id) => ruf(`/benutzer/${id}/mcp-token`),
+  mcpTokenAnlegen: (id, daten) =>
+    ruf(`/benutzer/${id}/mcp-token`, { methode: 'POST', daten }),
+  mcpTokenZuruecknehmen: (id) => ruf(`/mcp-token/${id}`, { methode: 'DELETE' }),
   benutzerAnlegen: (daten) => ruf('/benutzer', { methode: 'POST', daten }),
   benutzerAendern: (id, daten) => ruf(`/benutzer/${id}`, { methode: 'PATCH', daten }),
   benutzerEinstellungen: (id) => ruf(`/benutzer/${id}/einstellungen`),

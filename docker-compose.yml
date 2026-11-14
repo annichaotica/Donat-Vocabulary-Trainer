@@ -28,8 +28,8 @@ services:
       - ./daten:/daten
     environment:
       - TZ=Europe/Berlin
-      # Geheimnis für die MCP-Schnittstelle unter /mcp. Steht in .env
-      # (Rechte 600). Ohne Eintrag ist die Schnittstelle ABGESCHALTET — sie
-      # kann Vokabeln anlegen und Sprachprofile ändern und soll nicht
-      # versehentlich offen stehen.
-      - VOKABEL_MCP_TOKEN=${VOKABEL_MCP_TOKEN:-}
+      # Team-Kennung von Cloudflare Access. NUR wenn sie gesetzt ist, wird
+      # die Kopfzeile mit der geprüften Mailadresse überhaupt angesehen —
+      # sonst könnte im Heimnetz jemand sie selbst mitschicken und sich
+      # ausgeben. Leer lassen, solange nur das Heimnetz zugreift.
+      - VOKABEL_ACCESS_TEAM=${VOKABEL_ACCESS_TEAM:-}

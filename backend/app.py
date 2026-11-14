@@ -13,6 +13,7 @@ Im Betrieb läuft dasselbe im Docker-Container auf dem Familienserver.
 
 from __future__ import annotations
 
+import logging
 import os
 import pathlib
 import secrets
@@ -49,6 +50,8 @@ from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      SprachprofilSetzen, UebersetzungEingabe)
 
 OBERFLAECHE = pathlib.Path(__file__).resolve().parent.parent / "frontend"
+
+protokoll = logging.getLogger("vokabeltrainer")
 
 
 @asynccontextmanager
@@ -1135,9 +1138,18 @@ def _mcp_person(request: Request, db: sqlite3.Connection) -> dict:
                                  f"{int(rest // 60) + 1} Minuten.",
                             headers={"Retry-After": str(int(rest) + 1)})
 
-    treffer = zugang.person_zu_token(db, _mcp_geheimnis(request))
+    geheimnis = _mcp_geheimnis(request)
+    treffer = zugang.person_zu_token(db, geheimnis)
     if treffer is None:
         sperre = drossel.fehlversuch(wer)
+        # Welche Kopfzeilen kamen an? NUR die Namen — Werte nie, die wären
+        # Geheimnisse. Ohne das lässt sich ein fehlgeleiteter Konnektor
+        # nicht einkreisen: man sieht bloß 401 und weiß nicht, ob die
+        # Kopfzeile fehlte oder der Wert nicht stimmte.
+        protokoll.warning(
+            "MCP abgewiesen von %s · Kopfzeilen: %s · Merkmal mitgeschickt: %s",
+            wer, ", ".join(sorted(request.headers.keys())),
+            "ja, %d Zeichen" % len(geheimnis) if geheimnis else "NEIN")
         if not zugang.mcp_eingeschaltet(db):
             raise HTTPException(503, "Die MCP-Schnittstelle ist noch nicht "
                                      "eingerichtet. In den Einstellungen des "

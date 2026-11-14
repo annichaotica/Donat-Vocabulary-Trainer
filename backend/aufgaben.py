@@ -154,7 +154,15 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
         gruppe = _gruppe_der_form(code, wortart, fm)
         if gruppe is not None and gruppe["kennung"] not in e["formgruppen"]:
             continue
-        kennzeichen = mk.schluessel(fm)
+        # NORMALFORM, nicht das rohe Bündel. Der Schlüssel ist dafür da,
+        # dass eine Aufgabe dieselbe bleibt, wenn sich an den Daten etwas
+        # ändert — nur so überlebt der Lernstand eine Berichtigung.
+        # Roh genommen änderte er sich, sobald jemand ein unmarkiertes
+        # Merkmal ausdrücklich nachtrug (genus_verbi: aktiv steht ohnehin
+        # da, nur ungeschrieben). Die alte Aufgabe wurde abgeschaltet,
+        # eine neue angelegt, und der Lernstand hing an der alten.
+        # Drei Zeilen tiefer, bei der Formenreihe, stand es immer richtig.
+        kennzeichen = mk.schluessel(mk.normieren(fm, wortart))
         for typ in ("form_bilden", "form_bestimmen"):
             if typ in e["typen"]:
                 gewuenscht[_schluessel(typ, lexem_id, "merkmale", kennzeichen)] = \

@@ -147,6 +147,7 @@ def wandern(db: sqlite3.Connection, von: int) -> None:
                     ON text(sammlung_id, kennung) WHERE kennung IS NOT NULL""")
     db.execute("""CREATE INDEX IF NOT EXISTS idx_text_folge
                     ON text(sammlung_id, lektion_id, reihenfolge)""")
+    _aufgabenschluessel_normieren(db)
     # Gibt es noch keinen Verwalter, wird es die erste angelegte Person.
     # Ohne das stünde ein bestehender Bestand nach der Aktualisierung ohne
     # jemanden da, der Sprachprofile pflegen darf.
@@ -155,6 +156,53 @@ def wandern(db: sqlite3.Connection, von: int) -> None:
                        WHERE id = (SELECT MIN(id) FROM benutzer)""")
     if von != SCHEMA_VERSION:
         db.execute("UPDATE schema_stand SET version = ?", (SCHEMA_VERSION,))
+
+
+def _aufgabenschluessel_normieren(db: sqlite3.Connection) -> None:
+    """Einmalige Berichtigung der Formaufgaben-Schlüssel.
+
+    Sie trugen das ROHE Merkmalsbündel, nicht die Normalform. Ohne diese
+    Wanderung würde der erste Lauf von aufgaben.erzeugen() nach der
+    Berichtigung alle Formaufgaben abschalten und unter dem neuen
+    Schlüssel neu anlegen — und der Lernstand hinge an den
+    abgeschalteten. Genau das, was der Schlüssel verhindern soll.
+
+    Läuft bei jedem Start, tut aber nach dem ersten Mal nichts: es wird
+    nur angefasst, was sich wirklich unterscheidet.
+    """
+    if not db.execute("""SELECT 1 FROM sqlite_master
+                          WHERE type='table' AND name='aufgabe'""").fetchone():
+        return
+    import merkmale as mk
+    zeilen_ = db.execute("""SELECT a.id, a.schluessel, a.typ, a.lexem_id,
+                                   f.merkmale, l.wortart
+                              FROM aufgabe a
+                              JOIN form f ON f.id = a.ziel_id
+                              JOIN lexem l ON l.id = a.lexem_id
+                             WHERE a.ziel_art = 'form'""").fetchall()
+    belegt = {z[0] for z in db.execute("SELECT schluessel FROM aufgabe")}
+    for kennung, alt_s, typ, lexem_id, merkmale, wortart in zeilen_:
+        try:
+            fm = j_lesen(merkmale)
+            if not fm:
+                continue
+            neu_kennzeichen = mk.schluessel(mk.normieren(fm, wortart))
+        except Exception:
+            continue                    # kaputtes Bündel: nicht anfassen
+        neu_s = f"{typ}:{lexem_id}:merkmale:{neu_kennzeichen}"
+        if neu_s == alt_s:
+            continue
+        if neu_s in belegt:
+            # Zwei Aufgaben fielen auf denselben Schlüssel zusammen —
+            # etwa weil eine Form schon normiert gespeichert war und eine
+            # zweite nicht. Die bestehende behalten, diese stilllegen;
+            # löschen wäre endgültig und der Lernstand daran weg.
+            db.execute("UPDATE aufgabe SET aktiv = 0 WHERE id = ?", (kennung,))
+            continue
+        db.execute("UPDATE aufgabe SET schluessel = ? WHERE id = ?",
+                   (neu_s, kennung))
+        belegt.discard(alt_s)
+        belegt.add(neu_s)
 
 
 def sprachen_pflegen(db: sqlite3.Connection) -> None:

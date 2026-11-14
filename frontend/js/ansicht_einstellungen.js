@@ -1,0 +1,297 @@
+/* Einstellungen: was die Sammlung abfragt, wie der Algorithmus terminiert,
+ * und der Legastheniemodus. */
+
+import { api } from './api.js';
+import { h, leeren, meldung, zahl } from './hilfen.js';
+import { stammdaten } from './stammdaten.js';
+import { zustand, darstellungSetzen } from './zustand.js';
+
+export async function zeichnen(behaelter) {
+  const el = leeren(behaelter);
+  el.append(h('h1', { text: 'Einstellungen' }));
+
+  if (zustand.sammlungId) {
+    el.append(await teilSammlung(behaelter));
+  } else {
+    el.append(h('p', { class: 'leise',
+      text: 'Keine Sammlung gewählt — die Einstellungen zu Formgruppen und '
+          + 'Aufgabentypen gelten je Sammlung. Über die Übersicht eine auswählen.' }));
+  }
+  el.append(await teilLernen(behaelter));
+  el.append(await teilLegasthenie(behaelter));
+  el.append(h('details', { class: 'karte' },
+    h('summary', { text: 'Tastatur' }),
+    h('ul', {},
+      h('li', {}, h('kbd', { text: '1' }), '–', h('kbd', { text: '4' }), ' bewerten'),
+      h('li', {}, h('kbd', { text: 'Enter' }), ' prüfen, dann vorgeschlagene Bewertung'),
+      h('li', {}, h('kbd', { text: 'l' }), ' lernen, ',
+        h('kbd', { text: 'w' }), ' Wortschatz, ', h('kbd', { text: 'u' }), ' Übersicht'))));
+}
+
+/* ------------------------------------------------- Sammlung: was abfragen */
+
+async function teilSammlung(behaelter) {
+  const [einstellungen, typen] = await Promise.all([
+    api.sammlungEinstellungen(zustand.sammlungId),
+    stammdaten.aufgabentypen(),
+  ]);
+  const gruppen = await api.formgruppen(einstellungen.sprache);
+  const gewaehlteGruppen = new Set(einstellungen.formgruppen);
+  const gewaehlteTypen = new Set(einstellungen.typen);
+
+  const kasten = h('div', { class: 'karte' });
+  kasten.append(h('h2', { style: 'margin-top:0', text: 'Was diese Sammlung abfragt' }));
+  kasten.append(h('p', { class: 'leise',
+    text: 'Abgewählte Formgruppen werden abgeschaltet, nicht gelöscht — wer das '
+        + 'Plus-que-parfait später wieder zuschaltet, findet seinen Lernstand vor.' }));
+
+  // Aufgabentypen
+  kasten.append(h('h3', { text: 'Aufgabentypen' }));
+  for (const [kennung, t] of Object.entries(typen.typen)) {
+    const haken = h('input', {
+      type: 'checkbox', checked: gewaehlteTypen.has(kennung),
+      onchange: (e) => {
+        if (e.target.checked) gewaehlteTypen.add(kennung);
+        else gewaehlteTypen.delete(kennung);
+      },
+    });
+    kasten.append(h('label', { class: 'schalter' }, haken,
+      h('span', { class: 'schalter-text' },
+        h('b', { text: t.name }), h('span', { text: t.beschreibung }))));
+  }
+
+  // Formgruppen nach Wortart
+  kasten.append(h('h3', { text: 'Formgruppen' }));
+  for (const [wortart, liste] of Object.entries(gruppen.wortarten)) {
+    if (!liste.length) continue;
+    const reihe = h('div', { class: 'gruppenwahl' });
+    for (const g of liste) {
+      const knopf = h('button', {
+        class: gewaehlteGruppen.has(g.kennung) ? 'aktiv' : null,
+        title: `${g.zellen} ${g.zellen === 1 ? 'Form' : 'Formen'}`,
+        onclick: () => {
+          if (gewaehlteGruppen.has(g.kennung)) gewaehlteGruppen.delete(g.kennung);
+          else gewaehlteGruppen.add(g.kennung);
+          knopf.className = gewaehlteGruppen.has(g.kennung) ? 'aktiv' : '';
+        },
+      }, g.kurz);
+      reihe.append(knopf);
+    }
+    kasten.append(h('div', { style: 'margin-bottom:.8rem' },
+      h('p', { class: 'leise', style: 'margin:.4rem 0 .3rem',
+               text: wortartName(wortart) }), reihe));
+  }
+
+  const ungeprueft = h('input', {
+    type: 'checkbox', checked: einstellungen.ungeprueft_abfragen,
+  });
+  kasten.append(h('label', { class: 'schalter' }, ungeprueft,
+    h('span', { class: 'schalter-text' },
+      h('b', { text: 'Ungeprüfte Formen mitabfragen' }),
+      h('span', { text: 'Normalerweise werden von der KI oder einem Muster erzeugte '
+                      + 'Formen erst nach Bestätigung abgefragt. Eine erfundene Form, '
+                      + 'die unbemerkt gepaukt wird, ist schlimmer als eine fehlende.' }))));
+
+  kasten.append(h('button', {
+    class: 'wichtig', style: 'margin-top:.8rem',
+    onclick: async () => {
+      try {
+        const ergebnis = await api.sammlungEinstellungenSetzen(zustand.sammlungId, {
+          formgruppen: [...gewaehlteGruppen],
+          typen: [...gewaehlteTypen],
+          ungeprueft_abfragen: ungeprueft.checked,
+        });
+        const b = ergebnis.aufgaben;
+        meldung(`Gespeichert — ${b.angelegt} neu, ${b.reaktiviert} wieder dabei, `
+              + `${b.abgeschaltet} abgeschaltet.`, 4000);
+        zeichnen(behaelter);
+      } catch (fehler) { meldung(fehler.message); }
+    },
+  }, 'Speichern und Aufgaben neu rechnen'));
+  return kasten;
+}
+
+function wortartName(w) {
+  return { verb: 'Verben', substantiv: 'Substantive', adjektiv: 'Adjektive' }[w] || w;
+}
+
+/* --------------------------------------------------------- Lernverhalten */
+
+async function teilLernen(behaelter) {
+  const e = await api.benutzerEinstellungen(zustand.benutzerId);
+  const kasten = h('div', { class: 'karte' });
+  kasten.append(h('h2', { style: 'margin-top:0', text: 'Lernverhalten' }));
+
+  const retention = h('input', {
+    type: 'range', min: '0.80', max: '0.97', step: '0.01',
+    value: String(e.wunschretention),
+  });
+  const retentionWert = h('output', { text: Math.round(e.wunschretention * 100) + ' %' });
+  retention.addEventListener('input', () => {
+    retentionWert.textContent = Math.round(Number(retention.value) * 100) + ' %';
+  });
+
+  const neu = h('input', { type: 'number', min: '0', max: '200', value: String(e.neu_je_sitzung) });
+
+  kasten.append(h('div', { class: 'regler' },
+    h('label', { text: 'Wie sicher soll etwas sitzen, wenn es wieder dran ist?' }),
+    retentionWert, retention, h('span', {})));
+  kasten.append(h('p', { class: 'leise',
+    text: 'Höher heißt häufiger wiederholen und weniger vergessen, aber mehr '
+        + 'Aufwand. 90 % ist der übliche Mittelweg; darunter wird es schnell lückig.' }));
+
+  kasten.append(h('div', { class: 'regler' },
+    h('label', { text: 'Neue Aufgaben je Tag' }), h('span', {}), neu, h('span', {})));
+
+  kasten.append(h('button', {
+    class: 'wichtig', style: 'margin-top:.6rem',
+    onclick: async () => {
+      try {
+        await api.benutzerAendern(zustand.benutzerId, {
+          wunschretention: Number(retention.value),
+          neu_je_sitzung: Number(neu.value),
+        });
+        meldung('Gespeichert.');
+      } catch (fehler) { meldung(fehler.message); }
+    },
+  }, 'Speichern'));
+  return kasten;
+}
+
+/* ---------------------------------------------------------- Legasthenie */
+
+async function teilLegasthenie(behaelter) {
+  const lg = await api.legasthenieLesen(zustand.benutzerId);
+  const kasten = h('details', { class: 'karte', open: lg.aktiv });
+  kasten.append(h('summary', {}, h('strong', { text: 'Legastheniemodus' }),
+    lg.aktiv ? h('span', { class: 'marke', text: 'an' }) : null));
+
+  const stand = { ...lg };
+  const uebernehmen = () => darstellungSetzen(stand);
+
+  const probe = h('div', { class: 'probe' },
+    h('p', { style: 'margin:0 0 .4rem', text: 'So sieht es aus:' }),
+    h('p', { style: 'margin:0;font-family:var(--schrift-wort);font-size:1.3em;font-weight:600' },
+      'nous travaillions'),
+    h('p', { class: 'leise', style: 'margin:.2rem 0 0',
+             text: 'Imparfait, 1. Person Plural' }));
+
+  const anKnopf = h('input', {
+    type: 'checkbox', checked: stand.aktiv,
+    onchange: (e) => { stand.aktiv = e.target.checked; uebernehmen(); },
+  });
+  kasten.append(h('label', { class: 'schalter' }, anKnopf,
+    h('span', { class: 'schalter-text' },
+      h('b', { text: 'Legastheniemodus einschalten' }),
+      h('span', { text: 'Ändert Darstellung und Lernablauf. Jeder Posten unten '
+                      + 'einzeln abwählbar — Legasthenie sieht bei jedem anders aus.' }))));
+
+  // ------------------------------- Darstellung
+  kasten.append(h('h3', { text: 'Lesbarkeit' }));
+  kasten.append(h('p', { class: 'leise',
+    text: 'Zum Zeichenabstand ist die Befundlage gut: er erleichtert das Lesen '
+        + 'messbar. Zu den eigens für Legasthenie entworfenen Schriftarten ist sie '
+        + 'dünn — kontrollierte Vergleiche finden gegenüber einer schlichten '
+        + 'Grotesk meist keinen Vorteil. Darum ist der Abstand hier der '
+        + 'Hauptschalter und die Schrift nur ein Angebot. Am besten selbst '
+        + 'ausprobieren, was sich leichter liest.' }));
+
+  for (const [feld, beschriftung, min, max, schritt, einheit] of [
+    ['zeichenabstand', 'Zeichenabstand', 0, 0.35, 0.01, 'em'],
+    ['wortabstand', 'Wortabstand', 0, 0.6, 0.02, 'em'],
+    ['zeilenhoehe', 'Zeilenabstand', 1.2, 2.6, 0.05, ''],
+    ['schriftgroesse', 'Schriftgröße', 0.9, 2.0, 0.05, '×'],
+  ]) {
+    const regler = h('input', {
+      type: 'range', min: String(min), max: String(max), step: String(schritt),
+      value: String(stand[feld]),
+    });
+    const anzeige = h('output', { text: zahl(stand[feld], 2) + einheit });
+    regler.addEventListener('input', () => {
+      stand[feld] = Number(regler.value);
+      anzeige.textContent = zahl(stand[feld], 2) + einheit;
+      uebernehmen();
+    });
+    kasten.append(h('div', { class: 'regler' },
+      h('label', { text: beschriftung }), anzeige, regler, h('span', {})));
+  }
+
+  const schriftWahl = h('select', {
+    onchange: (e) => { stand.schriftart = e.target.value; uebernehmen(); },
+  },
+    h('option', { value: 'grotesk', text: 'Systemschrift (Grotesk)' }),
+    h('option', { value: 'serifenlos', text: 'Verdana — breit laufend' }),
+    h('option', { value: 'opendyslexic', text: 'OpenDyslexic (falls installiert)' }));
+  schriftWahl.value = stand.schriftart;
+  const grundWahl = h('select', {
+    onchange: (e) => { stand.hintergrund = e.target.value; uebernehmen(); },
+  },
+    h('option', { value: 'creme', text: 'Creme — gedämpfter Kontrast' }),
+    h('option', { value: 'hell', text: 'Weiß' }),
+    h('option', { value: 'dunkel', text: 'Dunkel' }));
+  grundWahl.value = stand.hintergrund;
+  kasten.append(h('div', { class: 'regler' },
+    h('label', { text: 'Schrift' }), h('span', {}), schriftWahl, h('span', {})));
+  kasten.append(h('div', { class: 'regler' },
+    h('label', { text: 'Hintergrund' }), h('span', {}), grundWahl, h('span', {})));
+  kasten.append(probe);
+
+  // ------------------------------- Lernablauf
+  kasten.append(h('h3', { text: 'Lernablauf' }));
+  for (const [feld, titel, erklaerung] of [
+    ['silben_faerben', 'Silben abwechselnd hinterlegen',
+     'Das Arbeitsgedächtnis hält drei bis vier Brocken, nicht zwölf Buchstaben.'],
+    ['stamm_hervorheben', 'Stamm und Endung trennen',
+     'Hier hat dieser Trainer einen Vorteil, den kein Kartenstapel hat: weil die '
+     + 'Formen eines Wortes zusammenstehen, wird der Stamm abgeleitet statt geraten '
+     + '— γράφ|ουμε ist die wirkliche Naht des Wortes, keine Silbentrennung.'],
+    ['vorlesen_zuerst', 'Erst hören, dann sehen',
+     'Mehrere Sinne gleichzeitig: sehen, hören, selbst schreiben. Wo es keine '
+     + 'Stimme gibt — Mittelhochdeutsch —, entfällt es von selbst.'],
+    ['erkennen_vor_schreiben', 'Beim ersten Mal erst ansehen',
+     'Ins Leere tippen, was man noch nie gesehen hat, erzeugt nur einen Fehler, '
+     + 'den man sich mitmerkt. Also zuerst ansehen und hören, dann schreiben.'],
+    ['fehler_benennen', 'Fehlerart benennen',
+     '„Du hast b und d vertauscht" ist eine brauchbare Auskunft, „falsch" ist keine.'],
+    ['mehr_wiederholungen', 'Häufiger wiederholen',
+     'Setzt die Zielsicherheit auf 95 % statt 90 % — kürzere Abstände, weniger '
+     + 'Vergessen. Eine eigene Vorgabe oben hat Vorrang.'],
+    ['weniger_neues', 'Weniger Neues auf einmal',
+     'Acht neue Aufgaben je Tag statt zwanzig.'],
+    ['keine_zeitmessung', 'Keine Zeitmessung',
+     'Nichts wird mitgestoppt. Zeitdruck verschlechtert gerade hier das Ergebnis.'],
+  ]) {
+    const haken = h('input', {
+      type: 'checkbox', checked: Boolean(stand[feld]),
+      onchange: (e) => { stand[feld] = e.target.checked; },
+    });
+    kasten.append(h('label', { class: 'schalter' }, haken,
+      h('span', { class: 'schalter-text' },
+        h('b', { text: titel }), h('span', { text: erklaerung }))));
+  }
+
+  const maske = h('select', { onchange: (e) => { stand.maske_stufe = Number(e.target.value); } },
+    h('option', { value: '0', text: 'Nichts vorgeben' }),
+    h('option', { value: '1', text: 'Ersten Buchstaben zeigen' }),
+    h('option', { value: '2', text: 'Ersten und letzten zeigen' }),
+    h('option', { value: '3', text: 'Alle Mitlaute zeigen' }));
+  maske.value = String(stand.maske_stufe ?? 2);
+  kasten.append(h('div', { class: 'regler' },
+    h('label', { text: 'Gerüst beim Schreiben' }), h('span', {}), maske, h('span', {})));
+
+  kasten.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    h('button', {
+      class: 'wichtig',
+      onclick: async () => {
+        try {
+          const gespeichert = await api.legasthenieSetzen(zustand.benutzerId, stand);
+          darstellungSetzen(gespeichert);
+          meldung('Gespeichert.');
+        } catch (fehler) { meldung(fehler.message); }
+      },
+    }, 'Speichern'),
+    h('button', {
+      onclick: async () => { darstellungSetzen(lg); zeichnen(behaelter); },
+    }, 'Verwerfen')));
+  return kasten;
+}

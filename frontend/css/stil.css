@@ -1,0 +1,726 @@
+/* Vokabeltrainer — Grundgestaltung.
+ *
+ * Alle Maße hängen an CSS-Variablen. Das ist nicht Spielerei, sondern die
+ * Voraussetzung dafür, dass der Legastheniemodus die ganze Darstellung
+ * umstellen kann — Zeichenabstand, Wortabstand, Zeilenhöhe, Schriftgröße,
+ * Hintergrund — und nicht bloß eine Schriftart austauscht.
+ *
+ * Zwei Grundsätze ziehen sich durch:
+ *   - Maße, die mitwachsen sollen, stehen in em (hängen also an --mass);
+ *     Maße, die ein Finger treffen muss, stehen in px beziehungsweise als
+ *     max(px, em) — ein Tippziel darf nie unter 44 px fallen.
+ *   - Nichts verlässt sich allein auf :hover. Auf dem iPad gibt es keines.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Von den Einstellungen überschrieben (zustand.js, darstellungSetzen) */
+  --mass: 1;                   /* Schriftgrößenfaktor */
+  --zeichenabstand: 0em;
+  --wortabstand: 0em;
+  --zeilenhoehe: 1.55;
+  --schrift: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+             "Helvetica Neue", Arial, sans-serif;
+  --schrift-wort: var(--schrift);
+
+  --grund: #f6f4f0;
+  --grund-2: #fffefc;
+  --grund-3: #ebe7df;
+  --text: #1f1d1a;
+  --leise: #655f56;
+  --rand: #dcd6cb;
+  --rand-stark: #c3bbac;
+  --akzent: #35558a;
+  --akzent-grund: #e4ebf7;
+  --richtig: #2a6a4a;
+  --richtig-grund: #e0f0e6;
+  --fast: #80590f;
+  --fast-grund: #faefd8;
+  --falsch: #8f3129;
+  --falsch-grund: #f9e4e1;
+
+  --rund: 12px;
+  --rund-klein: 8px;
+  --luft: clamp(.85rem, .6rem + 1.2vw, 1.15rem);
+  --schatten: 0 1px 2px rgb(0 0 0 / 5%), 0 6px 20px rgb(0 0 0 / 6%);
+
+  /* Mindestmaß für alles, was ein Finger treffen muss. */
+  --tipp: 44px;
+  /* Höhe der unteren Leiste — auf breiten Geräten gibt es keine. */
+  --leiste: 0px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-grund]) {
+    --grund: #171614;
+    --grund-2: #211f1d;
+    --grund-3: #2b2926;
+    --text: #ece8e2;
+    --leise: #a8a196;
+    --rand: #393631;
+    --rand-stark: #514d46;
+    --akzent: #9cbbe6;
+    --akzent-grund: #232e3c;
+    --richtig: #8fd6ab;
+    --richtig-grund: #1c2d23;
+    --fast: #e5c47f;
+    --fast-grund: #2d2616;
+    --falsch: #f0a8a1;
+    --falsch-grund: #301e1c;
+    --schatten: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 20px rgb(0 0 0 / 30%);
+  }
+}
+
+/* Vom Legastheniemodus gesetzt: ruhiger, warmer Grund statt Weiß auf Schwarz */
+:root[data-grund="creme"] {
+  color-scheme: light;
+  --grund: #f5efe1; --grund-2: #fdfaf2; --grund-3: #eae2d0;
+  --text: #2a2622; --leise: #675f54; --rand: #dbd0b9; --rand-stark: #c2b596;
+}
+:root[data-grund="hell"] {
+  color-scheme: light;
+  --grund: #ffffff; --grund-2: #ffffff; --grund-3: #f1f1f1;
+  --text: #1a1a1a; --leise: #585858; --rand: #d9d9d9; --rand-stark: #b8b8b8;
+}
+:root[data-grund="dunkel"] {
+  color-scheme: dark;
+  --grund: #131619; --grund-2: #1d2024; --grund-3: #262a2f;
+  --text: #e8eaec; --leise: #a2a8ae; --rand: #353a40; --rand-stark: #4c525a;
+  --akzent: #9cbbe6; --akzent-grund: #212b38;
+  --richtig: #8fd6ab; --richtig-grund: #1b2922;
+  --fast: #e5c47f; --fast-grund: #2a2416;
+  --falsch: #f0a8a1; --falsch-grund: #2d1d1b;
+  --schatten: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 20px rgb(0 0 0 / 30%);
+}
+
+* { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  /* Wenn der Browser ein Feld in den Blick scrollt, soll über und unter dem
+     Feld Luft bleiben — unten viel, dort steht die Bildschirmtastatur. */
+  scroll-padding-block: 5rem 40vh;
+}
+
+body {
+  margin: 0;
+  background: var(--grund);
+  color: var(--text);
+  font-family: var(--schrift);
+  font-size: calc(16px * var(--mass));
+  line-height: var(--zeilenhoehe);
+  letter-spacing: var(--zeichenabstand);
+  word-spacing: var(--wortabstand);
+  /* Kein Blocksatz, keine Kursive — beides erschwert das Lesen. */
+  text-align: left;
+  min-height: 100dvh;
+  accent-color: var(--akzent);
+  /* clip statt hidden: erzeugt keinen Scrollrahmen, position:sticky
+     funktioniert weiter. Fängt ab, was sonst die Seite seitlich zöge. */
+  overflow-x: clip;
+}
+
+em, i { font-style: normal; font-weight: 600; }
+
+/* Unsichtbar, aber nicht außerhalb der Seite — ein Element bei -9999px
+   zählt sonst zur Breite des Dokuments. */
+.sprungmarke {
+  position: absolute; top: 0; left: 0;
+  clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden;
+  background: var(--akzent); color: #fff; padding: .5rem 1rem; z-index: 60;
+  border-radius: 0 0 var(--rund-klein) 0;
+}
+.sprungmarke:focus {
+  clip-path: none; width: auto; height: auto;
+  top: env(safe-area-inset-top); left: 0;
+}
+
+/* ------------------------------------------------------------------ Kopf */
+
+.kopf {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .35rem clamp(.75rem, 3vw, 1.5rem);
+  padding-top: max(.35rem, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--rand);
+  position: sticky; top: 0; z-index: 20;
+  isolation: isolate;
+}
+/* Die Milchglasscheibe liegt in einem eigenen Element, nicht auf .kopf selbst:
+   ein backdrop-filter auf dem Elternteil würde zum Bezugsrahmen für alles
+   position:fixed darin — und die untere Leiste bliebe oben kleben. */
+.kopf::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: color-mix(in srgb, var(--grund-2) 88%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+/* display:flex sticht das hidden-Attribut aus — also ausdrücklich zurücknehmen. */
+.kopf[hidden] { display: none; }
+
+.kopf-titel { flex: 1 1 6rem; min-width: 0; display: flex; flex-direction: column; }
+.kopf-titel strong {
+  font-size: 1em; font-weight: 650; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kopf-titel .leise {
+  font-size: .8em; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kopf-titel .leise:empty { display: none; }
+
+.kopf-zurueck {
+  display: flex; align-items: center; justify-content: center;
+  width: var(--tipp); height: var(--tipp); min-height: 0; flex: none;
+  margin-left: -.6rem;
+  font-size: 1.6em; line-height: 1; padding: 0;
+  background: none; border: none; border-radius: 50%;
+  color: var(--leise); cursor: pointer;
+}
+.kopf-zurueck[hidden] { display: none; }
+
+.kopf-knoepfe { display: flex; align-items: center; gap: .25rem; flex: none; }
+.kopf-knoepfe button {
+  display: flex; align-items: center; gap: .4rem;
+  border: 1px solid transparent; background: none; color: var(--leise);
+  padding: .4em .7em; min-height: var(--tipp);
+  font-size: .92em; font-weight: 500;
+}
+.kopf-zeichen { width: 1.25em; height: 1.25em; flex: none; }
+.kopf-wort { white-space: nowrap; }
+
+.profil-knopf {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.2rem; height: 2.2rem; min-height: 0; flex: none;
+  border-radius: 50%; padding: 0;
+  font-weight: 650; font-size: .95em; color: #fff; border: none; cursor: pointer;
+}
+.kopf-knoepfe .profil-knopf {
+  width: var(--tipp); height: var(--tipp); margin-left: .2rem;
+  box-shadow: inset 0 0 0 2px var(--grund-2);
+}
+
+/* --------------------------------------------------------------- Inhalt */
+
+.inhalt {
+  max-width: 54rem;                 /* kurze Zeilen lesen sich leichter */
+  margin: 0 auto;
+  padding: clamp(1rem, 3vw, 2rem) clamp(.85rem, 3vw, 1.5rem)
+           calc(var(--leiste) + 3rem);
+  padding-left: max(clamp(.85rem, 3vw, 1.5rem), env(safe-area-inset-left));
+  padding-right: max(clamp(.85rem, 3vw, 1.5rem), env(safe-area-inset-right));
+}
+.inhalt:focus { outline: none; }
+
+h1 {
+  font-size: 1.55em; font-weight: 650; margin: 0 0 .3em;
+  line-height: 1.2; letter-spacing: calc(var(--zeichenabstand) - .012em);
+}
+h2 {
+  font-size: 1.15em; font-weight: 650; margin: 1.9em 0 .55em;
+  letter-spacing: calc(var(--zeichenabstand) - .005em);
+}
+h3 { font-size: .95em; font-weight: 650; margin: 1.6em 0 .5em; color: var(--leise); }
+p { margin: 0 0 .8em; max-width: 42em; }
+.leise { color: var(--leise); font-size: .9em; }
+.leer { text-align: center; color: var(--leise); padding: 3rem 1rem; }
+
+/* --------------------------------------------------------------- Knöpfe */
+
+button, .knopf {
+  font: inherit; letter-spacing: inherit; word-spacing: inherit;
+  padding: .5em .9em;
+  border: 1px solid var(--rand-stark);
+  border-radius: var(--rund-klein);
+  background: var(--grund-2);
+  color: var(--text);
+  cursor: pointer;
+  /* 44 px sind die Untergrenze für den Finger; bei großer Schrift wächst es mit. */
+  min-height: max(var(--tipp), 2.4em);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible, a:focus-visible {
+  outline: 2px solid var(--akzent); outline-offset: 2px;
+}
+button:disabled { opacity: .45; cursor: default; }
+
+/* Rückmeldung beim Antippen — das einzige, was auf Touch wirklich ankommt. */
+button:not(:disabled):active { background: var(--grund-3); transform: scale(.985); }
+@media (hover: hover) and (pointer: fine) {
+  button:hover:not(:disabled) { border-color: var(--akzent); }
+}
+
+button.wichtig {
+  background: var(--akzent); border-color: var(--akzent); color: #fff;
+  font-weight: 600;
+}
+button.wichtig:not(:disabled):active { background: var(--akzent); filter: brightness(.9); }
+@media (hover: hover) and (pointer: fine) {
+  button.wichtig:hover:not(:disabled) { filter: brightness(1.12); }
+}
+
+button.schlicht {
+  background: none; border-color: transparent; color: var(--leise);
+  padding-inline: .6em;
+}
+button.schlicht:not(:disabled):active { background: var(--grund-3); }
+@media (hover: hover) and (pointer: fine) {
+  button.schlicht:hover:not(:disabled) {
+    background: var(--grund-3); border-color: transparent; color: var(--text);
+  }
+}
+
+button.aktiv {
+  background: var(--akzent-grund); border-color: var(--akzent);
+  color: var(--akzent); font-weight: 600;
+}
+button.gefahr { color: var(--falsch); }
+
+input[type=text], input[type=search], input[type=number],
+input[type=color], select, textarea {
+  font: inherit; letter-spacing: inherit; word-spacing: inherit;
+  padding: .5em .7em; border: 1px solid var(--rand-stark);
+  border-radius: var(--rund-klein); background: var(--grund-2); color: var(--text);
+  width: 100%; min-width: 0; min-height: max(var(--tipp), 2.4em);
+}
+input[type=search] { -webkit-appearance: none; appearance: none; }
+input[type=checkbox] { accent-color: var(--akzent); }
+input[type=range] {
+  width: 100%; min-height: var(--tipp); accent-color: var(--akzent);
+  background: none; padding: 0;
+}
+
+/* --------------------------------------------------------------- Karten */
+
+.karte {
+  background: var(--grund-2);
+  border: 1px solid var(--rand);
+  border-radius: var(--rund);
+  padding: var(--luft);
+  margin-bottom: .75rem;
+}
+.karte > h2:first-child, .karte > h3:first-child { margin-top: 0; }
+.karte-reihe {
+  display: grid; gap: .75rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+.karte.klickbar {
+  cursor: pointer; text-align: left; width: 100%;
+  min-height: 0; padding: var(--luft);
+}
+.karte.klickbar:active { background: var(--grund-3); }
+@media (hover: hover) and (pointer: fine) {
+  .karte.klickbar:hover { border-color: var(--akzent); }
+}
+
+details.karte > summary {
+  list-style-position: inside;
+  cursor: pointer; padding: .2rem 0; margin: -.2rem 0;
+  min-height: var(--tipp); display: flex; align-items: center; gap: .5rem;
+  font-weight: 500; border-radius: var(--rund-klein);
+}
+details.karte[open] > summary { margin-bottom: .5rem; }
+details.karte > summary::-webkit-details-marker { display: none; }
+details.karte > summary::marker { color: var(--leise); }
+
+.zahlen {
+  display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; margin-top: .6rem;
+}
+.zahl { display: flex; flex-direction: column; min-width: 3.2rem; }
+.zahl b { font-size: 1.45em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.zahl span { font-size: .8em; line-height: 1.3; color: var(--leise); }
+.zahl.neu b { color: var(--akzent); }
+.zahl.faellig b { color: var(--fast); }
+.zahl.verlernt b { color: var(--falsch); }
+
+/* --------------------------------------------------------------- Abfrage */
+
+/* Das Herzstück. Alles hier dient der Konzentration: eine Spalte, viel Ruhe
+   um das Wort herum, und unter der Frage sofort das Feld. */
+.abfrage { display: flex; flex-direction: column; gap: .9rem; }
+
+.fortschritt {
+  height: 5px; background: var(--grund-3); border-radius: 99px; overflow: hidden;
+}
+.fortschritt i {
+  display: block; height: 100%; background: var(--akzent); border-radius: 99px;
+  transition: width .25s ease;
+}
+
+.aufgabentyp {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-size: .8em; color: var(--leise);
+  text-transform: none;
+}
+.aufgabentyp .punkt {
+  width: .45rem; height: .45rem; border-radius: 50%;
+  background: var(--akzent); flex: none;
+}
+
+.frage {
+  background: var(--grund-2); border: 1px solid var(--rand);
+  border-radius: var(--rund); padding: clamp(1.1rem, 5vw, 2.2rem) 1rem;
+  text-align: center; box-shadow: var(--schatten);
+}
+.frage-wort {
+  font-family: var(--schrift-wort);
+  font-size: clamp(1.75em, 8vw, 2.5em);
+  font-weight: 650; line-height: 1.2;
+  letter-spacing: calc(var(--zeichenabstand) - .005em);
+  margin: .45rem 0 0; overflow-wrap: anywhere;
+}
+/* Die Formangabe ist bei Formaufgaben die eigentliche Frage —
+   darum kein Kleingedrucktes. */
+.frage-zusatz {
+  margin: .5rem 0 0; font-size: 1.05em; color: var(--akzent); font-weight: 600;
+}
+.frage-hinweis { margin: .35rem 0 0; font-size: .85em; color: var(--leise); }
+.frage-werkzeuge {
+  display: flex; gap: .4rem; justify-content: center;
+  margin-top: .9rem; flex-wrap: wrap;
+}
+.frage .frage-werkzeuge { margin-top: 1.1rem; }
+
+.antwortfeld { display: flex; gap: .5rem; align-items: stretch; }
+.antwortfeld input {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 1.2em; font-family: var(--schrift-wort); text-align: center;
+  padding-block: .55em;
+}
+.antwortfeld button { flex: none; }
+.antwortfeld input.richtig { border-color: var(--richtig); background: var(--richtig-grund); color: var(--text); }
+.antwortfeld input.fast    { border-color: var(--fast);    background: var(--fast-grund);    color: var(--text); }
+.antwortfeld input.falsch  { border-color: var(--falsch);  background: var(--falsch-grund);  color: var(--text); }
+.antwortfeld input:disabled { opacity: 1; -webkit-text-fill-color: var(--text); }
+
+.maske {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .3em; color: var(--leise); text-align: center;
+  margin: .4rem 0 0; font-size: 1.05em;
+}
+
+.auswahlknoepfe {
+  display: grid; gap: .5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+}
+.auswahlknoepfe button { font-size: 1.1em; min-height: max(3.2rem, 3em); }
+
+.merkmalsfelder {
+  display: grid; gap: .6rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+}
+.merkmalsfeld label { display: block; font-size: .85em; color: var(--leise); margin-bottom: .2rem; }
+
+/* ------------------------------------------------------------ Rückmeldung */
+
+.rueckmeldung {
+  border-radius: var(--rund); padding: var(--luft);
+  border: 1px solid; border-left-width: 4px;
+}
+.rueckmeldung.richtig { background: var(--richtig-grund); border-color: var(--richtig); }
+.rueckmeldung.fast    { background: var(--fast-grund);    border-color: var(--fast); }
+.rueckmeldung.falsch  { background: var(--falsch-grund);  border-color: var(--falsch); }
+.rueckmeldung-kopf {
+  display: flex; align-items: baseline; gap: .45rem;
+  font-weight: 650; flex-wrap: wrap;
+}
+.rueckmeldung.richtig .rueckmeldung-kopf { color: var(--richtig); }
+.rueckmeldung.fast .rueckmeldung-kopf { color: var(--fast); }
+.rueckmeldung.falsch .rueckmeldung-kopf { color: var(--falsch); }
+.rueckmeldung p { margin: .4rem 0 0; }
+.rueckmeldung .leise { color: inherit; opacity: .8; }
+.loesung {
+  font-family: var(--schrift-wort); font-size: 1.3em; font-weight: 650;
+  margin: .2rem 0 0; overflow-wrap: anywhere;
+}
+
+/* Fehlerart: die nützlichste Zeile der ganzen Oberfläche */
+.fehlerart {
+  margin-top: .7rem; padding: .55rem .75rem;
+  background: var(--grund-2); border-radius: var(--rund-klein);
+  border-left: 3px solid var(--fast); font-size: .95em;
+}
+
+.alternativen { margin: .4rem 0 0; padding: 0; list-style: none; }
+.alternativen li { display: inline-block; margin: 0 .4rem .3rem 0; }
+.alternativen code {
+  font-family: var(--schrift-wort); background: var(--grund-3);
+  padding: .15em .5em; border-radius: var(--rund-klein); font-size: .95em;
+  overflow-wrap: anywhere;
+}
+
+/* Zerlegung in Stamm und Endung beziehungsweise Silben */
+.zerlegung { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; margin-top: .7rem; }
+.zerlegung .teil {
+  font-family: var(--schrift-wort); font-size: 1.2em; font-weight: 650;
+  padding: .15em .45em; border-radius: var(--rund-klein);
+}
+.zerlegung .teil.stamm { background: var(--akzent-grund); color: var(--akzent); }
+.zerlegung .teil.endung { background: var(--fast-grund); color: var(--fast); }
+.silbe { padding: .05em .15em; border-radius: 4px; }
+.silbe:nth-child(odd) { background: var(--akzent-grund); }
+
+/* ----------------------------------------------------------- Wertung */
+
+/* Die Bewertung wird abgeleitet, nicht erfragt. Dann muss aber sichtbar
+   sein, WIE gewertet wurde — sonst wird aus dem Fortschritt eine Blackbox. */
+.wertung {
+  background: var(--grund-2); border: 1px solid var(--rand);
+  border-radius: var(--rund); padding: var(--luft);
+}
+.wertung-kopf { display: flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
+.wertung-kopf b { font-size: 1.1em; font-weight: 650; }
+.wertung-grund { margin: .3rem 0 0; color: var(--leise); font-size: .92em; }
+
+/* ---------------------------------------------------------- Bewertung */
+
+.bewertung {
+  display: grid; gap: .5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  margin-top: .6rem;
+}
+.bewertung button {
+  display: flex; flex-direction: column; align-items: center; gap: .15rem;
+  padding: .6em .4em; min-height: max(3.6rem, 3.4em); text-align: center;
+}
+.bewertung button b { font-weight: 650; }
+.bewertung button span { font-size: .78em; color: var(--leise); line-height: 1.3; }
+.bewertung button kbd {
+  font-size: .7em; color: var(--leise); border: 1px solid var(--rand);
+  border-radius: 4px; padding: 0 .25em; font-family: inherit;
+}
+@media (hover: hover) and (pointer: fine) {
+  .bewertung button[data-note="1"]:hover { border-color: var(--falsch); }
+  .bewertung button[data-note="3"]:hover { border-color: var(--richtig); }
+}
+/* Auf dem Finger gibt es kein Hover — dafür eine Marke am Rand. */
+.bewertung button[data-note="1"] { border-left: 3px solid var(--falsch); }
+.bewertung button[data-note="2"] { border-left: 3px solid var(--fast); }
+.bewertung button[data-note="3"] { border-left: 3px solid var(--richtig); }
+.bewertung button[data-note="4"] { border-left: 3px solid var(--akzent); }
+/* Auf der Tastatur sichtbar, auf dem Finger überflüssig. */
+@media (pointer: coarse) { .bewertung button kbd { display: none; } }
+
+/* ------------------------------------------------------ Warum jetzt? */
+
+details.warum { font-size: .9em; }
+details.warum > summary {
+  cursor: pointer; color: var(--leise); padding: .6rem 0;
+  min-height: var(--tipp); display: flex; align-items: center; gap: .4rem;
+  border-radius: var(--rund-klein);
+}
+details.warum > summary::-webkit-details-marker { display: none; }
+details.warum > summary::before {
+  content: "›"; display: inline-block; font-size: 1.2em; line-height: 1;
+  transition: transform .15s ease; color: var(--leise);
+}
+details.warum[open] > summary::before { transform: rotate(90deg); }
+.warum-werte {
+  display: grid; gap: .6rem 1.2rem; margin-top: .4rem;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, max-content));
+}
+.warum-wert { display: flex; flex-direction: column; }
+.warum-wert b { font-variant-numeric: tabular-nums; font-weight: 650; }
+.warum-wert span { font-size: .85em; line-height: 1.3; color: var(--leise); }
+.balken { height: 6px; background: var(--grund-3); border-radius: 99px; overflow: hidden; margin-top: .25rem; }
+.balken i { display: block; height: 100%; background: var(--akzent); }
+
+/* ---------------------------------------------------------- Wortschatz */
+
+.liste { display: flex; flex-direction: column; gap: .4rem; }
+.eintrag {
+  display: flex; flex-wrap: wrap; column-gap: .65rem; row-gap: .25rem;
+  align-items: baseline;
+  padding: .65rem .8rem; background: var(--grund-2);
+  border: 1px solid var(--rand); border-radius: var(--rund-klein);
+  text-align: left; width: 100%; min-height: max(var(--tipp), 2.4em);
+}
+.eintrag:active { background: var(--grund-3); }
+@media (hover: hover) and (pointer: fine) {
+  .eintrag:hover { border-color: var(--akzent); }
+}
+.eintrag .lemma {
+  font-family: var(--schrift-wort); font-weight: 650;
+  flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere;
+}
+.eintrag .bedeutung {
+  color: var(--leise); flex: 1 1 6rem; min-width: 0; overflow-wrap: anywhere;
+}
+.marke {
+  font-size: .72em; padding: .15em .5em; border-radius: 99px;
+  background: var(--grund-3); color: var(--leise); white-space: nowrap;
+  /* Ohne das zieht der Flexkasten das Schild auf volle Höhe auseinander. */
+  align-self: center; flex: none; line-height: 1.6;
+}
+.marke.warnung { background: var(--fast-grund); color: var(--fast); }
+
+/* Breite Inhalte scrollen in ihrem eigenen Kasten, nie die Seite.
+   Die Schatten an den Rändern verraten, dass es dort weitergeht. */
+.tabellenrahmen {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--rand); border-radius: var(--rund);
+  background:
+    linear-gradient(to right, var(--grund-2) 40%, transparent)
+      left / 2.5rem 100% no-repeat local,
+    linear-gradient(to left, var(--grund-2) 40%, transparent)
+      right / 2.5rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 16%), transparent)
+      left / .7rem 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 16%), transparent)
+      right / .7rem 100% no-repeat scroll,
+    var(--grund-2);
+}
+table.paradigma { border-collapse: collapse; width: 100%; font-size: .95em; background: none; }
+table.paradigma th, table.paradigma td {
+  text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--rand);
+  vertical-align: middle;
+}
+table.paradigma tr:last-child td { border-bottom: none; }
+table.paradigma th { font-weight: 600; color: var(--leise); font-size: .88em; }
+table.paradigma td.form {
+  font-family: var(--schrift-wort); font-weight: 650; white-space: nowrap;
+}
+/* Die Form bleibt stehen, während der Rest der Zeile vorbeizieht. */
+table.paradigma th:first-child, table.paradigma td.form {
+  position: sticky; left: 0; z-index: 1; background: var(--grund-2);
+  box-shadow: 1px 0 0 var(--rand);
+}
+table.paradigma td:nth-child(2) { min-width: 8rem; }
+table.paradigma tr.ungeprueft td { background: var(--fast-grund); }
+table.paradigma tr.ungeprueft td.form { background: var(--fast-grund); }
+table.paradigma td:last-child { white-space: nowrap; }
+table.paradigma .marke { align-self: auto; }
+
+/* ------------------------------------------------------- Einstellungen */
+
+.schalter {
+  display: flex; align-items: flex-start; gap: .7rem;
+  padding: .55rem 0; min-height: var(--tipp); cursor: pointer;
+}
+.schalter input {
+  width: 1.35rem; height: 1.35rem; margin: .25rem 0 0; flex: none;
+  min-height: 0; min-width: 0; padding: 0;
+}
+.schalter-text { flex: 1; min-width: 0; }
+.schalter-text b { font-weight: 600; }
+.schalter-text span { display: block; font-size: .87em; color: var(--leise); }
+.schalter:active .schalter-text b { color: var(--akzent); }
+
+.regler {
+  display: grid; grid-template-columns: 1fr auto; gap: .2rem 1rem;
+  align-items: center; padding: .5rem 0;
+  border-top: 1px solid var(--rand);
+}
+.regler:first-of-type { border-top: none; }
+.regler > label { font-size: .95em; }
+.regler input[type=range] { width: 100%; }
+.regler output {
+  font-variant-numeric: tabular-nums; color: var(--akzent);
+  font-size: .9em; font-weight: 600;
+}
+
+.gruppenwahl { display: flex; gap: .4rem; flex-wrap: wrap; }
+.gruppenwahl button { font-size: .9em; padding: .45em .8em; }
+
+.probe {
+  margin-top: .9rem; padding: var(--luft);
+  background: var(--grund); border: 1px dashed var(--rand-stark);
+  border-radius: var(--rund);
+}
+
+/* ------------------------------------------------------------ Meldung */
+
+.meldung {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--leiste) + max(1rem, env(safe-area-inset-bottom)));
+  background: var(--text); color: var(--grund);
+  padding: .65rem 1.1rem; border-radius: 99px;
+  box-shadow: var(--schatten); z-index: 50;
+  max-width: min(32rem, calc(100vw - 2rem));
+  font-size: .92em; text-align: center;
+}
+
+/* ===================================================================
+   Schmale Geräte: aus der Kopfzeile wird eine untere Leiste.
+   Vier Knöpfe nebeneinander sprengen bei 360 px jede Kopfzeile; unten
+   sind sie außerdem mit dem Daumen erreichbar, wie bei einer App.
+   =================================================================== */
+
+@media (max-width: 44rem) {
+  :root { --leiste: calc(3.4rem + env(safe-area-inset-bottom)); }
+
+  .kopf { gap: .25rem; padding-block: .25rem; }
+  .kopf-titel strong { font-size: .98em; }
+
+  .kopf-knoepfe {
+    position: fixed; inset: auto 0 0 0;
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    gap: 0; z-index: 40;
+    background: var(--grund-2);
+    border-top: 1px solid var(--rand);
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    box-shadow: 0 -1px 12px rgb(0 0 0 / 6%);
+  }
+  .kopf-knoepfe button {
+    flex-direction: column; justify-content: center; gap: .1rem;
+    border: none; border-radius: 0;
+    padding: .3rem .2rem; min-height: 3.4rem;
+    font-size: .68em; font-weight: 500; line-height: 1.2;
+  }
+  .kopf-knoepfe button:not(:disabled):active {
+    background: var(--grund-3); transform: none;
+  }
+  .kopf-zeichen { width: 1.5em; height: 1.5em; }
+  .kopf-wort { font-size: 1em; }
+  .kopf-knoepfe .profil-knopf {
+    width: 2rem; height: 2rem; margin: 0 auto;
+    align-self: center; justify-self: center;
+    font-size: .95rem;
+  }
+
+  h2 { margin-top: 1.5em; }
+  .frage { padding-inline: .85rem; }
+  .frage-werkzeuge { gap: .35rem; }
+  .karte { padding: .9rem; }
+  /* Die Marken des Wortschatzeintrags rutschen in eine eigene Zeile. */
+  .eintrag .bedeutung { flex-basis: 100%; }
+  .bewertung { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Sehr schmal: die Beschriftungen der unteren Leiste dürfen nicht umbrechen. */
+@media (max-width: 22rem) {
+  .kopf-wort { font-size: .9em; }
+}
+
+/* -------------------------------------------------- Bildschirmtastatur */
+
+/* Beim Tippen soll nichts das Antwortfeld verdecken: die untere Leiste
+   fährt weg, und unter dem Inhalt entsteht Platz zum Hochscrollen.
+   Zusammen mit scroll-padding am html-Element landet das Feld über der
+   Tastatur statt dahinter. */
+@supports selector(:has(*)) {
+  @media (max-width: 44rem) {
+    body:has(.inhalt input:focus, .inhalt select:focus, .inhalt textarea:focus)
+      .kopf-knoepfe {
+      transform: translateY(110%);
+      transition: transform .18s ease;
+      pointer-events: none;
+    }
+    body:has(.inhalt input:focus, .inhalt textarea:focus) .inhalt {
+      padding-bottom: 55vh;
+    }
+  }
+}
+.antwortfeld input, .inhalt input, .inhalt select, .inhalt textarea {
+  scroll-margin-block: 4rem 45vh;
+}
+
+/* Wer Bewegung nicht mag, bekommt keine. */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  button:not(:disabled):active { transform: none; }
+}

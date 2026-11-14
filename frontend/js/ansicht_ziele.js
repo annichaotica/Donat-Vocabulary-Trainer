@@ -1,0 +1,238 @@
+/* Lernziele und dynamische Lernblöcke.
+ *
+ * Ein Lernziel ist ein Ausschnitt des Bestands mit einem Termin. Der
+ * Ausschnitt ist ausdrücklich nicht an eine Lektion gebunden — "alle Verben
+ * im Passé composé über alle Lektionen" ist ein genauso gültiges Ziel wie
+ * "Lektion 3 bis Freitag".
+ *
+ * Der Block wird daraus errechnet und nicht gespeichert: Fälliges zuerst,
+ * dann Wackliges, dann so viel Neues, wie der Termin verlangt — verschränkt
+ * gemischt, damit nicht sechs Formen desselben Verbs hintereinander kommen.
+ */
+
+import { api } from './api.js';
+import { h, leeren, meldung, anfuegen } from './hilfen.js';
+import { stammdaten } from './stammdaten.js';
+import { zustand, merken } from './zustand.js';
+
+export async function zeichnen(behaelter) {
+  const el = leeren(behaelter);
+  const ziele = await api.lernziele(zustand.benutzerId);
+
+  el.append(h('h1', { text: 'Lernziele' }));
+  if (!ziele.length) {
+    el.append(h('p', { class: 'leise',
+      text: 'Noch kein Ziel. Ein Ziel ist ein Ausschnitt des Bestands mit '
+          + 'einem Termin — der Trainer rechnet daraus aus, wie viel täglich '
+          + 'dran sein muss, und stellt die Blöcke entsprechend zusammen.' }));
+  }
+
+  for (const z of ziele) {
+    el.append(zielkarte(behaelter, z));
+  }
+  el.append(await teilNeuesZiel(behaelter));
+}
+
+function zielkarte(behaelter, z) {
+  const f = z.fortschritt || {};
+  const anteil = Math.round((f.anteil || 0) * 100);
+  const eng = f.neu_taeglich_noetig && !f.schaffbar;
+
+  return h('div', { class: 'karte' },
+    h('div', { style: 'display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap' },
+      h('strong', { text: z.name }),
+      z.termin ? h('span', { class: 'marke' + (eng ? ' warnung' : ''),
+                             text: f.lage || z.termin }) : null),
+    h('p', { class: 'leise', style: 'margin:.2rem 0 .5rem', text: f.umfang_text || '' }),
+
+    h('div', { class: 'zielbalken', title: `${f.geschafft} von ${f.gesamt}` },
+      h('i', { style: `width:${anteil}%` })),
+    h('p', { class: 'leise', style: 'margin:.3rem 0 0',
+             text: `${f.geschafft ?? 0} von ${f.gesamt ?? 0} geschafft (${anteil} %)` }),
+
+    h('div', { class: 'zahlen' },
+      zahl(f.faellig, 'fällig', 'faellig'),
+      zahl(f.verlernt, 'verlernt', 'verlernt'),
+      zahl(f.neu, 'noch nie dran', 'neu'),
+      f.neu_taeglich_noetig
+        ? zahl(f.neu_taeglich_noetig, 'täglich neu nötig')
+        : null),
+
+    eng ? h('p', { class: 'leise', style: 'color:var(--fast)',
+      text: 'Das wird eng — entweder den Termin verschieben oder den Umfang '
+          + 'kleiner schneiden.' }) : null,
+
+    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+      h('button', {
+        class: 'wichtig',
+        disabled: !(f.gesamt),
+        onclick: () => { merken({ lernzielId: z.id }); location.hash = `#/lernen/ziel/${z.id}`; },
+      }, 'Block starten'),
+      h('button', {
+        class: 'schlicht',
+        onclick: () => zeigeBlock(behaelter, z),
+      }, 'Was käme dran?'),
+      h('button', {
+        class: 'schlicht gefahr',
+        onclick: async () => {
+          if (!confirm(`Lernziel „${z.name}" löschen? Der Lernstand bleibt.`)) return;
+          await api.lernzielLoeschen(z.id);
+          zeichnen(behaelter);
+        },
+      }, 'Löschen')));
+}
+
+function zahl(wert, beschriftung, art) {
+  if (wert === null || wert === undefined) return null;
+  return h('div', { class: 'zahl' + (art ? ' ' + art : '') },
+    h('b', { text: String(wert) }), h('span', { text: beschriftung }));
+}
+
+/** Zeigt den errechneten Block samt Begründung des Zuschnitts. */
+async function zeigeBlock(behaelter, z) {
+  let block;
+  try {
+    block = await api.lernblock(z.id, zustand.benutzerId, 20);
+  } catch (fehler) { meldung(fehler.message); return; }
+
+  const el = leeren(behaelter);
+  el.append(h('h1', { text: z.name }));
+  el.append(h('div', { class: 'karte' },
+    h('p', { style: 'margin:0', text: block.begruendung })));
+
+  if (block.anzahl) {
+    const liste = h('div', { class: 'liste' });
+    for (const a of block.aufgaben) {
+      liste.append(h('div', { class: 'eintrag' },
+        h('span', { class: 'lemma', text: a.lemma }),
+        h('span', { class: 'bedeutung', text: a.typ.replace(/_/g, ' ') }),
+        h('span', { class: 'marke' + (a.herkunft === 'wacklig' ? ' warnung' : ''),
+                    text: { faellig: 'fällig', wacklig: 'wacklig',
+                            neu: 'neu' }[a.herkunft] })));
+    }
+    el.append(liste);
+  }
+  el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    block.anzahl ? h('button', {
+      class: 'wichtig',
+      onclick: () => { merken({ lernzielId: z.id }); location.hash = `#/lernen/ziel/${z.id}`; },
+    }, 'Los') : null,
+    h('button', { onclick: () => zeichnen(behaelter) }, 'Zurück')));
+}
+
+/* ----------------------------------------------------------- Neues Ziel */
+
+async function teilNeuesZiel(behaelter) {
+  const sammlungen = await api.sammlungen(zustand.benutzerId);
+  const kasten = h('details', { class: 'karte', style: 'margin-top:1.5rem' },
+    h('summary', { text: '+ Neues Lernziel' }));
+  const koerper = h('div', { style: 'display:grid;gap:.7rem;margin-top:.8rem' });
+  kasten.append(koerper);
+
+  const name = h('input', { type: 'text', placeholder: 'z.B. Lektion 3 bis Freitag' });
+  const termin = h('input', { type: 'date' });
+  const ziel = h('select', {},
+    h('option', { value: 'reif', text: 'sitzt dauerhaft (empfohlen)' }),
+    h('option', { value: 'einmal_richtig', text: 'wenigstens einmal gekonnt' }));
+
+  const sammlungWahl = h('select', {},
+    h('option', { value: '', text: 'alle zugänglichen Sammlungen' }),
+    sammlungen.map((s) => h('option', { value: String(s.id), text: s.name })));
+
+  const umfangFelder = h('div', { style: 'display:grid;gap:.7rem' });
+
+  const umfangBauen = async () => {
+    leeren(umfangFelder);
+    const sammlungId = sammlungWahl.value ? Number(sammlungWahl.value) : null;
+    if (!sammlungId) {
+      umfangFelder.append(h('p', { class: 'leise', style: 'margin:0',
+        text: 'Ohne Sammlung umfasst das Ziel alles — auch das ist erlaubt, '
+            + 'etwa für „alles, was fällig ist".' }));
+      return;
+    }
+    const [lektionen, einstellungen] = await Promise.all([
+      api.lektionen(sammlungId), api.sammlungEinstellungen(sammlungId),
+    ]);
+    const gruppen = await api.formgruppen(einstellungen.sprache);
+    const typen = await stammdaten.aufgabentypen();
+
+    umfangFelder._lektionen = mehrfachwahl(
+      'Lektionen', lektionen.map((l) => [String(l.id), l.name]),
+      'Mehrere wählbar — ein Ziel darf über Lektionen greifen.');
+    const alleGruppen = Object.values(gruppen.wortarten).flat();
+    umfangFelder._formgruppen = mehrfachwahl(
+      'Formgruppen', alleGruppen.map((g) => [g.kennung, g.kurz]),
+      'Nur Formaufgaben dieser Zeiten. Leer heißt: alle.');
+    umfangFelder._typen = mehrfachwahl(
+      'Aufgabentypen', Object.entries(typen.typen).map(([k, t]) => [k, t.name]),
+      'Leer heißt: alle.');
+    anfuegen(umfangFelder, umfangFelder._lektionen.element,
+             umfangFelder._formgruppen.element, umfangFelder._typen.element);
+  };
+  sammlungWahl.addEventListener('change', umfangBauen);
+
+  anfuegen(koerper,
+    beschriftet('Name', name),
+    beschriftet('Termin (freigestellt)', termin),
+    beschriftet('Was gilt als geschafft', ziel),
+    beschriftet('Sammlung', sammlungWahl),
+    umfangFelder,
+    h('button', {
+      class: 'wichtig',
+      onclick: async () => {
+        if (!name.value.trim()) { meldung('Der Name fehlt.'); return; }
+        const umfang = {};
+        if (sammlungWahl.value) umfang.sammlungen = [Number(sammlungWahl.value)];
+        for (const [feld, schluessel] of [['_lektionen', 'lektionen'],
+                                          ['_formgruppen', 'formgruppen'],
+                                          ['_typen', 'typen']]) {
+          const wahl = umfangFelder[feld]?.gewaehlt();
+          if (wahl?.length) {
+            umfang[schluessel] = schluessel === 'lektionen'
+              ? wahl.map(Number) : wahl;
+          }
+        }
+        try {
+          await api.lernzielAnlegen({
+            benutzer_id: zustand.benutzerId,
+            name: name.value.trim(),
+            umfang,
+            termin: termin.value || null,
+            ziel: ziel.value,
+          });
+          meldung('Ziel angelegt.');
+          zeichnen(behaelter);
+        } catch (fehler) { meldung(fehler.message); }
+      },
+    }, 'Anlegen'));
+
+  await umfangBauen();
+  return kasten;
+}
+
+function beschriftet(text, feld) {
+  return h('div', {}, h('label', { class: 'leise', text }), feld);
+}
+
+/** Mehrfachauswahl als Knopfreihe — auf dem Handy brauchbarer als ein
+ *  Mehrfach-Auswahlfeld, das man dort kaum bedienen kann. */
+function mehrfachwahl(titel, eintraege, hinweis) {
+  const gewaehlt = new Set();
+  const reihe = h('div', { class: 'gruppenwahl' });
+  for (const [wert, beschriftung] of eintraege) {
+    const knopf = h('button', {
+      type: 'button',
+      onclick: () => {
+        if (gewaehlt.has(wert)) gewaehlt.delete(wert); else gewaehlt.add(wert);
+        knopf.className = gewaehlt.has(wert) ? 'aktiv' : '';
+      },
+    }, beschriftung);
+    reihe.append(knopf);
+  }
+  const element = eintraege.length
+    ? h('div', {}, h('label', { class: 'leise', text: titel }), reihe,
+        h('p', { class: 'leise', style: 'margin:.2rem 0 0;font-size:.85em',
+                 text: hinweis }))
+    : null;
+  return { element, gewaehlt: () => [...gewaehlt] };
+}

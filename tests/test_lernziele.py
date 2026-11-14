@@ -1,0 +1,183 @@
+"""Lernziele und dynamisch zusammengestellte Lernblöcke."""
+
+import datetime as dt
+
+
+def _wort(klient, sammlung_id, lemma, uebersetzung, lektion_id=None):
+    return klient.post("/api/lexeme", json={
+        "sammlung_id": sammlung_id, "lemma": lemma, "wortart": "verb",
+        "lektion_id": lektion_id,
+        "bedeutungen": [{"uebersetzungen": [{"text": uebersetzung}]}]}).json()
+
+
+def _aufbau(klient, woerter=6):
+    b = klient.post("/api/benutzer", json={"name": "Zieler"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Französisch", "sprache": "fr"}).json()
+    lektionen = [klient.post(f"/api/sammlungen/{s['id']}/lektionen",
+                             json={"name": f"Lektion {i}", "reihenfolge": i}).json()
+                 for i in (1, 2)]
+    for i in range(woerter):
+        _wort(klient, s["id"], f"mot{i}", f"Wort {i}",
+              lektionen[i % 2]["id"])
+    return b, s, lektionen
+
+
+def test_lernziel_anlegen_und_umfang_beschreiben(klient):
+    b, s, lektionen = _aufbau(klient)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Lektion 1 bis Freitag",
+        "umfang": {"lektionen": [lektionen[0]["id"]]},
+        "termin": (dt.date.today() + dt.timedelta(days=7)).isoformat()}).json()
+    assert ziel["name"] == "Lektion 1 bis Freitag"
+    gelesen = klient.get(f"/api/lernziele/{ziel['id']}").json()
+    assert "Lektion" in gelesen["umfang_text"]
+
+
+def test_fortschritt_rechnet_den_tagesbedarf(klient):
+    b, s, lektionen = _aufbau(klient, woerter=10)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alles",
+        "termin": (dt.date.today() + dt.timedelta(days=10)).isoformat()}).json()
+    f = klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
+                   params={"benutzer_id": b["id"]}).json()
+    assert f["gesamt"] == 20          # je Wort zwei Bedeutungsaufgaben
+    assert f["geschafft"] == 0 and f["neu"] == 20
+    # 20 neue Aufgaben, 10 Tage minus 3 Tage Sicherheit = 7 Tage
+    assert f["neu_taeglich_noetig"] == 3
+    assert "noch 10 Tage" in f["lage"]
+    assert f["schaffbar"] is True
+
+
+def test_umfang_greift_ueber_lektionen_hinweg(klient):
+    """Ein Ziel darf quer über Lektionen greifen — das ist der Sinn."""
+    b, s, lektionen = _aufbau(klient, woerter=6)
+    eng = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Nur Lektion 1",
+        "umfang": {"lektionen": [lektionen[0]["id"]]}}).json()
+    weit = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Beide Lektionen",
+        "umfang": {"lektionen": [l["id"] for l in lektionen]}}).json()
+    f_eng = klient.get(f"/api/lernziele/{eng['id']}/fortschritt",
+                       params={"benutzer_id": b["id"]}).json()
+    f_weit = klient.get(f"/api/lernziele/{weit['id']}/fortschritt",
+                        params={"benutzer_id": b["id"]}).json()
+    assert f_eng["gesamt"] == 6 and f_weit["gesamt"] == 12
+
+
+def test_umfang_nach_aufgabentyp(klient):
+    b, s, _l = _aufbau(klient, woerter=4)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Nur Erkennen",
+        "umfang": {"typen": ["bedeutung_fremd_deutsch"]}}).json()
+    f = klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
+                   params={"benutzer_id": b["id"]}).json()
+    assert f["gesamt"] == 4
+
+
+def test_block_begruendet_seinen_zuschnitt(klient):
+    b, s, _l = _aufbau(klient, woerter=8)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alles",
+        "termin": (dt.date.today() + dt.timedelta(days=30)).isoformat()}).json()
+    block = klient.get(f"/api/lernziele/{ziel['id']}/block",
+                       params={"benutzer_id": b["id"], "anzahl": 10}).json()
+    assert block["anzahl"] > 0
+    assert "neu" in block["begruendung"]
+    assert block["zusammensetzung"]["neu"] == block["anzahl"]
+
+
+def test_block_verschraenkt_die_woerter(klient):
+    """Aufeinanderfolgende Aufgaben sollen nicht zum selben Wort gehören.
+    Wer sechs Formen desselben Verbs am Stück bekommt, merkt sich die
+    Reihenfolge statt der Formen."""
+    b, s, _l = _aufbau(klient, woerter=6)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alles"}).json()
+    block = klient.get(f"/api/lernziele/{ziel['id']}/block",
+                       params={"benutzer_id": b["id"], "anzahl": 12}).json()
+    lexeme = [a["lexem_id"] for a in block["aufgaben"]]
+    nacheinander = sum(1 for i in range(len(lexeme) - 1)
+                       if lexeme[i] == lexeme[i + 1])
+    assert nacheinander == 0, f"{nacheinander} Wiederholungen hintereinander"
+
+
+def test_block_nimmt_faelliges_zuerst(klient):
+    b, s, _l = _aufbau(klient, woerter=6)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alles"}).json()
+    # Zwei Aufgaben lernen und auf heute zurückdatieren
+    erste = klient.get(f"/api/lernziele/{ziel['id']}/block",
+                       params={"benutzer_id": b["id"], "anzahl": 2}).json()
+    for a in erste["aufgaben"]:
+        klient.post("/api/lernen/bewerten", json={
+            "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+            "urteil": "richtig", "denkzeit_ms": 1000})
+        klient.post("/api/lernen/termin", json={
+            "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+            "datum": dt.date.today().isoformat()})
+    zweite = klient.get(f"/api/lernziele/{ziel['id']}/block",
+                        params={"benutzer_id": b["id"], "anzahl": 10}).json()
+    assert zweite["zusammensetzung"]["faellig"] == 2
+    assert "fällig" in zweite["begruendung"]
+
+
+def test_lernen_kann_aus_einem_lernziel_ziehen(klient):
+    b, s, lektionen = _aufbau(klient, woerter=4)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Nur Lektion 2",
+        "umfang": {"lektionen": [lektionen[1]["id"]]}}).json()
+    reihe = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "lernziel_id": ziel["id"], "anzahl": 3}).json()
+    assert len(reihe) == 3
+    for a in reihe:
+        assert a["lernziel"]["name"] == "Nur Lektion 2"
+        assert a["herkunft"] in ("neu", "faellig", "wacklig")
+        assert a["frage_text"]            # vollständig ausgebaut
+        assert a["vorschau"]["3"]["text"]
+
+
+def test_leeres_lernziel_liefert_einen_leeren_block(klient):
+    b, _s, _l = _aufbau(klient, woerter=2)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Nichts",
+        "umfang": {"lexeme": [999999]}}).json()
+    block = klient.get(f"/api/lernziele/{ziel['id']}/block",
+                       params={"benutzer_id": b["id"]}).json()
+    assert block["anzahl"] == 0
+    assert "nichts zu tun" in block["begruendung"]
+    f = klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
+                   params={"benutzer_id": b["id"]}).json()
+    assert f["gesamt"] == 0 and f["anteil"] == 0.0
+
+
+def test_lernziel_aendern_und_loeschen(klient):
+    b, _s, _l = _aufbau(klient, woerter=2)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alt"}).json()
+    geaendert = klient.patch(f"/api/lernziele/{ziel['id']}",
+                             json={"name": "Neu", "ziel": "einmal_richtig"}).json()
+    assert geaendert["name"] == "Neu" and geaendert["ziel"] == "einmal_richtig"
+    assert klient.delete(f"/api/lernziele/{ziel['id']}").status_code == 204
+    assert klient.get(f"/api/lernziele/{ziel['id']}").status_code == 404
+
+
+def test_ziel_einmal_richtig_zaehlt_anders_als_reif(klient):
+    b, _s, _l = _aufbau(klient, woerter=3)
+    locker = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Einmal gekonnt",
+        "ziel": "einmal_richtig"}).json()
+    streng = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Sitzt dauerhaft", "ziel": "reif"}).json()
+    block = klient.get(f"/api/lernziele/{locker['id']}/block",
+                       params={"benutzer_id": b["id"], "anzahl": 3}).json()
+    for a in block["aufgaben"]:
+        klient.post("/api/lernen/bewerten", json={
+            "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+            "urteil": "richtig", "denkzeit_ms": 800})
+    f_locker = klient.get(f"/api/lernziele/{locker['id']}/fortschritt",
+                          params={"benutzer_id": b["id"]}).json()
+    f_streng = klient.get(f"/api/lernziele/{streng['id']}/fortschritt",
+                          params={"benutzer_id": b["id"]}).json()
+    assert f_locker["geschafft"] == 3
+    assert f_streng["geschafft"] < f_locker["geschafft"]

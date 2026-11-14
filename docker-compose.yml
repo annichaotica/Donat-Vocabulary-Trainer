@@ -1,0 +1,24 @@
+# Vokabeltrainer auf dem Familienserver.
+#
+#   cd /srv/vokabeltrainer && docker compose up -d
+#
+# Port 8020 — 80 (Startseite), 2283 (Immich), 8010 (Paperless) und
+# 9925 (Mealie) sind belegt.
+#
+# Die Datenbank liegt unter /srv/vokabeltrainer/daten und wird damit von
+# der bestehenden /srv-Sicherung mitgenommen. Siehe aber den Hinweis zur
+# WAL-Datei in der README: für eine konsistente Sicherung gehört
+# werkzeuge/sicherung.sh davor.
+
+services:
+  vokabeltrainer:
+    build: .
+    image: vokabeltrainer:neuste
+    container_name: vokabeltrainer
+    restart: unless-stopped
+    ports:
+      - "8020:8020"
+    volumes:
+      - ./daten:/daten
+    environment:
+      - TZ=Europe/Berlin

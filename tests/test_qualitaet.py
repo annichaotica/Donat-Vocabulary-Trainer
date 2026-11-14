@@ -1,0 +1,302 @@
+"""Qualitätsprüfung der Einträge und Sprachprofile aus der Datenbank."""
+
+
+def _aufbau(klient, sprache="fr"):
+    b = klient.post("/api/benutzer", json={"name": "Prüfer"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Probe", "sprache": sprache}).json()
+    return b, s
+
+
+def arten(bericht):
+    return {b["art"] for b in bericht["befunde"]}
+
+
+# ------------------------------------------------------- Eintrag prüfen
+
+def test_eintrag_ohne_uebersetzung_ist_ein_fehler(klient):
+    _b, s = _aufbau(klient)
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "aller", "wortart": "verb"}).json()
+    bericht = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    assert bericht["gut"] is False
+    assert "ohne_bedeutung" in arten(bericht)
+    # Der Rat muss sagen, WAS die Folge ist, nicht nur dass etwas fehlt.
+    rat = next(x for x in bericht["befunde"] if x["art"] == "ohne_bedeutung")["rat"]
+    assert "Bedeutungsaufgabe" in rat
+
+
+def test_nur_eine_uebersetzung_ist_ein_hinweis(klient):
+    _b, s = _aufbau(klient)
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "aller", "wortart": "verb",
+        "bedeutungen": [{"uebersetzungen": [{"text": "gehen"}]}]}).json()
+    bericht = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    assert bericht["gut"] is True              # kein Fehler
+    assert "nur_eine_uebersetzung" in arten(bericht)
+
+
+def test_vollstaendiger_eintrag_ist_sauber(klient):
+    _b, s = _aufbau(klient)
+    formen = [{"text": "parler", "merkmale": {"nonfinit": "infinitiv"},
+               "ist_grundform": True}]
+    for t, (p, n) in zip(["parle", "parles", "parle", "parlons", "parlez", "parlent"],
+                         [("1", "sg"), ("2", "sg"), ("3", "sg"),
+                          ("1", "pl"), ("2", "pl"), ("3", "pl")]):
+        formen.append({"text": t, "merkmale": {"modus": "indikativ",
+                                               "tempus": "praesens",
+                                               "person": p, "numerus": n}})
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "parler", "wortart": "verb",
+        "formen": formen,
+        "bedeutungen": [{"uebersetzungen": [{"text": "sprechen"},
+                                            {"text": "reden"}]}]}).json()
+    bericht = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    assert bericht["gut"] is True
+    assert "paradigma_lueckig" not in arten(bericht)
+    assert "stamm_nicht_ableitbar" not in arten(bericht)
+
+
+def test_lueckiges_paradigma_wird_benannt(klient):
+    _b, s = _aufbau(klient)
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "parler", "wortart": "verb",
+        "formen": [
+            {"text": "parler", "merkmale": {"nonfinit": "infinitiv"},
+             "ist_grundform": True},
+            {"text": "parle", "merkmale": {"modus": "indikativ",
+                                           "tempus": "praesens",
+                                           "person": "1", "numerus": "sg"}}],
+        "bedeutungen": [{"uebersetzungen": [{"text": "sprechen"},
+                                            {"text": "reden"}]}]}).json()
+    bericht = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    befund = next(b for b in bericht["befunde"] if b["art"] == "paradigma_lueckig")
+    assert "1 von 6" in befund["text"]
+    assert any("2." in x for x in befund["betrifft"])
+
+
+def test_nicht_ableitbarer_stamm_wird_gemeldet(klient):
+    """Bei "aller" ist das richtig so — vais und allons haben keinen
+    gemeinsamen Stamm. Der Hinweis sagt beides: dass es sein kann, und
+    dass es sonst ein Tippfehler wäre."""
+    _b, s = _aufbau(klient)
+    formen = [{"text": "aller", "merkmale": {"nonfinit": "infinitiv"},
+               "ist_grundform": True}]
+    for t, (p, n) in zip(["vais", "vas", "va", "allons", "allez", "vont"],
+                         [("1", "sg"), ("2", "sg"), ("3", "sg"),
+                          ("1", "pl"), ("2", "pl"), ("3", "pl")]):
+        formen.append({"text": t, "merkmale": {"modus": "indikativ",
+                                               "tempus": "praesens",
+                                               "person": p, "numerus": n}})
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "aller", "wortart": "verb",
+        "formen": formen,
+        "bedeutungen": [{"uebersetzungen": [{"text": "gehen"},
+                                            {"text": "laufen"}]}]}).json()
+    bericht = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    befund = next(b for b in bericht["befunde"]
+                  if b["art"] == "stamm_nicht_ableitbar")
+    assert befund["schwere"] == "hinweis"
+    assert "unregelmäßig" in befund["rat"]
+
+
+def test_doppeltes_lemma_wird_gemeldet(klient):
+    _b, s = _aufbau(klient)
+    daten = {"sammlung_id": s["id"], "lemma": "la banque", "wortart": "substantiv",
+             "merkmale": {"genus": "f"},
+             "bedeutungen": [{"uebersetzungen": [{"text": "die Bank"}]}]}
+    klient.post("/api/lexeme", json=daten)
+    zweites = klient.post("/api/lexeme", json=daten).json()
+    bericht = klient.get(f"/api/lexeme/{zweites['id']}/pruefung").json()
+    assert "lemma_doppelt" in arten(bericht)
+
+
+def test_sammlung_im_ganzen_pruefen(klient):
+    _b, s = _aufbau(klient)
+    klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "aller", "wortart": "verb"})
+    bericht = klient.get(f"/api/sammlungen/{s['id']}/pruefung").json()
+    assert bericht["zaehler"]["fehler"] >= 1
+    assert bericht["eintraege"][0]["lemma"] == "aller"
+
+
+# --------------------------------------------------- Sprachprofile als Daten
+
+MONGOLISCH = {
+    "pruefung": {"gross_klein": "ignorieren", "diakritika": "hinweis",
+                 "satzzeichen": "ignorieren", "schriftregeln": []},
+    "artikel": {"bestimmt": [], "unbestimmt": [], "regel": "ignorieren",
+                "genus_artikel": {}},
+    "formgruppen": {
+        "substantiv": [
+            {"kennung": "nom_sg", "name": "Nominativ Singular", "kurz": "Nom. Sg.",
+             "merkmale": {"kasus": "nom", "numerus": "sg"},
+             "zellen": [{"kasus": "nom", "numerus": "sg"}]},
+            {"kennung": "gen_sg", "name": "Genitiv Singular", "kurz": "Gen. Sg.",
+             "merkmale": {"kasus": "gen", "numerus": "sg"},
+             "zellen": [{"kasus": "gen", "numerus": "sg"}]},
+        ],
+    },
+    "formgruppen_standard": {"substantiv": "alle"},
+}
+
+
+def test_neue_sprache_anlegen_und_benutzen(klient):
+    """Ein Agent am MCP muss eine Sprache einrichten können, ohne dass
+    jemand Code ändert."""
+    antwort = klient.post("/api/sprachen", json={
+        "code": "mn", "name": "Mongolisch", "schrift": "kyrillisch",
+        "profil": MONGOLISCH})
+    assert antwort.status_code == 201
+    assert antwort.json()["im_code_hinterlegt"] is False
+
+    b = klient.post("/api/benutzer", json={"name": "Lerner"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Mongolisch", "sprache": "mn"}).json()
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "ном", "wortart": "substantiv",
+        "formen": [
+            {"text": "ном", "merkmale": {"kasus": "nom", "numerus": "sg"},
+             "ist_grundform": True},
+            {"text": "номын", "merkmale": {"kasus": "gen", "numerus": "sg"}}],
+        "bedeutungen": [{"uebersetzungen": [{"text": "das Buch"}]}]}).json()
+    # Die Formgruppe aus der Datenbank wird für die Beschriftung benutzt.
+    beschriftung = {f["text"]: f["beschriftung"] for f in lexem["formen"]}
+    assert beschriftung["номын"] == "Genitiv Singular"
+    assert len([a for a in lexem["aufgaben"] if a["aktiv"]]) >= 2
+
+
+def test_bestehende_sprache_um_eine_zeit_erweitern(klient):
+    """Eine Zeit anfügen, ohne die anderen vierzehn zu wiederholen."""
+    vorher = len(klient.get("/api/sprachen/fr/formgruppen").json()["wortarten"]["verb"])
+    antwort = klient.put("/api/sprachen/fr/profil", json={"profil": {
+        "formgruppen": {"verb": [
+            {"kennung": "subjonctif_imparfait", "name": "Subjonctif imparfait",
+             "kurz": "Subj. imp.",
+             "merkmale": {"modus": "konjunktiv", "tempus": "imperfekt"},
+             "zellen": [{"modus": "konjunktiv", "tempus": "imperfekt",
+                         "person": p, "numerus": n}
+                        for p, n in [("1", "sg"), ("2", "sg"), ("3", "sg"),
+                                     ("1", "pl"), ("2", "pl"), ("3", "pl")]]}]}}})
+    assert antwort.status_code == 200
+    nachher = klient.get("/api/sprachen/fr/formgruppen").json()["wortarten"]["verb"]
+    assert len(nachher) == vorher + 1
+    assert any(g["kennung"] == "subjonctif_imparfait" for g in nachher)
+    # Die im Code hinterlegten Gruppen bleiben erhalten.
+    assert any(g["kennung"] == "passe_compose" for g in nachher)
+
+
+def test_gleiche_kennung_ersetzt_die_gruppe_aus_dem_code(klient):
+    klient.put("/api/sprachen/fr/profil", json={"profil": {
+        "formgruppen": {"verb": [
+            {"kennung": "passe_compose", "name": "Perfekt (umbenannt)",
+             "kurz": "Perf.",
+             "merkmale": {"modus": "indikativ", "tempus": "perfekt"},
+             "zellen": [{"modus": "indikativ", "tempus": "perfekt",
+                         "person": "1", "numerus": "sg"}]}]}}})
+    gruppen = klient.get("/api/sprachen/fr/formgruppen").json()["wortarten"]["verb"]
+    passe = next(g for g in gruppen if g["kennung"] == "passe_compose")
+    assert passe["name"] == "Perfekt (umbenannt)"
+    assert passe["zellen"] == 1
+
+
+def test_unbrauchbares_profil_wird_abgelehnt(klient):
+    # Zelle ohne die Merkmale ihrer Gruppe
+    antwort = klient.put("/api/sprachen/fr/profil", json={"profil": {
+        "formgruppen": {"verb": [
+            {"kennung": "kaputt", "name": "Kaputt", "kurz": "k",
+             "merkmale": {"tempus": "praesens"},
+             "zellen": [{"tempus": "futur", "person": "1", "numerus": "sg"}]}]}}})
+    assert antwort.status_code == 400
+    assert "Zelle" in antwort.json()["detail"]
+
+
+def test_unbekanntes_merkmal_im_profil_wird_abgelehnt(klient):
+    antwort = klient.put("/api/sprachen/fr/profil", json={"profil": {
+        "formgruppen": {"verb": [
+            {"kennung": "x", "name": "X", "kurz": "x",
+             "merkmale": {"erfunden": "ja"}, "zellen": [{"erfunden": "ja"}]}]}}})
+    assert antwort.status_code == 400
+
+
+def test_unbekannter_profilschluessel_wird_abgelehnt(klient):
+    antwort = klient.put("/api/sprachen/fr/profil",
+                         json={"profil": {"farbe": "blau"}})
+    assert antwort.status_code == 400
+    assert "Unbekannte Einträge" in antwort.json()["detail"]
+
+
+def test_profilaenderung_rechnet_die_aufgaben_neu(klient):
+    _b, s = _aufbau(klient)
+    klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "parler", "wortart": "verb",
+        "bedeutungen": [{"uebersetzungen": [{"text": "sprechen"}]}]})
+    antwort = klient.put("/api/sprachen/fr/profil", json={
+        "profil": {"pruefung": {"diakritika": "streng"}}}).json()
+    assert antwort["aufgaben"]["sammlungen"] == 1
+
+
+def test_geaenderte_pruefregel_wirkt_sofort(klient):
+    b, s = _aufbau(klient)
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "élève", "wortart": "substantiv",
+        "merkmale": {"genus": "m"},
+        "bedeutungen": [{"uebersetzungen": [{"text": "der Schüler"}]}]}).json()
+    aufgabe = next(a for a in lexem["aufgaben"]
+                   if a["typ"] == "bedeutung_deutsch_fremd")
+    daten = {"benutzer_id": b["id"], "aufgabe_id": aufgabe["id"], "antwort": "eleve"}
+    assert klient.post("/api/lernen/pruefen", json=daten).json()["urteil"]["urteil"] == "fast"
+
+    klient.put("/api/sprachen/fr/profil",
+               json={"profil": {"pruefung": {"diakritika": "streng"}}})
+    assert klient.post("/api/lernen/pruefen", json=daten).json()["urteil"]["urteil"] == "falsch"
+
+
+# -------------------------------------------------------------- Wörterbuch
+
+def test_woerterbuch_findet_ueber_jede_form(klient):
+    """Wer im Text »έγραψαν« liest, muss γράφω finden — und erfahren,
+    welche Form das ist."""
+    _b, s = _aufbau(klient, "el")
+    klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "γράφω", "wortart": "verb",
+        "formen": [
+            {"text": "γράφω", "merkmale": {"modus": "indikativ",
+                                           "tempus": "praesens",
+                                           "person": "1", "numerus": "sg"},
+             "ist_grundform": True},
+            {"text": "έγραψαν", "merkmale": {"modus": "indikativ",
+                                             "tempus": "aorist",
+                                             "person": "3", "numerus": "pl"}}],
+        "bedeutungen": [{"uebersetzungen": [{"text": "schreiben"}]}]})
+    ergebnis = klient.get(f"/api/sammlungen/{s['id']}/woerterbuch",
+                          params={"suche": "έγραψαν"}).json()
+    assert ergebnis["gefunden"] == 1
+    eintrag = ergebnis["eintraege"][0]
+    assert eintrag["lemma"] == "γράφω"
+    fund = next(f for f in eintrag["fundstellen"] if f["wo"] == "form")
+    assert fund["beschriftung"] == "Αόριστος (Aorist), 3. Person Plural"
+
+
+def test_woerterbuch_findet_ueber_die_uebersetzung(klient):
+    _b, s = _aufbau(klient)
+    klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "la table", "wortart": "substantiv",
+        "merkmale": {"genus": "f"},
+        "bedeutungen": [{"uebersetzungen": [{"text": "der Tisch"},
+                                            {"text": "die Tafel"}]}]})
+    ergebnis = klient.get(f"/api/sammlungen/{s['id']}/woerterbuch",
+                          params={"suche": "Tafel"}).json()
+    assert ergebnis["gefunden"] == 1
+    assert ergebnis["eintraege"][0]["fundstellen"][0]["wo"] == "uebersetzung"
+
+
+def test_woerterbuch_stellt_genaue_treffer_nach_vorn(klient):
+    _b, s = _aufbau(klient)
+    for lemma in ("parler", "parlementaire"):
+        klient.post("/api/lexeme", json={
+            "sammlung_id": s["id"], "lemma": lemma, "wortart": "verb",
+            "bedeutungen": [{"uebersetzungen": [{"text": "x"}]}]})
+    ergebnis = klient.get(f"/api/sammlungen/{s['id']}/woerterbuch",
+                          params={"suche": "parler"}).json()
+    assert ergebnis["eintraege"][0]["lemma"] == "parler"

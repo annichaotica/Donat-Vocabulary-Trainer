@@ -1,0 +1,104 @@
+/* Zugriff auf die Schnittstelle. Ein Ort für alle Aufrufe. */
+
+export class ApiFehler extends Error {
+  constructor(text, status) { super(text); this.status = status; }
+}
+
+async function ruf(pfad, { methode = 'GET', daten = null, frage = null } = {}) {
+  let adresse = '/api' + pfad;
+  if (frage) {
+    const teile = new URLSearchParams();
+    for (const [name, wert] of Object.entries(frage)) {
+      if (wert === null || wert === undefined || wert === '') continue;
+      if (Array.isArray(wert)) wert.forEach((w) => teile.append(name, w));
+      else teile.append(name, wert);
+    }
+    const text = teile.toString();
+    if (text) adresse += '?' + text;
+  }
+  const antwort = await fetch(adresse, {
+    method: methode,
+    headers: daten ? { 'Content-Type': 'application/json' } : undefined,
+    body: daten ? JSON.stringify(daten) : undefined,
+  });
+  if (antwort.status === 204) return null;
+  const inhalt = await antwort.text();
+  let geparst = null;
+  try { geparst = inhalt ? JSON.parse(inhalt) : null; } catch { geparst = null; }
+  if (!antwort.ok) {
+    throw new ApiFehler(fehlertext(geparst) || `Fehler ${antwort.status}`, antwort.status);
+  }
+  return geparst;
+}
+
+function fehlertext(inhalt) {
+  if (!inhalt) return null;
+  const d = inhalt.detail;
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) {
+    // Pydantic nennt Feld und Grund — das soll man auch lesen können.
+    return d.map((f) => {
+      const ort = (f.loc || []).filter((t) => t !== 'body').join(' → ');
+      return ort ? `${ort}: ${f.msg}` : f.msg;
+    }).join('; ');
+  }
+  return null;
+}
+
+export const api = {
+  zustand: () => ruf('/zustand'),
+  sprachen: () => ruf('/sprachen'),
+  formgruppen: (code) => ruf(`/sprachen/${code}/formgruppen`),
+  merkmale: () => ruf('/merkmale'),
+  aufgabentypen: () => ruf('/aufgabentypen'),
+
+  benutzer: () => ruf('/benutzer'),
+  benutzerAnlegen: (daten) => ruf('/benutzer', { methode: 'POST', daten }),
+  benutzerAendern: (id, daten) => ruf(`/benutzer/${id}`, { methode: 'PATCH', daten }),
+  benutzerEinstellungen: (id) => ruf(`/benutzer/${id}/einstellungen`),
+  legasthenieLesen: (id) => ruf(`/benutzer/${id}/legasthenie`),
+  legasthenieSetzen: (id, daten) => ruf(`/benutzer/${id}/legasthenie`, { methode: 'PUT', daten }),
+
+  sammlungen: (benutzerId) => ruf('/sammlungen', { frage: { benutzer_id: benutzerId } }),
+  sammlungAnlegen: (daten) => ruf('/sammlungen', { methode: 'POST', daten }),
+  sammlungAendern: (id, daten) => ruf(`/sammlungen/${id}`, { methode: 'PATCH', daten }),
+  sammlungLoeschen: (id) => ruf(`/sammlungen/${id}`, { methode: 'DELETE' }),
+  sammlungEinstellungen: (id) => ruf(`/sammlungen/${id}/einstellungen`),
+  sammlungEinstellungenSetzen: (id, daten) =>
+    ruf(`/sammlungen/${id}/einstellungen`, { methode: 'PUT', daten }),
+  lektionen: (id) => ruf(`/sammlungen/${id}/lektionen`),
+  lektionAnlegen: (id, daten) => ruf(`/sammlungen/${id}/lektionen`, { methode: 'POST', daten }),
+
+  lexeme: (sammlungId, frage) => ruf(`/sammlungen/${sammlungId}/lexeme`, { frage }),
+  lexem: (id) => ruf(`/lexeme/${id}`),
+  lexemAnlegen: (daten) => ruf('/lexeme', { methode: 'POST', daten }),
+  lexemAendern: (id, daten) => ruf(`/lexeme/${id}`, { methode: 'PATCH', daten }),
+  lexemLoeschen: (id) => ruf(`/lexeme/${id}`, { methode: 'DELETE' }),
+  formAnlegen: (lexemId, daten) => ruf(`/lexeme/${lexemId}/formen`, { methode: 'POST', daten }),
+  formAendern: (id, daten) => ruf(`/formen/${id}`, { methode: 'PATCH', daten }),
+  formBestaetigen: (id) => ruf(`/formen/${id}/bestaetigen`, { methode: 'POST' }),
+  formLoeschen: (id) => ruf(`/formen/${id}`, { methode: 'DELETE' }),
+  bedeutungAnlegen: (lexemId, daten) =>
+    ruf(`/lexeme/${lexemId}/bedeutungen`, { methode: 'POST', daten }),
+  bedeutungLoeschen: (id) => ruf(`/bedeutungen/${id}`, { methode: 'DELETE' }),
+
+  lernziele: (benutzerId) => ruf('/lernziele', { frage: { benutzer_id: benutzerId } }),
+  lernzielAnlegen: (daten) => ruf('/lernziele', { methode: 'POST', daten }),
+  lernzielAendern: (id, daten) => ruf(`/lernziele/${id}`, { methode: 'PATCH', daten }),
+  lernzielLoeschen: (id) => ruf(`/lernziele/${id}`, { methode: 'DELETE' }),
+  lernzielFortschritt: (id, benutzerId) =>
+    ruf(`/lernziele/${id}/fortschritt`, { frage: { benutzer_id: benutzerId } }),
+  lernblock: (id, benutzerId, anzahl) =>
+    ruf(`/lernziele/${id}/block`, { frage: { benutzer_id: benutzerId, anzahl } }),
+
+  stand: (benutzerId, sammlungId) =>
+    ruf('/lernen/stand', { frage: { benutzer_id: benutzerId, sammlung_id: sammlungId } }),
+  naechste: (frage) => ruf('/lernen/naechste', { frage }),
+  pruefen: (daten) => ruf('/lernen/pruefen', { methode: 'POST', daten }),
+  bewerten: (daten) => ruf('/lernen/bewerten', { methode: 'POST', daten }),
+  aussetzen: (daten) => ruf('/lernen/aussetzen', { methode: 'POST', daten }),
+  fortsetzen: (daten) => ruf('/lernen/fortsetzen', { methode: 'POST', daten }),
+  zuruecksetzen: (daten) => ruf('/lernen/zuruecksetzen', { methode: 'POST', daten }),
+  termin: (daten) => ruf('/lernen/termin', { methode: 'POST', daten }),
+  verlauf: (frage) => ruf('/lernen/verlauf', { frage }),
+};

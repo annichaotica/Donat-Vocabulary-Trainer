@@ -1,0 +1,55 @@
+/* Zeichenleiste und Tastaturhilfe.
+ *
+ * Eigene Datei, damit sie neben stil.css gepflegt werden kann; sie wird von
+ * app.js nachgeladen. Alle Maße hängen wie überall an den CSS-Variablen,
+ * damit der Legastheniemodus auch hier wirkt.
+ */
+
+.zeichenleiste {
+  display: flex; flex-wrap: wrap; gap: .3rem;
+  margin-top: .5rem; align-items: center;
+}
+.zeichenleiste button.zeichen {
+  font-family: var(--schrift-wort);
+  font-size: 1.1em; line-height: 1;
+  min-width: 2.4rem; min-height: 2.4rem;
+  padding: .3rem .4rem;
+  background: var(--grund-3); border-color: transparent;
+}
+.zeichenleiste button.zeichen:active { background: var(--akzent-grund); }
+.zeichenleiste .leiste-hinweis { font-size: .82em; color: var(--leise); }
+
+/* Bei nichtlateinischer Schrift ersetzt keine Leiste ein Layout. */
+.tastaturhinweis {
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  margin-top: .5rem; padding: .5rem .7rem;
+  background: var(--grund-3); border-radius: var(--rund);
+  font-size: .88em; color: var(--leise);
+}
+.tastaturhinweis a { color: var(--akzent); }
+
+.tastaturhilfe ol { padding-left: 1.3em; }
+.tastaturhilfe li { margin-bottom: .35em; }
+.tastaturhilfe kbd {
+  font-family: inherit; font-size: .9em;
+  border: 1px solid var(--rand); border-bottom-width: 2px;
+  border-radius: 5px; padding: .08em .4em;
+  background: var(--grund-2); white-space: nowrap;
+}
+.tastaturhilfe .dieses-geraet {
+  border-left: 3px solid var(--akzent);
+}
+.tastaturhilfe .dieses-geraet > summary::after {
+  content: " — dein Gerät"; color: var(--akzent); font-size: .85em;
+}
+
+/* Fortschrittsbalken eines Lernziels */
+.zielbalken {
+  height: 8px; background: var(--grund-3);
+  border-radius: 4px; overflow: hidden;
+}
+.zielbalken i {
+  display: block; height: 100%;
+  background: var(--akzent); transition: width .3s ease;
+}
+@media (prefers-reduced-motion: reduce) { .zielbalken i { transition: none; } }

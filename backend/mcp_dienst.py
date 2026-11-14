@@ -78,7 +78,10 @@ def sammlungen_auflisten(db: sqlite3.Connection, person: dict):
     return {
         "ich": {"id": person["id"], "name": person["name"],
                 "verwalter": bool(person.get("verwalter"))},
-        "sammlungen": _fehler_wandeln(a.sammlungen_liste, person["id"], db),
+        # Mit Namen, nicht nach Stellung: die Route hat einen Request-
+        # Parameter, den nur FastAPI füllt, und der steht vorn.
+        "sammlungen": _fehler_wandeln(a.sammlungen_liste, request=None,
+                                      benutzer_id=person["id"], db=db),
         "hinweis": "Es werden nur Sammlungen gezeigt, die dir gehören oder "
                    "dir freigegeben sind. Alles Eintragen geschieht in "
                    "deinem Namen.",

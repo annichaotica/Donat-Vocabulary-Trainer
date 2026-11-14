@@ -3,3 +3,11 @@
 fastapi==0.162.7
 uvicorn[standard]==0.54.0
 pydantic==2.14.3
+
+# Direkt importiert in backend/wache.py (JSONResponse). Kommt zwar mit
+# FastAPI mit, gehört aber hierher: FastAPI verlangt nur starlette>=0.46,
+# ohne Obergrenze. Und genau dort gab es dieses Jahr CVE-2026-48710
+# ("BADHOST", in der KEV-Liste): die Host-Kopfzeile war ungeprüft, und
+# request.url.path konnte vom wirklich angefragten Pfad abweichen. Die
+# Wache entscheidet nach dem Pfad. Also festnageln.
+starlette==1.10.0

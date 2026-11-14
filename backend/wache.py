@@ -51,12 +51,18 @@ MUSTER = [
     (re.compile(r"^/api/lernziele/(\d+)"), "lernziel"),
     (re.compile(r"^/api/benutzer/(\d+)"), "benutzer"),
     (re.compile(r"^/api/mcp-token/(\d+)"), "mcp_token"),
+    # Kamen später dazu und fehlten hier — die Liste wächst nicht von
+    # selbst mit. `\d+` trifft dabei nicht /api/uebungen/lernen/…, das
+    # sind die Lernwege und die prüfen über sammlung_id.
+    (re.compile(r"^/api/uebungen/(\d+)"), "uebung"),
+    (re.compile(r"^/api/textaufgaben/(\d+)"), "textaufgabe"),
 ]
 
 # Diese Pfade sind für alle offen: Stammdaten ohne persönlichen Bezug.
 OFFEN = re.compile(r"^/api/(sprachen|merkmale|aufgabentypen|zustand|ich)(/|$)")
 
 SCHREIBEND = {"POST", "PUT", "PATCH", "DELETE"}
+LESEND = {"GET", "HEAD", "OPTIONS"}
 
 
 def _abweisen(grund: str) -> JSONResponse:
@@ -101,6 +107,20 @@ def _pruefen(db, person: dict, pfad: str, methode: str):
             elif art == "benutzer":
                 if kennung != ich:
                     return _abweisen("Das ist ein fremdes Profil.")
+            elif art == "uebung":
+                # Eine Übung ist eine Zeile in `text`.
+                s = dbm.wert(db, "SELECT sammlung_id FROM text WHERE id = ?",
+                             (kennung,))
+                if s is None:
+                    return None            # gibt es nicht — die Route sagt 404
+                zugang.sammlung_pruefen(db, ich, s, schreibend)
+            elif art == "textaufgabe":
+                s = dbm.wert(db, """SELECT t.sammlung_id FROM textaufgabe ta
+                                      JOIN text t ON t.id = ta.text_id
+                                     WHERE ta.id = ?""", (kennung,))
+                if s is None:
+                    return None
+                zugang.sammlung_pruefen(db, ich, s, schreibend)
             elif art == "mcp_token":
                 besitzer = dbm.wert(db, "SELECT benutzer_id FROM mcp_token WHERE id = ?",
                                     (kennung,))
@@ -123,8 +143,8 @@ def _ueber_cloudflare(kopfzeilen) -> bool:
     return bool((kopfzeilen.get(CLOUDFLARE_KOPFZEILE) or "").strip())
 
 
-def _benutzer_id_aus_anfrage(request) -> int | None:
-    wert = request.query_params.get("benutzer_id")
+def _zahl_aus_anfrage(request, name: str) -> int | None:
+    wert = request.query_params.get(name)
     if wert is None:
         return None
     try:
@@ -136,20 +156,34 @@ def _benutzer_id_aus_anfrage(request) -> int | None:
 async def wache(request, weiter):
     """Mittelschicht. Läuft vor jeder Anfrage."""
     pfad = request.url.path
-    if not pfad.startswith("/api/") or OFFEN.match(pfad):
+    if not pfad.startswith("/api/"):
         return await weiter(request)
+    methode = request.method
+    # OFFEN gilt nur fürs LESEN, und erst NACH der Identitätsprüfung.
+    # Vorher stand es ganz vorn und galt für jede Methode — unter
+    # /api/sprachen liegen aber zwei schreibende Routen, und deren
+    # Verwalterprüfung winkt ohne Identität wortlos durch. Damit war
+    # genau der Weg offen, den die Prüfung darunter schließen soll.
+    offen = bool(OFFEN.match(pfad)) and methode in LESEND
 
     db = dbm.verbindung()
     try:
         mail = identitaet.mail_aus_anfrage(request.headers)
         if not mail:
             if _ueber_cloudflare(request.headers):
-                # Von außen, aber ohne geprüfte Identität. Das ist kein
-                # Heimnetz, sondern ein Weg, vor dem kein Access steht.
+                if offen:
+                    # Stammdaten zum Lesen: die Anmeldeseite muss bis
+                    # hierher kommen, sonst kann sie nicht einmal fragen,
+                    # wer da ist.
+                    return await weiter(request)
+                # Sonst: von außen, aber ohne geprüfte Identität. Das ist
+                # kein Heimnetz, sondern ein Weg, vor dem kein Access steht.
                 return _abweisen(
                     "Von außen geht es nur über die Anmeldung. Diese Adresse "
                     "liefert die Oberfläche nicht aus.")
             # Heimnetz: keine geprüfte Identität, keine Wache.
+            return await weiter(request)
+        if offen:
             return await weiter(request)
         person = identitaet.profil_fuer_mail(db, mail)
         if person is None:
@@ -157,11 +191,23 @@ async def wache(request, weiter):
 
         # Wer von außen kommt, handelt immer als er selbst — ein fremdes
         # benutzer_id in der Abfrage wäre ein Versuch, sich auszugeben.
-        verlangt = _benutzer_id_aus_anfrage(request)
+        verlangt = _zahl_aus_anfrage(request, "benutzer_id")
         if verlangt is not None and verlangt != person["id"]:
             return _abweisen("Du kannst nur im eigenen Namen handeln.")
 
-        absage = _pruefen(db, dict(person), pfad, request.method)
+        # sammlung_id steht bei den Lernwegen im Abfrageteil, nicht im
+        # Pfad — dort greift kein MUSTER. Ungeprüft war das der bequemste
+        # Weg zu fremden Vokabeln: /api/lernen/naechste?sammlung_id=…
+        # gab sie seitenweise heraus, mit Hilfstext.
+        gewuenschte = _zahl_aus_anfrage(request, "sammlung_id")
+        if gewuenschte is not None:
+            try:
+                zugang.sammlung_pruefen(db, person["id"], gewuenschte,
+                                        methode in SCHREIBEND)
+            except zugang.NichtErlaubt as fehler:
+                return _abweisen(str(fehler))
+
+        absage = _pruefen(db, dict(person), pfad, methode)
         if absage is not None:
             return absage
     finally:

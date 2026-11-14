@@ -1,14 +1,20 @@
 .venv/
 __pycache__/
 *.pyc
-daten/*.db
-daten/*.db-wal
-daten/*.db-shm
+# Das GANZE Verzeichnis, nicht nur die Dateien eine Ebene tief:
+# `daten/*.db` greift nicht über ein Verzeichnistrennzeichen hinweg, und
+# werkzeuge/sicherung.sh legt seine Abzüge nach daten/abzug/. Hier steht
+# der Lernbestand der Familie drin; er hat in einem öffentlichen
+# Verzeichnis nichts zu suchen, egal wie die Datei heißt oder wo sie liegt.
+daten/*
+!daten/.gitkeep
 .pytest_cache/
 .DS_Store
 
 # Geheimnisse gehören nicht ins Verzeichnis
 .env
+.env.*
+!.env.beispiel
 deploy/cloudflared/.env
 BETRIEB-PRIVAT.md
 /LICENSE-pruefung.txt

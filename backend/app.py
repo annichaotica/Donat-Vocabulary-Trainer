@@ -158,12 +158,19 @@ DB = Depends(datenbank)
 
 def _wache_rumpf(db: sqlite3.Connection, request: Request | None,
                  sammlung_id: int | None = None, benutzer_id: int | None = None,
-                 verwalter: bool = False) -> None:
+                 verwalter: bool = False, aufgabe_id: int | None = None,
+                 textaufgabe_id: int | None = None,
+                 schreiben: bool = True) -> None:
     """Prüfung für Angaben, die im Rumpf stehen — die sieht die Wache nicht.
 
     Greift wie die Wache nur bei geprüfter Identität von außen. `request` darf
     None sein: dann kommt der Aufruf aus dem MCP-Dienst, der seine eigene,
     strengere Prüfung schon gemacht hat.
+
+    `aufgabe_id` und `textaufgabe_id` werden über ihr Wort beziehungsweise
+    ihren Text zur Sammlung aufgelöst. Ohne das war das Hochzählen dieser
+    Kennung der bequemste Weg zum gesamten Bestand aller Personen: die
+    Lernwege nennen keine Sammlung im Pfad, also griff kein Muster.
     """
     if request is None:
         return
@@ -173,9 +180,22 @@ def _wache_rumpf(db: sqlite3.Connection, request: Request | None,
     person = identitaet.profil_fuer_mail(db, mail)
     if person is None:
         raise HTTPException(403, "Zu dieser Mailadresse gibt es kein Profil.")
+    if aufgabe_id is not None:
+        sammlung_id = dbm.wert(db, """SELECT l.sammlung_id FROM aufgabe a
+                                        JOIN lexem l ON l.id = a.lexem_id
+                                       WHERE a.id = ?""", (aufgabe_id,))
+        if sammlung_id is None:
+            raise HTTPException(404, f"Aufgabe {aufgabe_id} gibt es nicht")
+    if textaufgabe_id is not None:
+        sammlung_id = dbm.wert(db, """SELECT t.sammlung_id FROM textaufgabe ta
+                                        JOIN text t ON t.id = ta.text_id
+                                       WHERE ta.id = ?""", (textaufgabe_id,))
+        if sammlung_id is None:
+            raise HTTPException(404, f"Textaufgabe {textaufgabe_id} gibt es nicht")
     try:
         if sammlung_id is not None:
-            zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+            zugang.sammlung_pruefen(db, person["id"], sammlung_id,
+                                    schreiben=schreiben)
         if benutzer_id is not None and benutzer_id != person["id"]:
             raise zugang.NichtErlaubt("Du kannst nur im eigenen Namen handeln.")
         if verwalter:
@@ -388,7 +408,16 @@ def benutzer_lesen(benutzer_id: int, db: sqlite3.Connection = DB):
 
 
 @app.post("/api/benutzer", status_code=201)
-def benutzer_anlegen(eingabe: BenutzerAnlegen, db: sqlite3.Connection = DB):
+def benutzer_anlegen(eingabe: BenutzerAnlegen, request: Request,
+                     db: sqlite3.Connection = DB):
+    # Von außen entstehen Profile ausschließlich über Access: wer in
+    # der Zugriffsregel steht, bekommt beim ersten Anmelden eines
+    # (identitaet.profil_fuer_mail). Von Hand angelegte Profile hätten
+    # dort niemanden hinter sich — sie würden nur die Auswahlliste im
+    # Heimnetz zumüllen.
+    if identitaet.mail_aus_anfrage(request.headers):
+        raise HTTPException(403, "Profile legt das Heimnetz an. Von außen "
+                                 "entsteht eines beim ersten Anmelden.")
     erster = not dbm.wert(db, "SELECT 1 FROM benutzer LIMIT 1")
     try:
         cur = db.execute("""INSERT INTO benutzer (name, farbe, verwalter)
@@ -505,9 +534,22 @@ def benutzer_einstellungen(benutzer_id: int, db: sqlite3.Connection = DB):
 # ============================================================ Sammlungen
 
 @app.get("/api/sammlungen")
-def sammlungen_liste(benutzer_id: int | None = None, db: sqlite3.Connection = DB):
+def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
+                     db: sqlite3.Connection = DB):
     if benutzer_id is None:
-        return dbm.zeilen(db, "SELECT * FROM sammlung ORDER BY name")
+        # Im Heimnetz die ganze Liste — dort wählt man sein Profil erst
+        # danach. Von außen steht die Person schon fest, und dann ist
+        # "alle Sammlungen" die Kennungsliste fremder Bestände.
+        mail = (identitaet.mail_aus_anfrage(request.headers)
+                if request is not None else None)
+        if mail:
+            person = identitaet.profil_fuer_mail(db, mail)
+            if person is None:
+                raise HTTPException(403, "Zu dieser Mailadresse gibt es "
+                                         "kein Profil.")
+            benutzer_id = person["id"]
+        else:
+            return dbm.zeilen(db, "SELECT * FROM sammlung ORDER BY name")
     return dbm.zeilen(db, """
         SELECT s.*, (s.besitzer_id = ?) AS eigen,
                (SELECT COUNT(*) FROM lexem l WHERE l.sammlung_id = s.id) AS lexeme,
@@ -897,26 +939,32 @@ def uebungen_naechste(benutzer_id: int, sammlung_id: int | None = None,
 
 
 @app.post("/api/uebungen/lernen/pruefen")
-def uebungen_pruefen(eingabe: UebungPruefenEingabe,
+def uebungen_pruefen(eingabe: UebungPruefenEingabe, request: Request,
                      db: sqlite3.Connection = DB):
     """Vergleicht Wort für Wort. Schreibt noch nichts fort."""
     _holen(db, "benutzer", eingabe.benutzer_id)
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 textaufgabe_id=eingabe.textaufgabe_id, schreiben=False)
     return _uebung_fehler(uebung_lernen.pruefen, db, eingabe.benutzer_id,
                           eingabe.textaufgabe_id, eingabe.antwort)
 
 
 @app.post("/api/uebungen/lernen/aufdecken")
-def uebungen_aufdecken(eingabe: UebungPruefenEingabe,
+def uebungen_aufdecken(eingabe: UebungPruefenEingabe, request: Request,
                        db: sqlite3.Connection = DB):
     _holen(db, "benutzer", eingabe.benutzer_id)
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 textaufgabe_id=eingabe.textaufgabe_id, schreiben=False)
     return _uebung_fehler(uebung_lernen.aufdecken, db, eingabe.benutzer_id,
                           eingabe.textaufgabe_id)
 
 
 @app.post("/api/uebungen/lernen/bewerten")
-def uebungen_bewerten(eingabe: UebungBewertenEingabe,
+def uebungen_bewerten(eingabe: UebungBewertenEingabe, request: Request,
                       db: sqlite3.Connection = DB):
     _holen(db, "benutzer", eingabe.benutzer_id)
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 textaufgabe_id=eingabe.textaufgabe_id)
     return _uebung_fehler(
         uebung_lernen.bewerten, db, eingabe.benutzer_id,
         eingabe.textaufgabe_id, eingabe.urteil, eingabe.bewertung,
@@ -1332,8 +1380,10 @@ def lernziele_liste(benutzer_id: int, nur_aktive: bool = True,
 
 
 @app.post("/api/lernziele", status_code=201)
-def lernziel_anlegen(eingabe: LernzielAnlegen, db: sqlite3.Connection = DB):
+def lernziel_anlegen(eingabe: LernzielAnlegen, request: Request,
+                     db: sqlite3.Connection = DB):
     _holen(db, "benutzer", eingabe.benutzer_id)
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id)
     try:
         return lernziele.anlegen(db, eingabe.benutzer_id, eingabe.name,
                                  eingabe.umfang, eingabe.termin, eingabe.ziel,
@@ -1532,9 +1582,12 @@ def lern_naechste(benutzer_id: int, sammlung_id: int | None = None,
 
 
 @app.post("/api/lernen/pruefen")
-def lern_pruefen(eingabe: PruefenEingabe, db: sqlite3.Connection = DB):
+def lern_pruefen(eingabe: PruefenEingabe, request: Request,
+                 db: sqlite3.Connection = DB):
     """Prüft die Antwort, ohne den Lernstand zu verändern."""
     _holen(db, "benutzer", eingabe.benutzer_id)
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 aufgabe_id=eingabe.aufgabe_id, schreiben=False)
     try:
         return lernmodul.pruefen(db, eingabe.benutzer_id, eingabe.aufgabe_id,
                                  eingabe.antwort, eingabe.denkzeit_ms,
@@ -1544,18 +1597,24 @@ def lern_pruefen(eingabe: PruefenEingabe, db: sqlite3.Connection = DB):
 
 
 @app.post("/api/lernen/aufdecken")
-def lern_aufdecken(eingabe: EingriffEingabe, db: sqlite3.Connection = DB):
+def lern_aufdecken(eingabe: EingriffEingabe, request: Request,
+                   db: sqlite3.Connection = DB):
     """Lösung zeigen, ohne zu bewerten — für "ich weiß es nicht" und für das
     Einprägen vor dem Schreiben im Legastheniemodus."""
     _holen(db, "benutzer", eingabe.benutzer_id)
     _holen(db, "aufgabe", eingabe.aufgabe_id)
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 aufgabe_id=eingabe.aufgabe_id, schreiben=False)
     return lernmodul.aufdecken(db, eingabe.benutzer_id, eingabe.aufgabe_id)
 
 
 @app.post("/api/lernen/bewerten")
-def lern_bewerten(eingabe: BewertenEingabe, db: sqlite3.Connection = DB):
+def lern_bewerten(eingabe: BewertenEingabe, request: Request,
+                  db: sqlite3.Connection = DB):
     _holen(db, "benutzer", eingabe.benutzer_id)
     _holen(db, "aufgabe", eingabe.aufgabe_id)
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 aufgabe_id=eingabe.aufgabe_id)
     try:
         return lernmodul.bewerten(
             db, eingabe.benutzer_id, eingabe.aufgabe_id, eingabe.bewertung,
@@ -1567,25 +1626,37 @@ def lern_bewerten(eingabe: BewertenEingabe, db: sqlite3.Connection = DB):
 
 
 @app.post("/api/lernen/aussetzen")
-def lern_aussetzen(eingabe: EingriffEingabe, db: sqlite3.Connection = DB):
+def lern_aussetzen(eingabe: EingriffEingabe, request: Request,
+                   db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 aufgabe_id=eingabe.aufgabe_id)
     lernmodul.aussetzen(db, eingabe.benutzer_id, eingabe.aufgabe_id, True)
     return {"zustand": "ausgesetzt"}
 
 
 @app.post("/api/lernen/fortsetzen")
-def lern_fortsetzen(eingabe: EingriffEingabe, db: sqlite3.Connection = DB):
+def lern_fortsetzen(eingabe: EingriffEingabe, request: Request,
+                    db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 aufgabe_id=eingabe.aufgabe_id)
     lernmodul.aussetzen(db, eingabe.benutzer_id, eingabe.aufgabe_id, False)
     return {"zustand": "wieder dabei"}
 
 
 @app.post("/api/lernen/zuruecksetzen")
-def lern_zuruecksetzen(eingabe: EingriffEingabe, db: sqlite3.Connection = DB):
+def lern_zuruecksetzen(eingabe: EingriffEingabe, request: Request,
+                       db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 aufgabe_id=eingabe.aufgabe_id)
     lernmodul.zuruecksetzen(db, eingabe.benutzer_id, eingabe.aufgabe_id)
     return {"zustand": "neu"}
 
 
 @app.post("/api/lernen/termin")
-def lern_termin(eingabe: EingriffEingabe, db: sqlite3.Connection = DB):
+def lern_termin(eingabe: EingriffEingabe, request: Request,
+                db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 aufgabe_id=eingabe.aufgabe_id)
     if not eingabe.datum:
         raise HTTPException(400, "datum fehlt (Format JJJJ-MM-TT)")
     try:

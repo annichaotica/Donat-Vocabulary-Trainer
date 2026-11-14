@@ -197,3 +197,28 @@ table.paradigma input[type="checkbox"] {
 }
 /* Die Dateiauswahl ist auf dem Telefon schnell breiter als der Bildschirm. */
 input[type="file"] { max-width: 100%; }
+
+
+/* Übungssätze in der Freigabe: Zielsprache und Übersetzung untereinander,
+   das Kästchen links daneben. In einer Tabelle rutschten beide bei einem
+   langen Satz seitlich aus dem Bild. */
+.uebungsliste { display: flex; flex-direction: column; }
+.uebungszeile {
+  display: flex;
+  gap: .7rem;
+  align-items: flex-start;
+  padding: .6rem .2rem;
+  border-bottom: 1px solid var(--rand);
+}
+.uebungszeile:last-child { border-bottom: none; }
+.uebungszeile.abgewaehlt { opacity: .5; }
+.uebungszeile.abgewaehlt .ziel { text-decoration: line-through; }
+.uebungskasten { flex: none; padding-top: .15rem; }
+.uebungskasten input[type="checkbox"] {
+  width: 1.4rem; height: 1.4rem; accent-color: var(--richtig);
+}
+.uebungstext { min-width: 0; flex: 1; }
+.uebungstext p { margin: 0; }
+.uebungstext .ziel { font-weight: 600; overflow-wrap: anywhere; }
+.uebungstext .grund { color: var(--leise); overflow-wrap: anywhere; }
+.uebungstext .leise { margin-top: .25rem; }

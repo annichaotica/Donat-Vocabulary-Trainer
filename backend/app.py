@@ -592,7 +592,8 @@ def freigabe_setzen(sammlung_id: int, eingabe: FreigabeEingabe,
     try:
         return freigabemodul.setzen(
             db, sammlung_id, eingabe.form_ids, eingabe.lexem_ids,
-            eingabe.lektion_nr, eingabe.ausser, eingabe.geprueft)
+            eingabe.lektion_nr, eingabe.ausser, eingabe.geprueft,
+            eingabe.uebung_ids, eingabe.ausser_uebungen)
     except freigabemodul.FreigabeFehler as fehler:
         raise HTTPException(400, str(fehler))
 

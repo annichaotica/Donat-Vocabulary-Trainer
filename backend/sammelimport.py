@@ -89,8 +89,16 @@ def _vorhandenes_lexem(db: sqlite3.Connection, sammlung_id: int,
     return treffer[0] if treffer else None
 
 
-def _formschluessel(merkmale: dict) -> str:
-    return mk.schluessel(merkmale)
+def _formschluessel(merkmale: dict, wortart: str = "sonstiges") -> str:
+    """Der Schlüssel einer ZELLE, nicht der eines Merkmalsbündels.
+
+    Über die Normalform, sonst gilt dieselbe Zelle zweimal: eine griechische
+    Aktivform trägt oft kein genus_verbi, weil es sich von selbst versteht,
+    eine andere Quelle schreibt es hin. Ohne normieren legt ein zweiter
+    Import alles daneben statt nachzubessern — und das Wort hat hinterher
+    zwei Grundformen und zwei Präsenstabellen.
+    """
+    return mk.schluessel(mk.normieren(merkmale, wortart))
 
 
 # -------------------------------------------------------------- Import
@@ -144,11 +152,13 @@ def _uebersetzungen_normieren(bedeutung: dict, grundsprache: str,
 
 
 def _formen_schreiben(db: sqlite3.Connection, lexem_id: int, formen: list,
-                      quelle: str) -> tuple[int, int, list[str]]:
+                      quelle: str, wortart: str = "sonstiges"
+                      ) -> tuple[int, int, list[str]]:
     """Formen anlegen oder nachziehen. Geprüfte werden nie überschrieben."""
     vorhanden = {}
     for z in dbm.zeilen(db, "SELECT * FROM form WHERE lexem_id = ?", (lexem_id,)):
-        vorhanden.setdefault(_formschluessel(dbm.j_lesen(z["merkmale"])), []).append(z)
+        vorhanden.setdefault(
+            _formschluessel(dbm.j_lesen(z["merkmale"]), wortart), []).append(z)
 
     neu = geaendert = 0
     abweichungen: list[str] = []
@@ -164,7 +174,7 @@ def _formen_schreiben(db: sqlite3.Connection, lexem_id: int, formen: list,
                                   "ist_grundform": False, "_variante": True})
     for f in entfaltet:
         merkmale = mk.pruefen(f.get("merkmale") or {})
-        schluessel = _formschluessel(merkmale)
+        schluessel = _formschluessel(merkmale, wortart)
         text = f["text"].strip()
         alt_liste = vorhanden.get(schluessel, [])
         gleich = next((a for a in alt_liste if a["text"] == text), None)
@@ -334,7 +344,7 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
                 ergebnis["aktualisiert"] += 1
 
             neu, geaendert, abweichungen = _formen_schreiben(
-                db, lexem_id, eintrag.get("formen") or [], quelle)
+                db, lexem_id, eintrag.get("formen") or [], quelle, wortart)
             ergebnis["formen_neu"] += neu
             ergebnis["formen_geaendert"] += geaendert
             _bedeutungen_schreiben(db, lexem_id, eintrag.get("bedeutungen") or [],

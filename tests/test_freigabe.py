@@ -266,3 +266,103 @@ def test_die_ki_kann_nicht_im_stapel_freigeben(klient):
     namen = {w["name"] for w in mcp_dienst.WERKZEUGE}
     assert "formen_bestaetigen" not in namen
     assert not any("freigab" in n or "bestaetig" in n for n in namen), namen
+
+
+# ------------------------------------------------------- Übungssätze
+
+UEBUNG = {"typ": "satz", "lektion_nr": 5,
+          "zielsprache": "Χθες πήγα στο θέατρο.",
+          "grundsprache": "Gestern ging ich ins Theater.",
+          "richtungen": ["el-de", "de-el"]}
+
+
+def _uebung(klient, sammlung_id, eintrag=None):
+    return klient.post(f"/api/sammlungen/{sammlung_id}/uebungen",
+                       json=eintrag or UEBUNG).json()
+
+
+def test_uebungen_warten_in_derselben_lektion(klient):
+    """Es wäre eine seltsame Trennung, die Formen einer Lektion anzusehen
+    und die Sätze derselben Lektion woanders."""
+    _b, s = _aufbau(klient)
+    importieren(klient, s["id"], [GRAFO])
+    _uebung(klient, s["id"])
+    uebersicht = klient.get(
+        f"/api/sammlungen/{s['id']}/freigabe/lektionen").json()
+    eintrag = next(k for k in uebersicht["lektionen"] if k["nr"] == 5)
+    assert eintrag["offen"] == 6
+    assert eintrag["uebungen_offen"] == 1
+    assert uebersicht["uebungen_offen_gesamt"] == 1
+
+    daten = ansicht(klient, s["id"], lektion_nr=5)
+    assert daten["uebungen_gesamt"] == 1
+    assert daten["uebungen"][0]["inhalt"] == "Χθες πήγα στο θέατρο."
+    assert daten["uebungen"][0]["geprueft"] is False
+
+
+def test_eine_lektion_freigeben_nimmt_die_uebungen_mit(klient):
+    """»Lektion 5 freigeben« meint die ganze Lektion, nicht ihre Hälfte."""
+    _b, s = _aufbau(klient)
+    importieren(klient, s["id"], [GRAFO])
+    _uebung(klient, s["id"])
+    ergebnis = setzen(klient, s["id"], lektion_nr=5).json()
+    assert ergebnis["gesetzt"] == 6 and ergebnis["uebungen"] == 1
+    uebersicht = klient.get(
+        f"/api/sammlungen/{s['id']}/freigabe/lektionen").json()
+    assert uebersicht["offen_gesamt"] == 0
+    assert uebersicht["uebungen_offen_gesamt"] == 0
+
+
+def test_abgewaehlte_uebungen_bleiben_liegen(klient):
+    _b, s = _aufbau(klient)
+    importieren(klient, s["id"], [GRAFO])
+    eine = _uebung(klient, s["id"])
+    _uebung(klient, s["id"], {**UEBUNG, "zielsprache": "Σήμερα διαβάζω.",
+                              "grundsprache": "Heute lese ich."})
+    ergebnis = setzen(klient, s["id"], lektion_nr=5,
+                      ausser_uebungen=[eine["id"]]).json()
+    assert ergebnis["uebungen"] == 1
+    assert klient.get(f"/api/uebungen/{eine['id']}").json()["geprueft"] is False
+
+
+def test_einzelne_uebung_freigeben(klient):
+    _b, s = _aufbau(klient)
+    importieren(klient, s["id"], [GRAFO])
+    eine = _uebung(klient, s["id"])
+    ergebnis = setzen(klient, s["id"], uebung_ids=[eine["id"]]).json()
+    assert ergebnis["uebungen"] == 1
+    # Die Formen der Lektion bleiben dabei unangetastet.
+    assert ergebnis["gesetzt"] == 0
+    assert ansicht(klient, s["id"])["offen_gesamt"] == 6
+
+
+def test_freigegebene_uebung_wird_abgefragt(klient):
+    """Der ganze Zweck: ungeprüft ist sie stumm."""
+    b, s = _aufbau(klient)
+    eine = _uebung(klient, s["id"])
+    stand = klient.get("/api/uebungen/lernen/stand", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"]}).json()
+    assert (stand["gesamt"], stand["ungeprueft"]) == (0, 2)
+    setzen(klient, s["id"], uebung_ids=[eine["id"]])
+    stand = klient.get("/api/uebungen/lernen/stand", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"]}).json()
+    assert (stand["gesamt"], stand["neu"], stand["ungeprueft"]) == (2, 2, 0)
+
+
+def test_zuruecknehmen_einer_lektion_trifft_auch_aeltere_freigaben(klient):
+    """Festgehalten, weil es beim Messen am echten Bestand zugebissen hat:
+    `geprueft=False` auf einer Lektion ist kein »Rückgängig« der letzten
+    Freigabe, sondern ein Zurücksetzen der ganzen Lektion."""
+    _b, s = _aufbau(klient)
+    importieren(klient, s["id"], [GRAFO])
+    alle = [f["form_id"] for w in ansicht(klient, s["id"])["woerter"]
+            for g in w["gruppen"] for z in g["zellen"] for f in z["formen"]]
+    # Zwei Formen von Hand freigeben, wie es ein Mensch früher getan hätte
+    setzen(klient, s["id"], form_ids=alle[:2])
+    assert ansicht(klient, s["id"])["offen_gesamt"] == 4
+
+    setzen(klient, s["id"], lektion_nr=5)
+    assert ansicht(klient, s["id"])["offen_gesamt"] == 0
+    setzen(klient, s["id"], lektion_nr=5, geprueft=False)
+    # Alle sechs sind offen, nicht nur die vier zuletzt freigegebenen.
+    assert ansicht(klient, s["id"])["offen_gesamt"] == 6

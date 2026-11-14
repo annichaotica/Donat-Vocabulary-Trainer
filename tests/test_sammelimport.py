@@ -222,3 +222,42 @@ def test_bericht_bleibt_kurz(klient):
     # Nur Einträge mit Befunden erscheinen; diese haben keine.
     assert ergebnis["mit_befunden"] == 0
     assert ergebnis["eintraege"] == []
+
+
+def test_dieselbe_zelle_wird_nicht_zweimal_angelegt(klient):
+    """Der Fall, der wirklich auftrat: ein Probeeintrag hatte griechische
+    Aktivformen OHNE genus_verbi — das versteht sich von selbst. Die
+    spätere Lieferung schrieb es hin. Ohne Normalform galten beide als
+    verschiedene Zellen: das Wort bekam zwei Präsenstabellen und zwei
+    Grundformen, und der Trainer fragte jede Form doppelt ab.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Importeurin"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    ohne = {"modus": "indikativ", "tempus": "praesens",
+            "person": "1", "numerus": "sg"}
+    mit = {**ohne, "genus_verbi": "aktiv"}
+
+    erst = klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "διαβάζω", "wortart": "verb",
+                       "bedeutungen": [{"uebersetzungen": ["lesen", "vorlesen"]}],
+                       "formen": [{"text": "διαβάζω", "merkmale": ohne,
+                                   "ist_grundform": True}]}]}).json()
+    assert erst["formen_neu"] == 1
+
+    zweit = klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "διαβάζω", "wortart": "verb",
+                       "bedeutungen": [{"uebersetzungen": ["lesen", "vorlesen"]}],
+                       "formen": [{"text": "διαβάζω", "merkmale": mit,
+                                   "ist_grundform": True}]}]}).json()
+    assert zweit["angelegt"] == 0 and zweit["aktualisiert"] == 1
+    assert zweit["formen_neu"] == 0, "Dieselbe Zelle darf nicht doppelt kommen"
+
+    lexem = klient.get(
+        f"/api/sammlungen/{s['id']}/lexeme").json()["lexeme"][0]
+    voll = klient.get(f"/api/lexeme/{lexem['id']}").json()
+    assert len(voll["formen"]) == 1
+    assert sum(1 for f in voll["formen"] if f["ist_grundform"]) == 1
+    arten = {x["art"] for x in
+             klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()["befunde"]}
+    assert "grundform_mehrfach" not in arten

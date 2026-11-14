@@ -42,7 +42,7 @@ export async function zeichnen(behaelter) {
 
   el.append(h('h1', { text: 'Freigabe' }));
   const uebersicht = await api.freigabeLektionen(sammlungId);
-  if (!uebersicht.offen_gesamt) {
+  if (!uebersicht.offen_gesamt && !uebersicht.uebungen_offen_gesamt) {
     el.append(h('div', { class: 'leer' },
       h('p', { text: 'Alles freigegeben — es wartet nichts.' }),
       h('p', { class: 'leise', text: 'Hier erscheinen Formen, die über die '
@@ -51,9 +51,14 @@ export async function zeichnen(behaelter) {
     return;
   }
 
+  const teile = [];
+  if (uebersicht.offen_gesamt) teile.push(`${uebersicht.offen_gesamt} Formen`);
+  if (uebersicht.uebungen_offen_gesamt) {
+    teile.push(`${uebersicht.uebungen_offen_gesamt} Übungen`);
+  }
   el.append(h('p', { class: 'leise', text:
-    `${uebersicht.offen_gesamt} Formen warten auf Freigabe. Bis dahin `
-    + 'werden sie nicht abgefragt.' }));
+    `${teile.join(' und ')} warten auf Freigabe. Bis dahin werden sie nicht `
+    + 'abgefragt.' }));
 
   const liste = h('div', { class: 'liste' });
   for (const k of uebersicht.lektionen) {
@@ -69,7 +74,13 @@ export async function zeichnen(behaelter) {
     },
       h('span', { class: 'lemma', text: name }),
       h('span', { class: 'bedeutung', text: `${k.woerter} Wörter` }),
-      h('span', { class: 'marke warnung', text: `${k.offen} offen` })));
+      k.offen
+        ? h('span', { class: 'marke warnung', text: `${k.offen} Formen` })
+        : null,
+      k.uebungen_offen
+        ? h('span', { class: 'marke warnung',
+                      text: `${k.uebungen_offen} Übungen` })
+        : null));
   }
   el.append(liste);
 }
@@ -86,6 +97,9 @@ export async function zeichnenLektion(behaelter, lektion) {
   const nr = lektion === 'ohne' ? null : Number(lektion);
   /** Einzeln abgewählte Formen. Alles andere gilt als in Ordnung. */
   const abgewaehlt = new Set();
+  /** Abgewählte Übungen werden getrennt geführt: ihre Kennungen stammen
+   *  aus einer anderen Tabelle und dürften sich sonst überschneiden. */
+  const abgewaehlteUebungen = new Set();
 
   const titel = h('h1', { text: nr === null ? 'Ohne Lektion' : `Lektion ${nr}` });
   const stand = h('p', { class: 'leise' });
@@ -99,10 +113,15 @@ export async function zeichnenLektion(behaelter, lektion) {
   let ab = 0;
   let offenGesamt = 0;
   let woerterGesamt = 0;
+  // Außerhalb von nachladen(): die Kartenbauer unten brauchen sie, und
+  // `daten` lebt nur innerhalb des Ladevorgangs.
+  let sprache = null;
 
+  let uebungenOffen = 0;
   const standSetzen = () => {
-    const abgezogen = abgewaehlt.size;
+    const abgezogen = abgewaehlt.size + abgewaehlteUebungen.size;
     stand.textContent = `${woerterGesamt} Wörter, ${offenGesamt} Formen offen`
+      + (uebungenOffen ? `, ${uebungenOffen} Übungen` : '')
       + (abgezogen ? ` — ${abgezogen} abgewählt` : '');
   };
 
@@ -112,8 +131,10 @@ export async function zeichnenLektion(behaelter, lektion) {
     });
     offenGesamt = daten.offen_gesamt;
     woerterGesamt = daten.gesamt;
+    uebungenOffen = daten.uebungen_gesamt || 0;
+    sprache = daten.sprache;
     if (!anfuegen) leeren(liste);
-    if (!daten.woerter.length && !anfuegen) {
+    if (!daten.woerter.length && !uebungenOffen && !anfuegen) {
       liste.append(h('div', { class: 'leer' },
         h('p', { text: 'Hier ist alles freigegeben.' }),
         h('button', { onclick: () => { location.hash = '#/freigabe'; } },
@@ -123,6 +144,9 @@ export async function zeichnenLektion(behaelter, lektion) {
       return;
     }
     for (const wort of daten.woerter) liste.append(wortkarte(wort));
+    if (!anfuegen && daten.uebungen && daten.uebungen.length) {
+      liste.append(uebungskarte(daten.uebungen, daten.uebungen_gesamt));
+    }
     leeren(fussleiste);
     if (ab + daten.anzahl < daten.gesamt) {
       fussleiste.append(h('button', {
@@ -135,18 +159,23 @@ export async function zeichnenLektion(behaelter, lektion) {
   };
 
   async function lektionFreigeben() {
-    const abgezogen = abgewaehlt.size;
+    const abgezogen = abgewaehlt.size + abgewaehlteUebungen.size;
     const frage = abgezogen
-      ? `Die ganze Lektion freigeben, ohne die ${abgezogen} abgewählten Formen?`
-      : 'Die ganze Lektion freigeben?';
+      ? `Die ganze Lektion freigeben — Formen und Übungssätze —, ohne die `
+        + `${abgezogen} abgewählten?`
+      : 'Die ganze Lektion freigeben, mit allen Übungssätzen?';
     if (!window.confirm(frage)) return;
     const ergebnis = await api.freigabeSetzen(sammlungId, {
       lektion_nr: nr === null ? null : nr,
       lexem_ids: nr === null ? ohneLektionIds() : null,
       ausser: [...abgewaehlt],
+      ausser_uebungen: [...abgewaehlteUebungen],
     });
-    meldung(`${ergebnis.gesetzt} Formen freigegeben.`);
+    meldung(`${ergebnis.gesetzt} Formen`
+      + (ergebnis.uebungen ? ` und ${ergebnis.uebungen} Übungen` : '')
+      + ' freigegeben.');
     abgewaehlt.clear();
+    abgewaehlteUebungen.clear();
     ab = 0;
     await nachladen();
   }
@@ -156,6 +185,61 @@ export async function zeichnenLektion(behaelter, lektion) {
   function ohneLektionIds() {
     return [...liste.querySelectorAll('[data-lexem]')]
       .map((el) => Number(el.dataset.lexem));
+  }
+
+  /** Die Übungssätze der Lektion — in EINER Karte, nicht je Satz eine.
+   *  Ein Satz ist in zwei Sekunden gelesen; vierzig Karten dafür wären
+   *  vierzig Mal scrollen. */
+  function uebungskarte(uebungen, gesamt) {
+    const karte = h('div', { class: 'karte' });
+    karte.append(h('div', { class: 'freigabe-kopf' },
+      h('h2', { style: 'margin:0', text: 'Übungssätze' }),
+      h('span', { class: 'marke warnung', text: `${gesamt} offen` })));
+    karte.append(h('p', { class: 'leise', style: 'margin:.2rem 0 .6rem',
+      text: 'Bis zur Freigabe werden sie nicht abgefragt. Einzelne lassen '
+          + 'sich abwählen.' }));
+
+    // Liste statt Tabelle: ein griechischer Satz ist lang, und in vier
+    // Spalten rutschen Übersetzung und Kästchen seitlich aus dem Bild.
+    // Untereinander bleibt beides lesbar, auch auf dem Telefon.
+    const liste = h('div', { class: 'uebungsliste' });
+    for (const u of uebungen) {
+      const zeile = h('div', { class: 'uebungszeile' });
+      const kasten = u.geprueft ? null : h('input', {
+        type: 'checkbox', checked: true,
+        'aria-label': `${u.inhalt} ist in Ordnung`,
+        onchange: (e) => {
+          if (e.target.checked) abgewaehlteUebungen.delete(u.uebung_id);
+          else abgewaehlteUebungen.add(u.uebung_id);
+          zeile.classList.toggle('abgewaehlt', !e.target.checked);
+          standSetzen();
+        },
+      });
+      zeile.append(
+        h('div', { class: 'uebungskasten' },
+          kasten || h('span', { class: 'marke', text: 'frei' })),
+        h('div', { class: 'uebungstext' },
+          h('p', { class: 'ziel', lang: sprache, text: u.inhalt }),
+          h('p', { class: 'grund', text: u.uebersetzung || '—' }),
+          h('p', { class: 'leise' },
+            h('span', { class: 'marke', text: u.typ }),
+            u.abschnitte > 1
+              ? h('span', { class: 'marke', text: `${u.abschnitte} Abschnitte` })
+              : null,
+            h('span', { class: 'marke',
+                        text: (u.richtungen || []).length === 2
+                          ? 'beide Richtungen'
+                          : ((u.richtungen || [])[0] === 'hin'
+                             ? 'nur hin' : 'nur zurück') }))));
+      liste.append(zeile);
+    }
+    karte.append(liste);
+    if (gesamt > uebungen.length) {
+      karte.append(h('p', { class: 'leise',
+        text: `… und ${gesamt - uebungen.length} weitere. Der Knopf unten `
+            + 'gibt alle frei.' }));
+    }
+    return karte;
   }
 
   function wortkarte(wort) {

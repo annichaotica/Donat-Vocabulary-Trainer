@@ -16,6 +16,10 @@ warum etwas nicht stimmt.
 
 **Freigeben.** Je Wort oder je Lektion, mit einzeln abwählbaren Zellen.
 
+Übungssätze werden mitgenommen: auch sie sind bis zur Freigabe stumm, und
+es wäre eine seltsame Trennung, die Formen einer Lektion anzusehen und die
+Sätze derselben Lektion woanders.
+
 **Die Freigabe bleibt beim Menschen.** Es gibt dafür absichtlich kein
 MCP-Werkzeug: ein Agent, der seine eigenen Einträge im Stapel freigibt,
 hätte die Prüfung abgeschafft, nicht erledigt.
@@ -178,17 +182,49 @@ def uebersicht(db: sqlite3.Connection, sammlung_id: int,
                         if b["schwere"] != "notiz"],
         })
 
+    # Die Übungen derselben Lektion gehören dazu — sie sind bis zur
+    # Freigabe genauso stumm wie die Formen.
+    u_wo, u_werte = ["t.sammlung_id = ?"], [sammlung_id]
+    if lektion_nr is not None:
+        u_wo.append("""t.lektion_id IN (SELECT id FROM lektion
+                         WHERE sammlung_id = ? AND nr = ?)""")
+        u_werte += [sammlung_id, lektion_nr]
+    if nur_offene:
+        u_wo.append("t.geprueft = 0")
+    u_bedingung = " AND ".join(u_wo)
+    uebungen = dbm.zeilen(db, f"""
+        SELECT t.id AS uebung_id, t.typ, t.titel, t.inhalt, t.uebersetzung,
+               t.geprueft, t.richtungen, k.nr AS lektion_nr,
+               (SELECT COUNT(*) FROM textabschnitt a WHERE a.text_id = t.id)
+                   AS abschnitte,
+               (SELECT COUNT(*) FROM textaufgabe x
+                 WHERE x.text_id = t.id AND x.aktiv = 1) AS aufgaben
+          FROM text t LEFT JOIN lektion k ON k.id = t.lektion_id
+         WHERE {u_bedingung}
+         ORDER BY k.nr, t.reihenfolge, t.id
+         LIMIT ?""", (*u_werte, anzahl))
+    for z in uebungen:
+        z["richtungen"] = dbm.j_lesen(z["richtungen"])
+        z["geprueft"] = bool(z["geprueft"])
+    uebungen_gesamt = dbm.wert(db, f"""
+        SELECT COUNT(*) FROM text t LEFT JOIN lektion k ON k.id = t.lektion_id
+         WHERE {u_bedingung}""", u_werte)
+
     return {"sammlung_id": sammlung_id, "sprache": code,
             "lektion_nr": lektion_nr, "gesamt": gesamt,
             "offen_gesamt": offen_gesamt, "ab": ab, "anzahl": len(woerter),
-            "woerter": woerter}
+            "woerter": woerter,
+            "uebungen": uebungen, "uebungen_gesamt": uebungen_gesamt}
 
 
 def offene_lektionen(db: sqlite3.Connection, sammlung_id: int) -> dict:
     """Wo ist noch etwas freizugeben? Der Einstieg in die Prüfansicht."""
     if dbm.zeile(db, "SELECT 1 FROM sammlung WHERE id = ?", (sammlung_id,)) is None:
         raise FreigabeFehler(f"Sammlung {sammlung_id} gibt es nicht")
-    zeilen = dbm.zeilen(db, """
+    # Formen und Übungen getrennt zählen und dann zusammenlegen: in EINER
+    # Abfrage verbunden multiplizierten sich die Zeilen, und die Zahlen
+    # wären schlicht falsch.
+    formen = {z["nr"]: z for z in dbm.zeilen(db, """
         SELECT k.id AS lektion_id, k.nr, k.name,
                COUNT(DISTINCT l.id) AS woerter,
                SUM(CASE WHEN f.geprueft = 0 THEN 1 ELSE 0 END) AS offen
@@ -196,11 +232,35 @@ def offene_lektionen(db: sqlite3.Connection, sammlung_id: int) -> dict:
           LEFT JOIN lektion k ON k.id = l.lektion_id
           LEFT JOIN form f ON f.lexem_id = l.id
          WHERE l.sammlung_id = ?
-         GROUP BY k.id
-         HAVING offen > 0
-         ORDER BY k.nr""", (sammlung_id,))
+         GROUP BY k.id""", (sammlung_id,))}
+    uebungen = {z["nr"]: z for z in dbm.zeilen(db, """
+        SELECT k.id AS lektion_id, k.nr, k.name,
+               COUNT(*) AS uebungen,
+               SUM(CASE WHEN t.geprueft = 0 THEN 1 ELSE 0 END) AS uebungen_offen
+          FROM text t
+          LEFT JOIN lektion k ON k.id = t.lektion_id
+         WHERE t.sammlung_id = ?
+         GROUP BY k.id""", (sammlung_id,))}
+
+    zeilen = []
+    for nr in sorted(set(formen) | set(uebungen),
+                     key=lambda n: (n is None, n)):
+        f = formen.get(nr, {})
+        u = uebungen.get(nr, {})
+        offen = f.get("offen") or 0
+        uebungen_offen = u.get("uebungen_offen") or 0
+        if not offen and not uebungen_offen:
+            continue
+        zeilen.append({
+            "lektion_id": f.get("lektion_id") or u.get("lektion_id"),
+            "nr": nr, "name": f.get("name") or u.get("name"),
+            "woerter": f.get("woerter") or 0, "offen": offen,
+            "uebungen": u.get("uebungen") or 0,
+            "uebungen_offen": uebungen_offen,
+        })
     return {"sammlung_id": sammlung_id, "lektionen": zeilen,
-            "offen_gesamt": sum(z["offen"] or 0 for z in zeilen)}
+            "offen_gesamt": sum(z["offen"] for z in zeilen),
+            "uebungen_offen_gesamt": sum(z["uebungen_offen"] for z in zeilen)}
 
 
 def _betroffene(db: sqlite3.Connection, sammlung_id: int,
@@ -238,20 +298,68 @@ def _betroffene(db: sqlite3.Connection, sammlung_id: int,
          WHERE {' AND '.join(wo)}""", werte)]
 
 
+def _uebungen_setzen(db: sqlite3.Connection, sammlung_id: int,
+                     uebung_ids: list | None, lektion_nr: int | None,
+                     ausser_uebungen: list | None, geprueft: bool) -> int:
+    """Gibt Übungen frei. Gleiche Regeln wie bei den Formen."""
+    wo, werte = ["sammlung_id = ?"], [sammlung_id]
+    genannt = False
+    if uebung_ids:
+        wo.append(f"id IN ({','.join('?' * len(uebung_ids))})")
+        werte += [int(x) for x in uebung_ids]
+        genannt = True
+    if lektion_nr is not None:
+        wo.append("""lektion_id IN (SELECT id FROM lektion
+                       WHERE sammlung_id = ? AND nr = ?)""")
+        werte += [sammlung_id, lektion_nr]
+        genannt = True
+    if not genannt:
+        return 0
+    if ausser_uebungen:
+        wo.append(f"id NOT IN ({','.join('?' * len(ausser_uebungen))})")
+        werte += [int(x) for x in ausser_uebungen]
+    ids = [z["id"] for z in dbm.zeilen(
+        db, f"SELECT id FROM text WHERE {' AND '.join(wo)}", werte)]
+    if not ids:
+        return 0
+    db.execute(f"""UPDATE text SET geprueft = ?, geaendert = datetime('now')
+                    WHERE id IN ({','.join('?' * len(ids))})""",
+               (int(bool(geprueft)), *ids))
+    return len(ids)
+
+
 def setzen(db: sqlite3.Connection, sammlung_id: int,
            form_ids: list | None = None, lexem_ids: list | None = None,
            lektion_nr: int | None = None, ausser: list | None = None,
-           geprueft: bool = True) -> dict:
-    """Gibt Formen frei oder nimmt die Freigabe zurück.
+           geprueft: bool = True, uebung_ids: list | None = None,
+           ausser_uebungen: list | None = None) -> dict:
+    """Gibt Formen und Übungen frei oder nimmt die Freigabe zurück.
 
     `ausser` ist der Weg für die abgewählten Zellen: man sieht eine Lektion
     an, hakt die zwei falschen Formen ab und gibt den Rest frei.
+
+    Bei `lektion_nr` werden die Übungen derselben Lektion mitgenommen —
+    "Lektion 12 freigeben" meint die ganze Lektion, nicht ihre Hälfte.
+
+    **Vorsicht mit `geprueft=False` auf einer ganzen Lektion.** Das trifft
+    ALLE ihre Formen, auch die, die schon vorher freigegeben waren — es ist
+    kein "Rückgängig" der letzten Freigabe, sondern ein Zurücksetzen der
+    Lektion. Wer nur eine eigene Freigabe zurücknehmen will, muss die
+    betroffenen Kennungen mitgeben.
     """
     if dbm.zeile(db, "SELECT 1 FROM sammlung WHERE id = ?", (sammlung_id,)) is None:
         raise FreigabeFehler(f"Sammlung {sammlung_id} gibt es nicht")
+    nur_uebungen = uebung_ids and not (form_ids or lexem_ids
+                                       or lektion_nr is not None)
+    uebungen = _uebungen_setzen(db, sammlung_id, uebung_ids, lektion_nr,
+                                ausser_uebungen, geprueft)
+    if nur_uebungen:
+        return {"gesetzt": 0, "geprueft": bool(geprueft), "lexeme": 0,
+                "uebungen": uebungen}
     ziele = _betroffene(db, sammlung_id, form_ids, lexem_ids, lektion_nr, ausser)
     if not ziele:
-        return {"gesetzt": 0, "geprueft": geprueft, "lexeme": 0}
+        return {"gesetzt": 0, "geprueft": bool(geprueft), "lexeme": 0,
+                "uebungen": uebungen}
     betroffene_lexeme = {z["lexem_id"] for z in dbm.zeilen(db, f"""
         SELECT DISTINCT lexem_id FROM form
          WHERE id IN ({','.join('?' * len(ziele))})""", ziele)}
@@ -262,4 +370,4 @@ def setzen(db: sqlite3.Connection, sammlung_id: int,
     for lexem_id in betroffene_lexeme:
         aufgaben.erzeugen(db, lexem_id)
     return {"gesetzt": len(ziele), "geprueft": bool(geprueft),
-            "lexeme": len(betroffene_lexeme)}
+            "lexeme": len(betroffene_lexeme), "uebungen": uebungen}

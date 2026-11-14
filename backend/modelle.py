@@ -111,6 +111,10 @@ class FreigabeEingabe(BaseModel):
     lexem_ids: list[int] | None = None
     lektion_nr: int | None = None
     ausser: list[int] | None = None
+    # Übungssätze derselben Lektion werden bei lektion_nr mitgenommen;
+    # einzeln lassen sie sich hierüber ansprechen.
+    uebung_ids: list[int] | None = None
+    ausser_uebungen: list[int] | None = None
     geprueft: bool = True
 
 

@@ -333,3 +333,26 @@ def test_die_wortdurchsicht_hat_ein_weiter():
     # kein zweiter Behandler hängenbleiben, sonst löst Enter doppelt aus.
     assert "let tastenbehandler = null;" in quelle
     assert "removeEventListener('keydown', tastenbehandler)" in quelle
+
+
+def test_die_anleitung_nennt_keine_feste_adresse():
+    """Das Repo ist öffentlich. Die Adresse der Schnittstelle gehört zur
+    Anlage, kommt aus der Umgebung und darf nirgends im Quelltext stehen —
+    auch nicht in einem Test, der sie verbieten soll."""
+    quelle = (WURZEL / "frontend" / "js" / "ansicht_hilfe.js").read_text()
+    assert "stand.mcp_url" in quelle
+    for datei in list(JS) + [HTML]:
+        text = datei.read_text()
+        fremde = [
+            u for u in re.findall(r"https?://[\w.:-]+", text)
+            if "localhost" not in u and "127.0.0.1" not in u
+            and "github.com" not in u and "gnu.org" not in u
+        ]
+        assert not fremde, f"{datei.name}: {fremde}"
+
+
+def test_die_anleitung_ist_von_ueberall_erreichbar():
+    """Eine Anleitung, die man suchen muss, liest niemand."""
+    assert 'href="#/hilfe"' in HTML.read_text()
+    app = (WURZEL / "frontend" / "js" / "app.js").read_text()
+    assert "case 'hilfe':" in app

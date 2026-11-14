@@ -9,6 +9,9 @@ import { zustand, darstellungSetzen } from './zustand.js';
 export async function zeichnen(behaelter) {
   const el = leeren(behaelter);
   el.append(h('h1', { text: 'Einstellungen' }));
+  el.append(h('p', {},
+    h('button', { onclick: () => { location.hash = '#/hilfe'; } },
+      'Anleitung — Lernen und Chatprogramm anschließen')));
 
   if (zustand.sammlungId) {
     el.append(await teilSammlung(behaelter));

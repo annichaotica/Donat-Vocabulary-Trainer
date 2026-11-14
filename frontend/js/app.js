@@ -13,6 +13,7 @@ import * as ziele from './ansicht_ziele.js';
 import * as freigabe from './ansicht_freigabe.js';
 import * as einlesen from './ansicht_import.js';
 import * as uebungen from './ansicht_uebungen.js';
+import * as hilfe from './ansicht_hilfe.js';
 
 // Zusätzliche Stildatei (Zeichenleiste, Tastaturhilfe) nachladen. Von hier
 // aus, damit index.html unberührt bleibt.
@@ -83,6 +84,7 @@ async function kopfzeile() {
     uebersicht: 'Übersicht', wortschatz: 'Wortschatz', wort: 'Wort',
     neu: 'Neues Wort', lernen: 'Abfrage', ziele: 'Lernziele',
     freigabe: 'Freigabe', import: 'Datei einlesen', ueben: 'Sätze üben',
+    hilfe: 'Anleitung',
     einstellungen: 'Einstellungen',
     tastatur: 'Tastatur', profile: 'Profil wählen',
   }[weg[0]] || 'Vokabeltrainer';
@@ -207,6 +209,8 @@ async function wegweisen() {
           await sitzung.start();
           return;
         }
+      case 'hilfe':
+        return await hilfe.zeichnen(inhalt);
       case 'import':
         return await einlesen.zeichnen(inhalt);
       case 'freigabe':

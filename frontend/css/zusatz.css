@@ -485,3 +485,16 @@ input[type="file"] { max-width: 100%; }
   border-bottom: 1px solid var(--rand);
 }
 .zugriffszeile:last-child { border-bottom: none; }
+
+
+/* Die Anleitung. Aufklappbare Abschnitte, damit man nicht durch alles
+   scrollen muss, um das eine zu finden, das man gerade braucht. */
+.karte.hilfe { margin-bottom: .6rem; }
+.karte.hilfe > summary { cursor: pointer; padding: .2rem 0; }
+.hilfe-inhalt { margin-top: .7rem; }
+.hilfe-inhalt > p { margin: .5rem 0; }
+.hilfe-inhalt dt { font-weight: 600; margin-top: .6rem; }
+.hilfe-inhalt dd { margin: .1rem 0 0 .9rem; color: var(--leise); }
+.hilfe-schritte { margin: .4rem 0; padding-left: 1.3rem; }
+.hilfe-schritte li { margin: .35rem 0; }
+.hilfe-inhalt input[readonly] { width: 100%; }

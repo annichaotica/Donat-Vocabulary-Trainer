@@ -1563,6 +1563,11 @@ def lern_verlauf(benutzer_id: int, aufgabe_id: int | None = None,
 # stehen darauf — "x-account-key" schon.
 MCP_KOPFZEILEN = ("authorization", "x-vokabel-token", "x-account-key")
 
+# Die öffentliche Adresse der Schnittstelle — nur für die Anleitung, damit
+# dort die Adresse zum Abschreiben steht und kein Platzhalter. Sie kommt
+# aus der Umgebung, weil sie zur Anlage gehört und nicht in den Quelltext.
+MCP_URL = os.environ.get("VOKABEL_MCP_URL", "").strip()
+
 
 def _mcp_geheimnis(request: Request) -> str:
     kopf = request.headers.get("authorization", "")
@@ -1713,6 +1718,11 @@ def zustand():
         # Fußzeile der Oberfläche, nicht nur in einer Datei im Repo.
         "lizenz": "AGPL-3.0-or-later",
         "quelltext": QUELLTEXT,
+        # Leer, solange niemand von außen zugreift — die Anleitung sagt
+        # dann, dass es nur im Heimnetz geht, statt eine Adresse zu
+        # nennen, die nicht stimmt.
+        "mcp_url": MCP_URL,
+        "mcp_kopfzeile": "x-account-key",
     }
 
 

@@ -33,3 +33,8 @@ services:
       # sonst könnte im Heimnetz jemand sie selbst mitschicken und sich
       # ausgeben. Leer lassen, solange nur das Heimnetz zugreift.
       - VOKABEL_ACCESS_TEAM=${VOKABEL_ACCESS_TEAM:-}
+      # Unter welcher Adresse die MCP-Schnittstelle von außen erreichbar
+      # ist. Nur für die Anleitung im Tool — sie soll die richtige Adresse
+      # zum Abschreiben zeigen statt eines Platzhalters. Gehört in die
+      # .env und nicht hierher: die Adresse ist privat.
+      - VOKABEL_MCP_URL=${VOKABEL_MCP_URL:-}

@@ -517,3 +517,8 @@ input[type="file"] { max-width: 100%; }
 
 .regel-pruefung { border-top: 1px solid var(--rand); padding-top: .7rem;
                   margin-top: .7rem; }
+
+.uebung-zeile { margin: .2rem 0; }
+
+/* Eine Fehlermeldung soll man als solche erkennen, nicht nur lesen. */
+#meldung.fehler { background: var(--falsch, #b3261e); color: #fff; }

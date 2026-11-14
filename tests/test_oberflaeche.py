@@ -356,3 +356,16 @@ def test_die_anleitung_ist_von_ueberall_erreichbar():
     assert 'href="#/hilfe"' in HTML.read_text()
     app = (WURZEL / "frontend" / "js" / "app.js").read_text()
     assert "case 'hilfe':" in app
+
+
+def test_meldung_versteht_auch_die_art_statt_der_dauer():
+    """`meldung(text, 'fehler')` ergab setTimeout(fn, NaN) — geklemmt auf
+    0, also war die Meldung ausgerechnet im Fehlerfall unsichtbar.
+
+    Vier Aufrufstellen schrieben es so, in der Annahme, dort stünde die
+    Art. Statt sie zu berichtigen und auf die fünfte zu hoffen, versteht
+    die Funktion beides.
+    """
+    quelle = (WURZEL / "frontend" / "js" / "hilfen.js").read_text()
+    assert "MELDUNG_FEHLER" in quelle
+    assert "Number.isFinite" in quelle, "die Dauer muss geprüft werden"

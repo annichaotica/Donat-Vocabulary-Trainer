@@ -49,6 +49,9 @@ export class Uebungssitzung {
     this.wertungOffen = false;
     this.gezaehlt = { richtig: 0, fast: 0, falsch: 0 };
     this.aufgedeckt = false;
+    // Die Wertung der laufenden Aufgabe. MUSS bei jeder neuen Aufgabe
+    // zurück auf null — siehe naechste().
+    this.gewertet = null;
     this._taste = (e) => this.aufTaste(e);
     document.addEventListener('keydown', this._taste);
   }
@@ -69,6 +72,12 @@ export class Uebungssitzung {
     this.eingabeWert = '';
     this.wertungOffen = false;
     this.aufgedeckt = false;
+    // Blieb stehen und wirkte in die nächste Aufgabe hinein: nach der
+    // ersten Wertung zeigte jeder lange Text statt »Wie war es?« die
+    // Wertung der VORIGEN Aufgabe, und »Weiter« übersprang ihn
+    // ungewertet. Derselbe Fehlertyp wie der doppelte Tastenbehandler
+    // und das überholte <main>.
+    this.gewertet = null;
     let liste;
     try {
       liste = await api.uebungNaechste({
@@ -340,10 +349,53 @@ export class Uebungssitzung {
     return h('div', { class: 'frage-werkzeuge eingriffe' },
       h('button', { class: 'schlicht', onclick: () => this.weissNicht() },
         'Weiß ich nicht'),
+      // Zeigt die ganze Übung, nicht nur den laufenden Abschnitt. Der
+      // Knopf zeigte auf #/uebungen/<id> — eine Adresse, die der
+      // Wegweiser nicht kennt; man landete auf »Diese Seite gibt es
+      // nicht« und die Sitzung war dabei beendet.
       h('button', {
         class: 'schlicht',
-        onclick: () => { location.hash = `#/uebungen/${this.aufgabe.uebung_id}`; },
+        onclick: () => this.ganzeUebungZeigen(),
       }, 'Übung ansehen'));
+  }
+
+  /* Die ganze Übung ansehen, ohne die Sitzung zu verlassen.
+   *
+   * Beim Üben steht immer nur ein Abschnitt da. Wer den Zusammenhang
+   * braucht — bei einem Dialog oder einem längeren Text —, bekommt ihn
+   * hier eingeblendet und übt danach weiter.
+   */
+  async ganzeUebungZeigen() {
+    const id = this.aufgabe?.uebung_id;
+    if (!id) return;
+    let u;
+    try {
+      u = await api.uebung(id);
+    } catch (fehler) {
+      meldung(fehler.message, 'fehler');
+      return;
+    }
+    const abschnitte = u.abschnitte || [];
+    const kasten = h('div', { class: 'karte' },
+      h('h2', { text: u.titel || 'Die ganze Übung' }),
+      u.lektion_nr !== null && u.lektion_nr !== undefined
+        ? h('p', { class: 'leise', text: `Lektion ${u.lektion_nr}` })
+        : null);
+    for (const a of abschnitte) {
+      kasten.append(h('p', { class: 'uebung-zeile' },
+        h('b', { text: a.original || '' })));
+      if (a.referenz) {
+        kasten.append(h('p', { class: 'leise uebung-zeile',
+                               text: a.referenz }));
+      }
+    }
+    if (!abschnitte.length) {
+      kasten.append(h('p', { class: 'leise', text: 'Keine Abschnitte.' }));
+    }
+    kasten.append(h('div', { class: 'frage-werkzeuge' },
+      h('button', { class: 'wichtig', onclick: () => this.zeichnen() },
+        'Zurück zur Aufgabe')));
+    leeren(this.behaelter).append(kasten);
   }
 
   /* -------------------------------------------------------------- Tun */

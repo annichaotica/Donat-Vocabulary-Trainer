@@ -81,6 +81,25 @@ def _jetzt() -> str:
     return dt.datetime.now().isoformat(timespec="seconds")
 
 
+def _selber_tag(zeitpunkt: str | None, jetzt: dt.datetime | None = None) -> bool:
+    """Kam die vorige Antwort am selben KALENDERTAG?
+
+    FSRS entschied das nach exakten 24 Stunden. Der Terminplan rechnet
+    aber in Kalendertagen: `faellig` ist ein Datum. Wer abends um 20 Uhr
+    lernt und morgens um 9 weitermacht, ist für den Plan einen Tag
+    weiter, für die 24-Stunden-Regel aber noch am selben — und bekam die
+    Selber-Tag-Formel, die kaum Stabilität zugesteht. Zwölf Minuten
+    entschieden über Faktor drei.
+    """
+    if not zeitpunkt:
+        return False                   # noch nie dran
+    try:
+        davor = dt.datetime.fromisoformat(zeitpunkt)
+    except ValueError:
+        return False
+    return davor.date() == (jetzt or dt.datetime.now()).date()
+
+
 def _tage_seit(zeitpunkt: str | None) -> float:
     if not zeitpunkt:
         return 0.0
@@ -774,7 +793,11 @@ def _aufgabe_ausbauen(db: sqlite3.Connection, r: dict, wunschretention: float,
         f["regeln"] = []
     z = fsrs.Zustand(r["stabilitaet"], r["schwierigkeit"])
     verstrichen = _tage_seit(r["letzte_wiederholung"])
-    vorschau = fsrs.vorschau(z, verstrichen, wunschretention)
+    # Mit denselben Angaben wie das spätere Bewerten — sonst zeigt der
+    # Knopf einen anderen Termin an, als er setzt.
+    vorschau = fsrs.vorschau(z, verstrichen, wunschretention,
+                             saat=r["aufgabe_id"],
+                             selber_tag=_selber_tag(r["letzte_wiederholung"]))
     return {
         **f,
         "lernstand": {
@@ -968,7 +991,8 @@ def bewerten(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
     verstrichen = _tage_seit(z["letzte_wiederholung"])
 
     ergebnis = fsrs.bewerten(vorher, bewertung, verstrichen,
-                             e["wunschretention"], saat=aufgabe_id)
+                             e["wunschretention"], saat=aufgabe_id,
+                             selber_tag=_selber_tag(z["letzte_wiederholung"]))
 
     if bewertung == fsrs.NOCHMAL:
         faellig = heute().isoformat()          # bleibt heute dran

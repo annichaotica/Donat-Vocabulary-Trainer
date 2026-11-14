@@ -96,6 +96,7 @@ export const api = {
   // Merkmalsbündel-Dateien (das Format, das die KI liefert)
   vokabelnImportieren: (sammlungId, daten) =>
     ruf(`/sammlungen/${sammlungId}/import/vokabeln`, { methode: 'POST', daten }),
+  uebung: (id) => ruf(`/uebungen/${id}`),
   regeln: (sammlungId, nurUngepruefte = false) =>
     ruf(`/sammlungen/${sammlungId}/regeln`,
         { frage: { nur_ungepruefte: nurUngepruefte } }),

@@ -170,8 +170,19 @@ class Ergebnis:
 
 def bewerten(zustand: Zustand, bewertung: int, verstrichen_tage: float = 0.0,
              wunschretention: float = 0.9, w=STANDARD,
-             saat: int | None = None) -> Ergebnis:
-    """Rechnet den neuen Gedächtniszustand und den nächsten Termin aus."""
+             saat: int | None = None,
+             selber_tag: bool | None = None) -> Ergebnis:
+    """Rechnet den neuen Gedächtniszustand und den nächsten Termin aus.
+
+    `selber_tag` sagt, ob die vorige Antwort am selben KALENDERTAG kam.
+    Ohne die Angabe wird wie bisher nach 24 Stunden entschieden — und
+    genau das passte nicht zum Terminplan, der in Kalendertagen rechnet:
+    wer abends um 20 Uhr lernt und morgens um 9 weitermacht, ist 13
+    Stunden später einen Tag weiter, für die 24-Stunden-Regel aber noch
+    am selben. Gemessen hat das Faktor drei ausgemacht (23,9 h → 1,41
+    gegen 24,1 h → 4,03), und reife Karten blähte die Selber-Tag-Formel
+    umgekehrt auf.
+    """
     if bewertung not in BEWERTUNGEN:
         raise ValueError(f"Bewertung muss 1..4 sein, nicht {bewertung!r}")
 
@@ -188,7 +199,9 @@ def bewerten(zustand: Zustand, bewertung: int, verstrichen_tage: float = 0.0,
         d_alt = _klemmen(float(zustand.schwierigkeit), 1.0, 10.0)
         r_vorher = abrufwahrscheinlichkeit(verstrichen_tage, s_alt)
         d = neue_schwierigkeit(d_alt, bewertung, w)
-        if verstrichen_tage < 1.0:
+        gleicher_tag = (verstrichen_tage < 1.0 if selber_tag is None
+                        else selber_tag)
+        if gleicher_tag:
             s = stabilitaet_am_selben_tag(s_alt, bewertung, w)
         elif bewertung == NOCHMAL:
             s = stabilitaet_nach_vergessen(s_alt, d_alt, r_vorher, w)
@@ -222,12 +235,22 @@ def bewerten(zustand: Zustand, bewertung: int, verstrichen_tage: float = 0.0,
 
 
 def vorschau(zustand: Zustand, verstrichen_tage: float = 0.0,
-             wunschretention: float = 0.9, w=STANDARD) -> dict[int, float]:
+             wunschretention: float = 0.9, w=STANDARD,
+             saat: int | None = None,
+             selber_tag: bool | None = None) -> dict[int, float]:
     """Was würde jede der vier Bewertungen für einen Termin ergeben?
-    Wird in der Oberfläche direkt auf den Knöpfen angezeigt — damit sichtbar
-    ist, was die eigene Bewertung bewirkt."""
+
+    Wird in der Oberfläche direkt auf den Knöpfen angezeigt — damit
+    sichtbar ist, was die eigene Bewertung bewirkt.
+
+    `saat` und `selber_tag` müssen dieselben sein wie beim späteren
+    `bewerten`, sonst zeigt der Knopf etwas anderes an, als er tut: die
+    Streuung um ±5 % lief nur in der Rechnung, nicht in der Vorschau.
+    Der Knopf sagte »in 3,0 Monaten« und setzte 2,9.
+    """
     return {
-        b: bewerten(zustand, b, verstrichen_tage, wunschretention, w).intervall_tage
+        b: bewerten(zustand, b, verstrichen_tage, wunschretention, w,
+                    saat=saat, selber_tag=selber_tag).intervall_tage
         for b in BEWERTUNGEN
     }
 

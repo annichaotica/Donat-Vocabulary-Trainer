@@ -296,7 +296,10 @@ def ausbauen(db: sqlite3.Connection, textaufgabe_id: int, benutzer_id: int,
         "begruendung": lernmodul._begruendung(z) if hasattr(
             lernmodul, "_begruendung") else None,
         "vorschau": {str(b): fsrs.tage_in_text(
-            fsrs.vorschau(vorher, verstrichen, wunschretention)[b])
+            fsrs.vorschau(vorher, verstrichen, wunschretention,
+                          saat=textaufgabe_id,
+                          selber_tag=lernmodul._selber_tag(
+                              z["letzte_wiederholung"]))[b])
             for b in fsrs.BEWERTUNGEN},
     }
 
@@ -372,8 +375,10 @@ def bewerten(db: sqlite3.Connection, benutzer_id: int, textaufgabe_id: int,
     z = _zustand_sichern(db, textaufgabe_id, benutzer_id)
     vorher = fsrs.Zustand(z["stabilitaet"], z["schwierigkeit"])
     verstrichen = lernmodul._tage_seit(z["letzte_wiederholung"])
-    ergebnis = fsrs.bewerten(vorher, bewertung, verstrichen,
-                             e["wunschretention"], saat=textaufgabe_id)
+    ergebnis = fsrs.bewerten(
+        vorher, bewertung, verstrichen, e["wunschretention"],
+        saat=textaufgabe_id,
+        selber_tag=lernmodul._selber_tag(z["letzte_wiederholung"]))
     faellig = (lernmodul.heute().isoformat() if bewertung == fsrs.NOCHMAL
                else (lernmodul.heute()
                      + dt.timedelta(days=round(ergebnis.intervall_tage))

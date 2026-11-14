@@ -41,12 +41,32 @@ export function anfuegen(el, ...kinder) {
 export function leeren(el) { while (el.firstChild) el.firstChild.remove(); return el; }
 
 let meldungsUhr = null;
-export function meldung(text, dauer = 2600) {
+/* Kurze Rückmeldung am Bildschirmrand.
+ *
+ * Der zweite Parameter darf eine Dauer in Millisekunden sein ODER das
+ * Wort 'fehler'. Letzteres, weil vier Aufrufstellen es ohnehin so
+ * geschrieben haben — in der Annahme, dort stünde die Art der Meldung.
+ * Daraus wurde `setTimeout(fn, 'fehler')`, also NaN, geklemmt auf 0:
+ * der Kasten verschwand im nächsten Tick. Ausgerechnet im Fehlerfall
+ * war die Meldung damit unsichtbar.
+ *
+ * Statt vier Aufrufe zu berichtigen und auf den fünften zu hoffen,
+ * versteht die Funktion jetzt beides. Ein Fehler bleibt länger stehen
+ * als eine Bestätigung — er will gelesen werden.
+ */
+export const MELDUNG_KURZ = 2600;
+export const MELDUNG_FEHLER = 6000;
+
+export function meldung(text, dauer = MELDUNG_KURZ) {
   const kasten = document.getElementById('meldung');
   kasten.textContent = text;
   kasten.hidden = false;
+  kasten.classList.toggle('fehler', dauer === 'fehler');
+  const ms = Number.isFinite(Number(dauer)) && Number(dauer) > 0
+    ? Number(dauer)
+    : (dauer === 'fehler' ? MELDUNG_FEHLER : MELDUNG_KURZ);
   clearTimeout(meldungsUhr);
-  meldungsUhr = setTimeout(() => { kasten.hidden = true; }, dauer);
+  meldungsUhr = setTimeout(() => { kasten.hidden = true; }, ms);
 }
 
 export function zahl(wert, stellen = 1) {

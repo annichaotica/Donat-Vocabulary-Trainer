@@ -44,7 +44,14 @@ KLANG = [("d", "t"), ("g", "k"), ("b", "p"), ("f", "v"), ("s", "z"),
 REIHENFOLGE = [("ei", "ie"), ("ie", "ei"), ("eu", "ue"), ("au", "ua")]
 
 DOPPELBAR = "bdfgklmnprstz"
-VOKALE = "aeiouäöüyâêîôûæœ"
+# Auch die griechischen — sonst zeigt die Maske auf Stufe 3 das ganze
+# Wort, weil keiner ihrer Buchstaben als Vokal erkannt wird. Bei den
+# Tipps wäre das die Lösung statt eines Hinweises, im Legastheniemodus
+# stünde die Antwort in der Frage.
+VOKALE = ("aeiouäöüyâêîôûæœ"
+          "αειουηω"                      # griechische Vokale
+          "άέίόύήώ"                      # mit Tonos
+          "ϊϋΐΰ")                        # mit Trema
 
 
 def _zeichen(text: str) -> str:

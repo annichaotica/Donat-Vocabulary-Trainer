@@ -72,7 +72,8 @@ def bezugszeit(db: sqlite3.Connection, benutzer_id: int, typ: str,
 def einschaetzen(urteil: str, fehlerart: str | None = None,
                  denkzeit_ms: int | None = None, versuche: int = 1,
                  aufgedeckt: bool = False, bezug_ms: float | None = None,
-                 messwerte: int = 0, zeitmessung: bool = True) -> dict:
+                 messwerte: int = 0, zeitmessung: bool = True,
+                 tipps: int = 0) -> dict:
     """Leitet die Bewertung 1 bis 4 ab und begründet sie in Klartext.
 
     Die Begründung ist kein Beiwerk: wer nicht selbst bewertet, muss sehen
@@ -100,6 +101,12 @@ def einschaetzen(urteil: str, fehlerart: str | None = None,
             gruende.append("Erst im zweiten Anlauf richtig")
         else:
             gruende.append("Fast richtig, dann richtig")
+    elif tipps:
+        # Mit Tipp gewusst ist nicht »auf Anhieb«, aber auch nicht
+        # »nicht gewusst«: die Antwort kam ja selbst. Darum Schwer.
+        note = SCHWER
+        gruende.append("Richtig, aber mit Tipp"
+                       if tipps == 1 else f"Richtig, aber mit {tipps} Tipps")
     else:
         note = GUT
         gruende.append("Auf Anhieb richtig")
@@ -152,10 +159,10 @@ def fuer_aufgabe(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
                  urteil: str, fehlerart: str | None = None,
                  denkzeit_ms: int | None = None, versuche: int = 1,
                  aufgedeckt: bool = False, erwartet: str | None = None,
-                 zeitmessung: bool = True) -> dict:
+                 zeitmessung: bool = True, tipps: int = 0) -> dict:
     """Bewertung für eine bestimmte Aufgabe, mit dem passenden Zeitbezug."""
     a = dbm.zeile(db, "SELECT typ FROM aufgabe WHERE id = ?", (aufgabe_id,))
     typ = a["typ"] if a else "bedeutung_fremd_deutsch"
     bezug, messwerte = bezugszeit(db, benutzer_id, typ, len(erwartet or "") or 8)
     return einschaetzen(urteil, fehlerart, denkzeit_ms, versuche, aufgedeckt,
-                        bezug, messwerte, zeitmessung)
+                        bezug, messwerte, zeitmessung, tipps)

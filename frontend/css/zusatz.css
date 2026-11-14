@@ -522,3 +522,10 @@ input[type="file"] { max-width: 100%; }
 
 /* Eine Fehlermeldung soll man als solche erkennen, nicht nur lesen. */
 #meldung.fehler { background: var(--falsch, #b3261e); color: #fff; }
+
+
+/* Der Tipp: sichtbar, aber nicht so laut wie die Frage selbst. */
+.tipp { margin: .6rem 0; padding: .6rem .8rem; border-radius: .5rem;
+        background: var(--sanft, #f3f1ec); }
+.tipp-maske { font-size: 1.4em; letter-spacing: .12em; margin: 0 0 .2rem;
+              font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

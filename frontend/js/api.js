@@ -142,6 +142,7 @@ export const api = {
     ruf('/lernen/stand', { frage: { benutzer_id: benutzerId, sammlung_id: sammlungId } }),
   naechste: (frage) => ruf('/lernen/naechste', { frage }),
   pruefen: (daten) => ruf('/lernen/pruefen', { methode: 'POST', daten }),
+  tipp: (frage) => ruf('/lernen/tipp', { frage }),
   aufdecken: (daten) => ruf('/lernen/aufdecken', { methode: 'POST', daten }),
   bewerten: (daten) => ruf('/lernen/bewerten', { methode: 'POST', daten }),
   aussetzen: (daten) => ruf('/lernen/aussetzen', { methode: 'POST', daten }),

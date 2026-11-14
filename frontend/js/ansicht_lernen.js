@@ -42,6 +42,8 @@ export class Sitzung {
     this.laeuft = false;
     this.abgebrochen = false;
     this.aufgedeckt = false;
+    this.tipps = 0;
+    this.tippText = null;
     this.eingabeWert = '';
     this.reihenWerte = {};
     this.merkmalsWahl = {};
@@ -88,6 +90,8 @@ export class Sitzung {
     this.versuche = 1;
     this.wertungOffen = false;
     this.aufgedeckt = false;      // sonst wirkt "Weiß ich nicht" fort
+    this.tipps = 0;               // ebenso die genommenen Tipps
+    this.tippText = null;
     this.zeichneLade();
     let reihe;
     try {
@@ -142,6 +146,81 @@ export class Sitzung {
     const code = this._antwortsprache?.code;
     if (!feld || !this.umschrift || !kannUmschreiben(code)) return;
     this._umschriftLoesen = umschriftAnhaengen(feld, code);
+  }
+
+  /* Ein Tipp — weniger als die Lösung, und die Abfrage läuft weiter.
+   *
+   * Dazwischen fehlte bisher alles: »Weiß ich nicht« deckt auf und
+   * wertet als Nochmal, »Wort ansehen« führte aus der Abfrage heraus
+   * und zurück kam man nicht. Wer nur einen Anstoß brauchte, hatte
+   * keine Wahl.
+   *
+   * Ein genommener Tipp deckelt die Bewertung auf »Schwer« — die
+   * Antwort kam selbst, aber nicht allein. Das steht auch in der
+   * Begründung, damit niemand rätselt, warum es nicht »Gut« wurde.
+   */
+  async tippHolen() {
+    if (this.tipps >= 3) return;
+    try {
+      const t = await api.tipp({
+        benutzer_id: zustand.benutzerId,
+        aufgabe_id: this.aufgabe.aufgabe_id,
+        stufe: this.tipps + 1,
+      });
+      this.tipps = t.stufe || this.tipps + 1;
+      this.tippText = t;
+      this.zeichnen();
+    } catch (fehler) {
+      meldung(fehler.message, 'fehler');
+    }
+  }
+
+  teilTipp() {
+    const t = this.tippText;
+    if (!t) return null;
+    return h('div', { class: 'tipp' },
+      h('p', { class: 'tipp-maske', lang: this.aufgabe.antwort_sprache,
+               text: t.maske || '' }),
+      h('p', { class: 'leise' },
+        t.buchstaben
+          ? `${t.buchstaben} Buchstaben`
+            + (t.woerter > 1 ? ` in ${t.woerter} Wörtern` : '')
+          : (t.hinweis || ''),
+        t.stamm ? h('span', {}, ' · Stamm: ', h('b', { text: t.stamm })) : null,
+        t.stufe >= t.hoechste_stufe
+          ? h('span', { text: ' · mehr gibt es nicht' })
+          : null));
+  }
+
+  /* Das Wort einblenden, ohne die Abfrage zu verlassen. */
+  async wortZeigen() {
+    let lexem;
+    try {
+      lexem = await api.lexem(this.aufgabe.lexem_id);
+    } catch (fehler) { meldung(fehler.message, 'fehler'); return; }
+    const kasten = h('div', { class: 'karte' },
+      h('h2', { lang: lexem.sprache || this.aufgabe.sprache,
+                text: lexem.lemma || '' }));
+    for (const b of lexem.bedeutungen || []) {
+      kasten.append(h('p', {},
+        h('b', { text: (b.uebersetzungen || []).map((u) => u.text).join(', ') }),
+        b.kontext ? h('span', { class: 'leise', text: ` (${b.kontext})` })
+                  : null));
+    }
+    const formen = (lexem.formen || []).filter((f) => f.geprueft);
+    if (formen.length) {
+      kasten.append(h('p', { class: 'leise', style: 'margin-top:.6rem',
+                             text: `${formen.length} Formen` }));
+      kasten.append(h('ul', { class: 'regel-beispiele' },
+        formen.slice(0, 20).map((f) => h('li', {},
+          h('b', { text: f.text }),
+          f.beschriftung ? h('span', { text: ` — ${f.beschriftung}` })
+                         : null))));
+    }
+    kasten.append(h('div', { class: 'frage-werkzeuge' },
+      h('button', { class: 'wichtig', onclick: () => this.zeichnen() },
+        'Zurück zur Abfrage')));
+    leeren(this.behaelter).append(kasten);
   }
 
   /* ---------------------------------------------------------- Zeichnen */
@@ -281,6 +360,7 @@ export class Sitzung {
       this.ergebnis ? this.teilRueckmeldung() : null,
       this.ergebnis && this.phase === 'rueckmeldung' ? this.teilWertung() : null,
       this.ergebnis && this.phase === 'rueckmeldung' ? this.teilSignale() : null,
+      this.teilTipp(),
       this.teilRegeln(),
       this.teilWarum(),
       this.teilEingriffe()));
@@ -748,6 +828,14 @@ export class Sitzung {
     const kennung = { benutzer_id: zustand.benutzerId, aufgabe_id: this.aufgabe.aufgabe_id };
     const reihe = h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' });
     if (this.phase !== 'rueckmeldung') {
+      // Der Tipp steht VOR »Weiß ich nicht«: er ist das Kleinere, und
+      // wer ihn zuerst sieht, greift nicht gleich zur Lösung.
+      reihe.append(h('button', {
+        class: 'schlicht',
+        title: 'Ein Anstoß, ohne die Lösung zu zeigen',
+        disabled: this.tipps >= 3,
+        onclick: () => this.tippHolen(),
+      }, this.tipps ? 'Noch ein Tipp' : 'Tipp'));
       reihe.append(h('button', { class: 'schlicht', onclick: () => this.weissNicht() },
         'Weiß ich nicht'));
     }
@@ -760,9 +848,12 @@ export class Sitzung {
           this.naechste();
         },
       }, 'Aussetzen'),
+      // Nicht mehr `location.hash` — das riss die Abfrage ab, und zurück
+      // kam man nicht. Das Wort wird eingeblendet, danach geht es weiter.
       h('button', {
-        class: 'schlicht', title: 'Dieses Wort im Wortschatz ansehen',
-        onclick: () => { location.hash = `#/wort/${this.aufgabe.lexem_id}`; },
+        class: 'schlicht',
+        title: 'Dieses Wort ansehen, ohne die Abfrage zu verlassen',
+        onclick: () => this.wortZeigen(),
       }, 'Wort ansehen'));
     return reihe;
   }

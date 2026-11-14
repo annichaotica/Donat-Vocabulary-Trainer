@@ -889,7 +889,7 @@ def _aufgabe_ausbauen(db: sqlite3.Connection, r: dict, wunschretention: float,
 
 def pruefen(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
             eingabe, denkzeit_ms: int | None = None, versuche: int = 1,
-            aufgedeckt: bool = False) -> dict:
+            aufgedeckt: bool = False, tipps: int = 0) -> dict:
     """Prüft die Antwort — ohne den Lernstand zu ändern.
 
     Getrennt vom Bewerten, damit "fast richtig" möglich ist: dann wird noch
@@ -914,6 +914,7 @@ def pruefen(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
                        else ("verwechslung" if "verwechslung" in urteil.abweichungen
                              else None))),
         denkzeit_ms=denkzeit_ms, versuche=versuche, aufgedeckt=aufgedeckt,
+        tipps=tipps,
         erwartet=erwartet,
         zeitmessung=_zeitmessung(e),
     )
@@ -1032,11 +1033,57 @@ def aufdecken(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int) -> dict
             "zerlegung": zerlegung}
 
 
+# Wie viele Stufen ein Tipp hat. Mehr wären keine Hilfe mehr, sondern
+# die Lösung auf Umwegen — dafür gibt es »Weiß ich nicht«.
+TIPPSTUFEN = 3
+
+
+def tipp(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
+         stufe: int = 1) -> dict:
+    """Ein Tipp — weniger als die Lösung, und in der Abfrage bleibend.
+
+    Bisher gab es nur »Weiß ich nicht« (deckt alles auf und wertet als
+    Nochmal) und »Wort ansehen« (führte aus der Abfrage heraus, und
+    zurück kam man nicht). Dazwischen fehlte das Naheliegende: ein
+    Anstoß, nach dem man selbst weiterkommt.
+
+    Die Stufen bauen aufeinander auf:
+      1  Wie viele Buchstaben, und der erste. Bei Formaufgaben der Stamm.
+      2  Dazu der letzte Buchstabe.
+      3  Dazu die Mitlaute — die Selbstlaute bleiben die Arbeit.
+
+    Die Lösung steht nirgends in der Antwort: was der Browser nicht
+    bekommt, kann er auch nicht verraten.
+    """
+    stufe = max(1, min(int(stufe), TIPPSTUFEN))
+    _urteil, aufloesung = aufgaben.antwort_pruefen(db, aufgabe_id, "",
+                                                   fehler_benennen=False)
+    erwartet = next(iter(aufloesung.get("erwartet") or []), None)
+    if not erwartet:
+        return {"stufe": stufe, "hoechste_stufe": TIPPSTUFEN,
+                "maske": None, "hinweis": "Dazu gibt es keinen Tipp."}
+    antwort = {
+        "stufe": stufe,
+        "hoechste_stufe": TIPPSTUFEN,
+        "maske": legasthenie_modul.maske(erwartet, stufe),
+        "buchstaben": len([z for z in erwartet if z.isalpha()]),
+        "woerter": len(erwartet.split()),
+    }
+    if stufe == 1:
+        stamm = aufgaben.stamm_fuer_aufgabe(db, aufgabe_id)
+        # Der Stamm nur, wenn er wirklich kürzer ist als die Antwort —
+        # sonst wäre der »Tipp« das Wort selbst.
+        if stamm and len(stamm) < len(erwartet):
+            antwort["stamm"] = stamm
+    return antwort
+
+
 def bewerten(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
              bewertung: int | None = None, antwort: str | None = None,
              urteil: str | None = None, dauer_ms: int | None = None,
              denkzeit_ms: int | None = None, versuche: int = 1,
-             aufgedeckt: bool = False, fehlerart: str | None = None) -> dict:
+             aufgedeckt: bool = False, fehlerart: str | None = None,
+             tipps: int = 0) -> dict:
     """Schreibt die Bewertung fort: Lernzustand neu rechnen, protokollieren.
 
     Ohne `bewertung` wird sie aus den Antwortsignalen abgeleitet — das ist der
@@ -1053,6 +1100,7 @@ def bewerten(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
         einschaetzung = bewertungsmodul.fuer_aufgabe(
             db, benutzer_id, aufgabe_id, urteil=urteil, fehlerart=fehlerart,
             denkzeit_ms=denkzeit_ms, versuche=versuche, aufgedeckt=aufgedeckt,
+        tipps=tipps,
             erwartet=antwort, zeitmessung=_zeitmessung(e))
         bewertung = einschaetzung["bewertung"]
         quelle = "automatisch"

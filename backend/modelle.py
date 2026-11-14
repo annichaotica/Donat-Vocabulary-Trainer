@@ -366,6 +366,9 @@ class PruefenEingabe(BaseModel):
     denkzeit_ms: int | None = Field(default=None, ge=0)
     versuche: int = Field(default=1, ge=1, le=10)
     aufgedeckt: bool = False
+    # Wie viele Tipps genommen wurden. Ein genommener Tipp deckelt die
+    # Bewertung auf »Schwer«: die Antwort kam selbst, aber nicht allein.
+    tipps: int = Field(default=0, ge=0, le=9)
 
 
 class BewertenEingabe(BaseModel):
@@ -381,6 +384,7 @@ class BewertenEingabe(BaseModel):
     denkzeit_ms: int | None = Field(default=None, ge=0)
     versuche: int = Field(default=1, ge=1, le=10)
     aufgedeckt: bool = False
+    tipps: int = Field(default=0, ge=0, le=9)
 
 
 class EingriffEingabe(BaseModel):

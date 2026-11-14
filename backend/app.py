@@ -1678,7 +1678,8 @@ def lern_pruefen(eingabe: PruefenEingabe, request: Request,
     try:
         return lernmodul.pruefen(db, eingabe.benutzer_id, eingabe.aufgabe_id,
                                  eingabe.antwort, eingabe.denkzeit_ms,
-                                 eingabe.versuche, eingabe.aufgedeckt)
+                                 eingabe.versuche, eingabe.aufgedeckt,
+                                 eingabe.tipps)
     except KeyError as fehler:
         raise HTTPException(404, str(fehler))
 
@@ -1695,6 +1696,24 @@ def lern_aufdecken(eingabe: EingriffEingabe, request: Request,
     return lernmodul.aufdecken(db, eingabe.benutzer_id, eingabe.aufgabe_id)
 
 
+@app.get("/api/lernen/tipp")
+def lern_tipp(benutzer_id: int, aufgabe_id: int, stufe: int = 1,
+              request: Request = None, db: sqlite3.Connection = DB):
+    """Ein Tipp statt der Lösung — die Abfrage läuft weiter.
+
+    Die erwartete Antwort steht bewusst NICHT in der Rückgabe: was der
+    Browser nicht bekommt, kann er auch nicht verraten.
+    """
+    _holen(db, "benutzer", benutzer_id)
+    _holen(db, "aufgabe", aufgabe_id)
+    _wache_rumpf(db, request, benutzer_id=benutzer_id,
+                 aufgabe_id=aufgabe_id, schreiben=False)
+    try:
+        return lernmodul.tipp(db, benutzer_id, aufgabe_id, stufe)
+    except KeyError as fehler:
+        raise HTTPException(404, str(fehler))
+
+
 @app.post("/api/lernen/bewerten")
 def lern_bewerten(eingabe: BewertenEingabe, request: Request,
                   db: sqlite3.Connection = DB):
@@ -1707,7 +1726,7 @@ def lern_bewerten(eingabe: BewertenEingabe, request: Request,
             db, eingabe.benutzer_id, eingabe.aufgabe_id, eingabe.bewertung,
             eingabe.antwort, eingabe.urteil, eingabe.dauer_ms,
             eingabe.denkzeit_ms, eingabe.versuche, eingabe.aufgedeckt,
-            eingabe.fehlerart)
+            eingabe.fehlerart, eingabe.tipps)
     except ValueError as fehler:
         raise HTTPException(400, str(fehler))
 

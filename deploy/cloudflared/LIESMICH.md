@@ -11,13 +11,17 @@ nicht über eine Portweiterleitung. Der Unterschied ist nicht Geschmackssache:
 
 ## Was erreichbar ist
 
+Welche Namen das sind, steht in `einrichten.py` unter `DIENSTE` und wird
+beim Einrichten über `CF_ZONE` mit der eigenen Domain verbunden:
+
 | Name | Dienst | intern |
 |---|---|---|
-| `vokabeln.deine-domain.example` | Vokabeltrainer | `127.0.0.1:8030` |
-| `rezepte.deine-domain.example` | Mealie | `127.0.0.1:9925` |
+| `vokabeln.<deine-domain>` | Vokabeltrainer | `127.0.0.1:8030` |
+| `rezepte.<deine-domain>` | Mealie | `127.0.0.1:9925` |
+| `mcp.<deine-domain>` | MCP-Schnittstelle | `127.0.0.1:8030` |
 
-Alles andere — Immich, Paperless, die Startseite — bleibt ausschließlich im
-Heimnetz. Das ist Absicht: dort liegen Fotos und Dokumente.
+Alles, was nicht in dieser Liste steht, beantwortet der Tunnel mit 404 — auch
+wenn jemand den Namen errät.
 
 ## Davor steht Cloudflare Access
 
@@ -28,6 +32,12 @@ einen sechsstelligen Einmalcode. Nur hinterlegte Adressen kommen durch.
 
 Wer hinterlegt ist, steht in der Zugriffsregel in der Cloudflare-Verwaltung
 unter **Zero Trust → Access → Anwendungen**.
+
+Die **MCP-Schnittstelle** ist anders geschützt: sie wird von einem Programm
+gerufen, nicht von einem Menschen, und kann keine Anmeldeseite bedienen.
+Davor steht ein **Access-Diensttoken** (zwei feste Kopfzeilen), dazu im
+Trainer selbst noch ein eigenes Geheimnis. Zwei Schlösser, beide ohne
+Mensch bedienbar.
 
 ## Wartung
 

@@ -6,3 +6,7 @@ daten/*.db-wal
 daten/*.db-shm
 .pytest_cache/
 .DS_Store
+
+# Geheimnisse gehören nicht ins Verzeichnis
+.env
+deploy/cloudflared/.env

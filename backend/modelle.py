@@ -274,3 +274,13 @@ class ImportEingabe(BaseModel):
     zuordnung: dict[str, str] | None = None
     hat_kopfzeile: bool | None = None
     doppelte: Literal["ueberspringen", "ergaenzen", "trotzdem"] = "ueberspringen"
+
+
+class McpTokenAnlegen(BaseModel):
+    """Ein Zugangsmerkmal für die MCP-Schnittstelle, gebunden an ein Profil.
+
+    Je Person und je Gerät eines — dann lässt sich einzeln zurücknehmen,
+    was abhandengekommen ist, ohne allen anderen den Zugang zu nehmen.
+    """
+    name: str = Field(min_length=1, max_length=80,
+                      description="wofür, z.B. »Claude-App auf dem iPad«")

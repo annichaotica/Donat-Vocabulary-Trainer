@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Legt Beispieldaten an, damit sich der Trainer ansehen lässt.
 
-    .venv/bin/python werkzeuge/beispieldaten.py
+    .venv/bin/python werkzeuge/beispieldaten.py [Profilname]
 
-Löscht nichts. Wenn ein Profil "Annuschka" schon besteht, wird es benutzt.
+Löscht nichts. Besteht das Profil schon, wird es benutzt.
 """
 
 import pathlib
@@ -169,15 +169,16 @@ def main():
     db = dbm.verbindung()
     dbm.einrichten(db)
 
-    person = dbm.zeile(db, "SELECT * FROM benutzer WHERE name = ?", ("Annuschka",))
+    name = sys.argv[1] if len(sys.argv) > 1 else "Ich"
+    person = dbm.zeile(db, "SELECT * FROM benutzer WHERE name = ?", (name,))
     if person is None:
         cur = db.execute("INSERT INTO benutzer (name, farbe) VALUES (?, ?)",
-                         ("Annuschka", "#6b7fd7"))
+                         (name, "#6b7fd7"))
         benutzer_id = cur.lastrowid
-        print("Profil »Annuschka« angelegt")
+        print(f"Profil »{name}« angelegt")
     else:
         benutzer_id = person["id"]
-        print("Profil »Annuschka« vorhanden")
+        print(f"Profil »{name}« vorhanden")
 
     bestand = [
         ("Französisch, Grundwortschatz", "fr", FRANZOESISCH),

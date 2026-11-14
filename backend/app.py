@@ -8,13 +8,15 @@ Im Betrieb läuft dasselbe im Docker-Container auf dem Familienserver.
 
 from __future__ import annotations
 
+import os
 import pathlib
+import secrets
 import sqlite3
 from contextlib import asynccontextmanager
 from typing import Iterator
 
-from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import aufgaben
@@ -23,13 +25,18 @@ import datenbank as dbm
 import legasthenie
 import lernen as lernmodul
 import lernziele
+import identitaet
+import mcp_dienst
 import merkmale as mk
 import qualitaet
 import sprachen
+import wache
+import zugang
 from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
                      ImportEingabe, LernzielAendern, LernzielAnlegen,
+                     McpTokenAnlegen,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
                      SammlungEinstellungen, SpracheAnlegen,
@@ -48,7 +55,12 @@ async def lebenslauf(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Vokabeltrainer", version="0.1.0", lifespan=lebenslauf)
+app = FastAPI(title="Vokabeltrainer", version="0.2.0", lifespan=lebenslauf)
+
+# Die Wache steht VOR allen Routen. Als Mittelschicht und nicht als Prüfung
+# in jeder einzelnen Route — so gilt sie auch für Routen, die später
+# dazukommen und bei denen jemand die Prüfung vergisst.
+app.middleware("http")(wache.wache)
 
 
 def datenbank() -> Iterator[sqlite3.Connection]:
@@ -63,6 +75,34 @@ def datenbank() -> Iterator[sqlite3.Connection]:
 
 
 DB = Depends(datenbank)
+
+
+def _wache_rumpf(db: sqlite3.Connection, request: Request | None,
+                 sammlung_id: int | None = None, benutzer_id: int | None = None,
+                 verwalter: bool = False) -> None:
+    """Prüfung für Angaben, die im Rumpf stehen — die sieht die Wache nicht.
+
+    Greift wie die Wache nur bei geprüfter Identität von außen. `request` darf
+    None sein: dann kommt der Aufruf aus dem MCP-Dienst, der seine eigene,
+    strengere Prüfung schon gemacht hat.
+    """
+    if request is None:
+        return
+    mail = identitaet.mail_aus_anfrage(request.headers)
+    if not mail:
+        return
+    person = identitaet.profil_fuer_mail(db, mail)
+    if person is None:
+        raise HTTPException(403, "Zu dieser Mailadresse gibt es kein Profil.")
+    try:
+        if sammlung_id is not None:
+            zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+        if benutzer_id is not None and benutzer_id != person["id"]:
+            raise zugang.NichtErlaubt("Du kannst nur im eigenen Namen handeln.")
+        if verwalter:
+            zugang.verwalter_pruefen(dict(person))
+    except zugang.NichtErlaubt as fehler:
+        raise HTTPException(403, str(fehler)) from fehler
 
 
 def _holen(db: sqlite3.Connection, tabelle: str, id_: int) -> dict:
@@ -93,12 +133,14 @@ def sprachen_liste(db: sqlite3.Connection = DB):
 
 
 @app.post("/api/sprachen", status_code=201)
-def sprache_anlegen(eingabe: SpracheAnlegen, db: sqlite3.Connection = DB):
+def sprache_anlegen(eingabe: SpracheAnlegen, request: Request = None,
+                    db: sqlite3.Connection = DB):
     """Eine neue Sprache einrichten, samt Profil.
 
     Für Sprachen, die noch kein Profil im Code haben. Das Profil bestimmt,
     welche Formgruppen es gibt und wie Antworten geprüft werden.
     """
+    _wache_rumpf(db, request, verwalter=True)
     if dbm.wert(db, "SELECT 1 FROM sprache WHERE code = ?", (eingabe.code,)):
         raise HTTPException(409, f"Die Sprache {eingabe.code!r} gibt es schon. "
                                  f"Zum Ändern: PUT /api/sprachen/{eingabe.code}/profil")
@@ -136,7 +178,7 @@ def sprachprofil_lesen(code: str, db: sqlite3.Connection = DB):
 
 @app.put("/api/sprachen/{code}/profil")
 def sprachprofil_setzen(code: str, eingabe: SprachprofilSetzen,
-                        db: sqlite3.Connection = DB):
+                        request: Request = None, db: sqlite3.Connection = DB):
     """Das Profil einer Sprache anpassen.
 
     Hiermit kann ein Agent am MCP eine Sprache zum Laufen bringen, ohne dass
@@ -147,6 +189,7 @@ def sprachprofil_setzen(code: str, eingabe: SprachprofilSetzen,
     sonst zeigte die Oberfläche neue Formgruppen an, zu denen es keine
     Aufgaben gäbe.
     """
+    _wache_rumpf(db, request, verwalter=True)
     zeile = dbm.zeile(db, "SELECT * FROM sprache WHERE code = ?", (code,))
     if zeile is None:
         raise HTTPException(404, f"Die Sprache {code!r} ist nicht eingetragen")
@@ -237,14 +280,18 @@ def aufgabentypen():
 
 @app.get("/api/benutzer")
 def benutzer_liste(db: sqlite3.Connection = DB):
-    return dbm.zeilen(db, "SELECT id, name, farbe, angelegt FROM benutzer ORDER BY name")
+    return dbm.zeilen(db, """SELECT id, name, farbe, verwalter, angelegt,
+                                    (email IS NOT NULL) AS hat_mail
+                               FROM benutzer ORDER BY name""")
 
 
 @app.post("/api/benutzer", status_code=201)
 def benutzer_anlegen(eingabe: BenutzerAnlegen, db: sqlite3.Connection = DB):
+    erster = not dbm.wert(db, "SELECT 1 FROM benutzer LIMIT 1")
     try:
-        cur = db.execute("INSERT INTO benutzer (name, farbe) VALUES (?, ?)",
-                         (eingabe.name, eingabe.farbe))
+        cur = db.execute("""INSERT INTO benutzer (name, farbe, verwalter)
+                            VALUES (?, ?, ?)""",
+                         (eingabe.name, eingabe.farbe, int(erster)))
     except sqlite3.IntegrityError:
         raise HTTPException(409, f"Es gibt schon ein Profil namens {eingabe.name!r}")
     return _holen(db, "benutzer", cur.lastrowid)
@@ -317,7 +364,9 @@ def sammlungen_liste(benutzer_id: int | None = None, db: sqlite3.Connection = DB
 
 
 @app.post("/api/sammlungen", status_code=201)
-def sammlung_anlegen(eingabe: SammlungAnlegen, db: sqlite3.Connection = DB):
+def sammlung_anlegen(eingabe: SammlungAnlegen, request: Request = None,
+                     db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=eingabe.besitzer_id)
     _holen(db, "benutzer", eingabe.besitzer_id)
     if not dbm.wert(db, "SELECT 1 FROM sprache WHERE code = ?", (eingabe.sprache,)):
         raise HTTPException(400, f"Sprache {eingabe.sprache!r} ist nicht eingetragen")
@@ -477,11 +526,14 @@ def lexeme_liste(sammlung_id: int, suche: str | None = None,
 
 
 @app.post("/api/lexeme", status_code=201)
-def lexem_anlegen(eingabe: LexemEingabe, db: sqlite3.Connection = DB):
+def lexem_anlegen(eingabe: LexemEingabe, request: Request = None,
+                  db: sqlite3.Connection = DB):
     """Ein vollständiges Wort in einem Aufruf: Lemma, Formen, Bedeutungen.
 
     Die Aufgaben werden anschließend selbsttätig erzeugt.
     """
+    # Die Sammlungskennung steht im Rumpf, die Wache sieht sie darum nicht.
+    _wache_rumpf(db, request, sammlung_id=eingabe.sammlung_id)
     s = _holen(db, "sammlung", eingabe.sammlung_id)
     try:
         lex_merkmale = sprachen.pruefen_lexemmerkmale(
@@ -974,6 +1026,116 @@ def lern_verlauf(benutzer_id: int, aufgabe_id: int | None = None,
     return dbm.zeilen(db, """SELECT * FROM wiederholung WHERE benutzer_id = ?
                               ORDER BY zeitpunkt DESC LIMIT ?""",
                       (benutzer_id, anzahl))
+
+
+# ================================================================== MCP
+
+# Jede Anfrage gehört zu einer Person: das Token ist an ein Profil gebunden,
+# und alles, was darüber geschieht, geschieht in deren Namen und nur auf
+# deren Bestand. Ein gemeinsames Geheimnis wäre hier falsch — man könnte
+# weder zuordnen noch einzeln entziehen.
+#
+# Die Schnittstelle schaltet sich selbst frei, sobald es ein Token gibt.
+# Ohne Token kommt niemand hinein, auch nicht versehentlich.
+
+def _mcp_person(request: Request, db: sqlite3.Connection) -> dict:
+    kopf = request.headers.get("authorization", "")
+    geheimnis = kopf[7:].strip() if kopf[:7].lower() == "bearer " else ""
+    if not geheimnis:
+        geheimnis = request.headers.get("x-vokabel-token", "").strip()
+    treffer = zugang.person_zu_token(db, geheimnis)
+    if treffer is None:
+        if not zugang.mcp_eingeschaltet(db):
+            raise HTTPException(503, "Die MCP-Schnittstelle ist noch nicht "
+                                     "eingerichtet. In den Einstellungen des "
+                                     "Trainers ein Zugangsmerkmal anlegen.")
+        raise HTTPException(401, "Kein gültiges Zugangsmerkmal. Erwartet wird "
+                                 "die Kopfzeile Authorization: Bearer <Token>.")
+    return dict(treffer["benutzer"])
+
+
+@app.post("/mcp")
+async def mcp_endpunkt(request: Request, db: sqlite3.Connection = DB):
+    """MCP über HTTP (Streamable HTTP, zustandslos).
+
+    Zustandslos heißt: keine Sitzungskennung, jede Anfrage steht für sich.
+    Für einen Werkzeugserver ohne von sich aus gesendete Nachrichten ist das
+    zulässig und spart die ganze Sitzungsverwaltung.
+    """
+    person = _mcp_person(request, db)
+    try:
+        inhalt = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={
+            "jsonrpc": "2.0", "id": None,
+            "error": {"code": -32700, "message": "Kein gültiges JSON"}})
+
+    stapel = inhalt if isinstance(inhalt, list) else [inhalt]
+    antworten = []
+    for nachricht in stapel:
+        if not isinstance(nachricht, dict):
+            continue
+        antwort = mcp_dienst.behandeln(nachricht, db, person)
+        if antwort is not None:
+            antworten.append(antwort)
+
+    if not antworten:
+        return Response(status_code=202)
+    return JSONResponse(content=antworten if isinstance(inhalt, list)
+                        else antworten[0])
+
+
+@app.get("/mcp")
+async def mcp_strom(request: Request, db: sqlite3.Connection = DB):
+    """Dieser Server sendet nichts von sich aus, also kein Ereignisstrom."""
+    _mcp_person(request, db)
+    return Response(status_code=405, headers={"Allow": "POST"})
+
+
+@app.delete("/mcp")
+async def mcp_beenden(request: Request, db: sqlite3.Connection = DB):
+    """Zustandslos — es gibt keine Sitzung zu beenden."""
+    _mcp_person(request, db)
+    return Response(status_code=204)
+
+
+# ------------------------------------------------- Zugangsmerkmale
+
+@app.get("/api/benutzer/{benutzer_id}/mcp-token")
+def mcp_token_liste(benutzer_id: int, db: sqlite3.Connection = DB):
+    """Die Zugangsmerkmale einer Person. Das Geheimnis selbst steht nirgends
+    gespeichert — nur sein Streuwert und die ersten Zeichen."""
+    _holen(db, "benutzer", benutzer_id)
+    return zugang.token_auflisten(db, benutzer_id)
+
+
+@app.post("/api/benutzer/{benutzer_id}/mcp-token", status_code=201)
+def mcp_token_anlegen(benutzer_id: int, eingabe: McpTokenAnlegen,
+                      db: sqlite3.Connection = DB):
+    """Legt ein Zugangsmerkmal an. Das Geheimnis wird NUR HIER einmal
+    zurückgegeben und ist danach nicht mehr abrufbar."""
+    _holen(db, "benutzer", benutzer_id)
+    return zugang.token_anlegen(db, benutzer_id, eingabe.name)
+
+
+@app.delete("/api/mcp-token/{token_id}", status_code=204)
+def mcp_token_zuruecknehmen(token_id: int, db: sqlite3.Connection = DB):
+    _holen(db, "mcp_token", token_id)
+    zugang.token_zuruecknehmen(db, token_id)
+
+
+# ============================================================ Identität
+
+@app.get("/api/ich")
+def wer_bin_ich(request: Request, db: sqlite3.Connection = DB):
+    """Wer fragt hier an?
+
+    Von außen steht Cloudflare Access davor und hat die Mailadresse schon
+    geprüft; dann steht die Identität fest und der Profilwähler entfällt.
+    Im Heimnetz gibt es keine solche Angabe — dort wählt man sein Profil wie
+    bisher aus der Liste.
+    """
+    return identitaet.wer_bin_ich(db, request.headers)
 
 
 # ============================================================ Oberfläche

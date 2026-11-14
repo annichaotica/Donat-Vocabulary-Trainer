@@ -96,7 +96,7 @@ Er braucht **keine Fremdpakete**, nur Python 3.
 ```sh
 claude mcp add vokabeltrainer \
   --env VOKABEL_URL=http://familienserver:8030 \
-  -- python3 /Users/annuschkabrenner/Projects/Vokabeltrainer/mcp/vokabeltrainer_mcp.py
+  -- python3 ~/Projects/Vokabeltrainer/mcp/vokabeltrainer_mcp.py
 ```
 
 ### In der Claude-App einrichten
@@ -108,7 +108,7 @@ In `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "vokabeltrainer": {
       "command": "python3",
-      "args": ["/Users/annuschkabrenner/Projects/Vokabeltrainer/mcp/vokabeltrainer_mcp.py"],
+      "args": ["~/Projects/Vokabeltrainer/mcp/vokabeltrainer_mcp.py"],
       "env": { "VOKABEL_URL": "http://familienserver:8030" }
     }
   }

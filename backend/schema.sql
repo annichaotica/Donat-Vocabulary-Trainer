@@ -24,10 +24,36 @@ CREATE TABLE IF NOT EXISTS sprache (
 CREATE TABLE IF NOT EXISTS benutzer (
     id             INTEGER PRIMARY KEY,
     name           TEXT NOT NULL UNIQUE,
+    -- Von Cloudflare Access geprüfte Mailadresse. Nur gesetzt bei Profilen,
+    -- die von außen hereinkommen; im Heimnetz bleibt sie leer und man wählt
+    -- sein Profil wie bisher aus der Liste.
+    email          TEXT UNIQUE,
     farbe          TEXT NOT NULL DEFAULT '#6b7fd7',
     einstellungen  TEXT NOT NULL DEFAULT '{}',
+    -- Darf Sprachprofile ändern und neue Sprachen einrichten. Das wirkt auf
+    -- den ganzen Bestand, auch auf fremde Sammlungen — ein eingeladener Gast
+    -- soll das nicht können. Die erste angelegte Person bekommt es.
+    verwalter      INTEGER NOT NULL DEFAULT 0,
     angelegt       TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Zugangsmerkmale für die MCP-Schnittstelle, je Person eines.
+--
+-- Ein gemeinsames Geheimnis wäre hier falsch: man könnte nicht sagen, wer
+-- etwas eingetragen hat, und man könnte es niemandem einzeln entziehen.
+-- Gespeichert wird nur der Streuwert — das Geheimnis selbst sieht der Server
+-- nach der Ausgabe nie wieder.
+CREATE TABLE IF NOT EXISTS mcp_token (
+    id              INTEGER PRIMARY KEY,
+    benutzer_id     INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,           -- wofür, z.B. "Claude-App iPad"
+    streuwert       TEXT NOT NULL UNIQUE,    -- sha256 des Geheimnisses
+    anfang          TEXT NOT NULL,           -- erste Zeichen, zum Wiedererkennen
+    angelegt        TEXT NOT NULL DEFAULT (datetime('now')),
+    zuletzt_benutzt TEXT,
+    aktiv           INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_token_benutzer ON mcp_token(benutzer_id);
 
 -- --------------------------------------------------------------- Sammlungen
 

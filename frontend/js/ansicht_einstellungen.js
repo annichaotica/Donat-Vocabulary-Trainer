@@ -2,7 +2,7 @@
  * und der Legastheniemodus. */
 
 import { api } from './api.js';
-import { datumText, h, leeren, meldung, zahl } from './hilfen.js';
+import { datumText, h, leeren, meldung, zahl, tun } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, darstellungSetzen } from './zustand.js';
 
@@ -144,38 +144,38 @@ async function teilZugriff(behaelter) {
         h('span', { class: 'marke', text: RECHTE[m.recht] || m.recht })),
       h('div', { class: 'durchsicht-knoepfe' },
         h('button', {
-          onclick: async () => {
-            await api.zugriffSetzen(zustand.sammlungId, {
-              benutzer_id: m.id,
-              recht: m.recht === 'lesen' ? 'schreiben' : 'lesen',
-            });
-            meldung('Geändert.');
-            neu();
-          },
+          onclick: () => tun(async () => {
+              await api.zugriffSetzen(zustand.sammlungId, {
+                benutzer_id: m.id,
+                recht: m.recht === 'lesen' ? 'schreiben' : 'lesen',
+              });
+              meldung('Geändert.');
+              neu();
+          }),
         }, m.recht === 'lesen' ? 'auch pflegen lassen' : 'nur mitlernen'),
         h('button', {
           class: 'schlicht gefahr',
-          onclick: async () => {
-            if (!confirm(`${m.name} den Zugriff entziehen?\n\n`
-                       + 'Der Lernstand bleibt erhalten, falls du es dir '
-                       + 'anders überlegst.')) return;
-            await api.zugriffSetzen(zustand.sammlungId,
-                                    { benutzer_id: m.id, recht: null });
-            meldung('Zugriff entzogen.');
-            neu();
-          },
+          onclick: () => tun(async () => {
+              if (!confirm(`${m.name} den Zugriff entziehen?\n\n`
+                         + 'Der Lernstand bleibt erhalten, falls du es dir '
+                         + 'anders überlegst.')) return;
+              await api.zugriffSetzen(zustand.sammlungId,
+                                      { benutzer_id: m.id, recht: null });
+              meldung('Zugriff entzogen.');
+              neu();
+          }),
         }, 'entziehen'),
         h('button', {
           class: 'schlicht',
-          onclick: async () => {
-            if (!confirm(`Die Sammlung an ${m.name} übertragen?\n\n`
-                       + `${m.name} wird Besitzerin. Du behältst `
-                       + 'Schreibzugriff, kannst also weiter pflegen.')) return;
-            await api.besitzUebertragen(zustand.sammlungId, {
-              benutzer_id: m.id, bisherige_behaelt_zugriff: true });
-            meldung('Übertragen.');
-            neu();
-          },
+          onclick: () => tun(async () => {
+              if (!confirm(`Die Sammlung an ${m.name} übertragen?\n\n`
+                         + `${m.name} wird Besitzerin. Du behältst `
+                         + 'Schreibzugriff, kannst also weiter pflegen.')) return;
+              await api.besitzUebertragen(zustand.sammlungId, {
+                benutzer_id: m.id, bisherige_behaelt_zugriff: true });
+              meldung('Übertragen.');
+              neu();
+          }),
         }, 'Besitz übertragen'))));
   }
 
@@ -190,12 +190,12 @@ async function teilZugriff(behaelter) {
     kasten.append(h('div', { class: 'zugriffszeile', style: 'margin-top:.8rem' },
       wahl, recht,
       h('button', {
-        onclick: async () => {
-          await api.zugriffSetzen(zustand.sammlungId, {
-            benutzer_id: Number(wahl.value), recht: recht.value });
-          meldung('Freigegeben.');
-          neu();
-        },
+        onclick: () => tun(async () => {
+            await api.zugriffSetzen(zustand.sammlungId, {
+              benutzer_id: Number(wahl.value), recht: recht.value });
+            meldung('Freigegeben.');
+            neu();
+        }),
       }, 'Dazunehmen')));
   } else if (!z.mitlernende.length) {
     kasten.append(h('p', { class: 'leise',
@@ -485,12 +485,12 @@ async function teilZugaenge(behaelter) {
         t.aktiv
           ? h('button', {
               class: 'schlicht gefahr',
-              onclick: async () => {
-                if (!confirm(`Zugang „${t.name}" zurücknehmen? Claude kann `
-                           + 'damit sofort nichts mehr eintragen.')) return;
-                await api.mcpTokenZuruecknehmen(t.id);
-                zeichnen(behaelter);
-              },
+              onclick: () => tun(async () => {
+                  if (!confirm(`Zugang „${t.name}" zurücknehmen? Claude kann `
+                             + 'damit sofort nichts mehr eintragen.')) return;
+                  await api.mcpTokenZuruecknehmen(t.id);
+                  zeichnen(behaelter);
+              }),
             }, 'Zurücknehmen')
           : h('span', { class: 'marke warnung', text: 'zurückgenommen' })));
     }

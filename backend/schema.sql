@@ -302,7 +302,20 @@ CREATE TABLE IF NOT EXISTS text (
     quelle        TEXT NOT NULL DEFAULT 'manuell'
                   CHECK (quelle IN ('manuell','import','ki','wiktionary')),
     notiz         TEXT,
-    angelegt      TEXT NOT NULL DEFAULT (datetime('now'))
+    angelegt      TEXT NOT NULL DEFAULT (datetime('now')),
+    -- Die folgenden Spalten kamen später dazu. Sie stehen ZUSÄTZLICH in
+    -- NACHRUESTEN (datenbank.py): dort für bestehende Bestände, hier
+    -- damit eine frische Datenbank sie gleich mitbringt und wer das
+    -- Schema liest die ganze Tabelle sieht. Vorher fehlte hier die
+    -- halbe Tabelle, während der Kommentarblock darüber sie beschrieb.
+    typ           TEXT NOT NULL DEFAULT 'satz',
+    richtungen    TEXT,                   -- JSON: ["el-de","de-el"]
+    verweis_titel TEXT,                   -- fremde Texte werden verlinkt,
+    verweis_url   TEXT,                   -- nicht abgeschrieben
+    geprueft      INTEGER NOT NULL DEFAULT 0,
+    kennung       TEXT,                   -- stabil fürs Wiederfinden
+    reihenfolge   INTEGER NOT NULL DEFAULT 0,
+    geaendert     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_text_sammlung ON text(sammlung_id);
 
@@ -317,7 +330,9 @@ CREATE TABLE IF NOT EXISTS textabschnitt (
     reihenfolge   INTEGER NOT NULL DEFAULT 0,
     original      TEXT NOT NULL,
     referenz      TEXT,                   -- Referenzübersetzung des Abschnitts
-    notiz         TEXT
+    notiz         TEXT,
+    varianten          TEXT,              -- JSON-Liste
+    referenz_varianten TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_textabschnitt_text ON textabschnitt(text_id, reihenfolge);
 
@@ -392,7 +407,21 @@ CREATE TABLE IF NOT EXISTS textbearbeitung (
     antwort        TEXT,
     bewertung      INTEGER,          -- 1..4, wie bei den Vokabeln
     rueckmeldung   TEXT,             -- Text der KI oder eigene Notiz
-    dauer_ms       INTEGER
+    dauer_ms       INTEGER,
+    -- Dieselben Felder wie in `wiederholung`: die beiden Protokolle
+    -- sind absichtlich deckungsgleich, damit ein Lernkern beides kann
+    -- (backend/lernkern.py).
+    urteil             TEXT,
+    denkzeit_ms        INTEGER,
+    versuche           INTEGER NOT NULL DEFAULT 1,
+    bewertung_quelle   TEXT,
+    aufgedeckt         INTEGER NOT NULL DEFAULT 0,
+    stabilitaet_vor    REAL,
+    stabilitaet_nach   REAL,
+    schwierigkeit_vor  REAL,
+    schwierigkeit_nach REAL,
+    intervall_tage     REAL,
+    verstrichen_tage   REAL
 );
 CREATE INDEX IF NOT EXISTS idx_textbearbeitung
     ON textbearbeitung(benutzer_id, textaufgabe_id, zeitpunkt);

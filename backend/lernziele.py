@@ -34,7 +34,15 @@ MINDESTENS_NEU = 2
 
 
 def _heute() -> dt.date:
-    return dt.date.today()
+    """Dieselbe Uhr wie im Lernkern.
+
+    Hier stand `dt.date.today()`. Die Tests stellen die Uhr über
+    `lernen.heute` (»zwei Wochen später«) — die Lernzielrechnung blieb
+    dabei im echten Heute stehen, und zwei Module waren verschiedener
+    Meinung darüber, welcher Tag ist.
+    """
+    import lernen
+    return lernen.heute()
 
 
 # --------------------------------------------------------------- Verwaltung
@@ -195,7 +203,8 @@ def fortschritt(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
     geschafft = sum(1 for r in reihe if _geschafft(r, ziel["ziel"]))
     neu = sum(1 for r in reihe if r["zustand"] in (None, "neu"))
     faellig = sum(1 for r in reihe
-                  if r["zustand"] in ("lernen", "reif") and (r["faellig"] or "") <= heute)
+                  if r["zustand"] in ("lernen", "reif")
+                  and r["faellig"] and r["faellig"] <= heute)
     verlernt = sum(1 for r in reihe if r["zustand"] == "verlernt")
     offen = gesamt - geschafft
 
@@ -387,7 +396,11 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
         elif r["zustand"] == "ausgesetzt":
             continue
         elif (r["zustand"] == "verlernt"
-              or (r["faellig"] or "") <= heute):
+              # `or ""` machte aus einem fehlenden Termin »fällig«. In
+              # SQL ist `faellig <= heute` für NULL unwahr — damit waren
+              # Lernzielblock und Abfrage verschiedener Meinung darüber,
+              # was heute dran ist.
+              or (r["faellig"] and r["faellig"] <= heute)):
             faellig.append(r)
         else:
             nicht_faellig.append(r)

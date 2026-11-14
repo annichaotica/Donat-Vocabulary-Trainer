@@ -19,12 +19,16 @@ Quelle = Literal["manuell", "generiert", "wiktionary", "ki", "import"]
 
 class BenutzerAnlegen(BaseModel):
     name: str = Field(min_length=1, max_length=60)
-    farbe: str = "#6b7fd7"
+    # Muster, nicht bloß str: die Farbe landet in einem style-Attribut.
+    # Ohne Muster ließe sich dort eine ganze Deklarationsliste
+    # unterbringen — »#fff;position:fixed;inset:0« legt eine
+    # bildschirmfüllende Fläche über die Oberfläche.
+    farbe: str = Field(default="#6b7fd7", pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class BenutzerAendern(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=60)
-    farbe: str | None = None
+    farbe: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
     # Die Mailadresse, unter der Cloudflare Access diese Person kennt.
     # Leerer String entfernt die Bindung wieder.
     email: str | None = Field(default=None, max_length=254)

@@ -9,7 +9,7 @@
 
 import { api } from './api.js';
 import { anfuegen, h, leeren, meldung, prozent, zahl, zerlegungZeigen,
-         silbenZeigen, sprechen, stimmeDa } from './hilfen.js';
+         silbenZeigen, sprechen, stimmeDa, tun } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zeichenleiste, umschriftAnhaengen,
          kannUmschreiben } from './tastatur.js';
@@ -842,11 +842,11 @@ export class Sitzung {
     reihe.append(
       h('button', {
         class: 'schlicht', title: 'Diese Aufgabe nicht mehr abfragen',
-        onclick: async () => {
-          await api.aussetzen(kennung);
-          meldung('Ausgesetzt. In den Einstellungen wieder einschaltbar.');
-          this.naechste();
-        },
+        onclick: () => tun(async () => {
+            await api.aussetzen(kennung);
+            meldung('Ausgesetzt. In den Einstellungen wieder einschaltbar.');
+            this.naechste();
+        }),
       }, 'Aussetzen'),
       // Nicht mehr `location.hash` — das riss die Abfrage ab, und zurück
       // kam man nicht. Das Wort wird eingeblendet, danach geht es weiter.

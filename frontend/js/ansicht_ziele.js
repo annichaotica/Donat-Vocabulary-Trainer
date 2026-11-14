@@ -11,7 +11,7 @@
  */
 
 import { api } from './api.js';
-import { h, leeren, meldung, anfuegen } from './hilfen.js';
+import { h, leeren, meldung, anfuegen, tun } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 
@@ -110,11 +110,11 @@ function zielkarte(behaelter, z) {
       }, 'Bearbeiten'),
       h('button', {
         class: 'schlicht gefahr',
-        onclick: async () => {
-          if (!confirm(`Lernziel „${z.name}" löschen? Der Lernstand bleibt.`)) return;
-          await api.lernzielLoeschen(z.id);
-          zeichnen(behaelter);
-        },
+        onclick: () => tun(async () => {
+            if (!confirm(`Lernziel „${z.name}" löschen? Der Lernstand bleibt.`)) return;
+            await api.lernzielLoeschen(z.id);
+            zeichnen(behaelter);
+        }),
       }, 'Löschen')));
 }
 

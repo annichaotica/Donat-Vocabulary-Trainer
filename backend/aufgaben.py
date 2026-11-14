@@ -591,10 +591,7 @@ def _dimensionen(code: str, wortart: str) -> list[dict]:
                        if w in mk.INVENTAR.get(d, {}) else 99)
         ergebnis.append({
             "dimension": d,
-            "name": {"person": "Person", "numerus": "Zahl", "genus": "Geschlecht",
-                     "kasus": "Fall", "stufe": "Steigerung", "tempus": "Zeit",
-                     "modus": "Modus", "nonfinit": "Nennform",
-                     "genus_verbi": "Form"}.get(d, d),
+            "name": mk.name_der_dimension(d),
             "werte": [{"wert": w, "text": mk.INVENTAR[d][w][0]} for w in werte
                       if w in mk.INVENTAR.get(d, {})],
         })
@@ -795,11 +792,8 @@ def _merkmale_pruefen(db: sqlite3.Connection, lexem: dict, form: dict,
         if gleich > treffer_zahl:
             beste, treffer_zahl = lesart, gleich
     falsch = [d for d, w in (beste or {}).items() if gegeben.get(d) != w]
-    namen = {"person": "Person", "numerus": "Zahl", "tempus": "Zeit",
-             "modus": "Modus", "kasus": "Fall", "genus": "Geschlecht",
-             "stufe": "Steigerung", "nonfinit": "Nennform"}
     if falsch and treffer_zahl > 0:
-        fehlend = ", ".join(namen.get(d, d) for d in falsch)
+        fehlend = ", ".join(mk.name_der_dimension(d) for d in falsch)
         return Urteil("falsch", " / ".join(beschriftungen),
                       f"Nicht ganz — {fehlend} stimmt nicht. "
                       f"Richtig: {' oder '.join(beschriftungen)}.",

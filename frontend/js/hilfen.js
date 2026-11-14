@@ -2,12 +2,19 @@
  * noch starten, ohne dass sich ein Paketbaum von 2026 neu auflösen lässt. */
 
 /** Element bauen. h('p', {class:'leise'}, 'Text') */
+/* Baut ein Element. Es gibt BEWUSST keinen Weg, HTML einzusetzen.
+ *
+ * Hier stand einmal `html: wert -> el.innerHTML = wert`. Benutzt hat es
+ * niemand — aber ein Teil der angezeigten Inhalte kommt von KI-Agenten
+ * und aus eingelesenen Dateien, und ein einziges künftiges
+ * `h('p', { html: lexem.lemma })` wäre gespeichertes XSS. Eine Tür, die
+ * nicht gebraucht wird, baut man zu, statt sie zu bewachen.
+ */
 export function h(tag, eigenschaften = {}, ...kinder) {
   const el = document.createElement(tag);
   for (const [name, wert] of Object.entries(eigenschaften || {})) {
     if (wert === null || wert === undefined || wert === false) continue;
     if (name === 'class') el.className = wert;
-    else if (name === 'html') el.innerHTML = wert;
     else if (name === 'text') el.textContent = wert;
     else if (name.startsWith('on') && typeof wert === 'function') {
       el.addEventListener(name.slice(2), wert);
@@ -54,6 +61,30 @@ let meldungsUhr = null;
  * versteht die Funktion jetzt beides. Ein Fehler bleibt länger stehen
  * als eine Bestätigung — er will gelesen werden.
  */
+/* Hüllt einen Klickbehandler ein, der etwas am Server tut.
+ *
+ * `onclick: () => tun(async () => { … })`
+ *
+ * Ein `async`-Behandler, den niemand abwartet, verschluckt jeden
+ * Fehler: die Zurückweisung läuft ins Leere, der Knopf sieht aus, als
+ * hätte er gewirkt, und die Ansicht steht mit altem Inhalt da. Genau
+ * das war an einem guten Dutzend Stellen so — Rechte ändern, Besitz
+ * übertragen, Wörter und Formen löschen, Lernziele löschen.
+ *
+ * Statt jede Stelle einzeln einzupacken gibt es diese eine, damit auch
+ * die nächste Stelle sie benutzt.
+ */
+export async function tun(arbeit, gelungen = null) {
+  try {
+    const wert = await arbeit();
+    if (gelungen) meldung(gelungen);
+    return wert;
+  } catch (fehler) {
+    meldung(fehler?.message || 'Das ging schief.', 'fehler');
+    return undefined;
+  }
+}
+
 export const MELDUNG_KURZ = 2600;
 export const MELDUNG_FEHLER = 6000;
 
@@ -162,4 +193,7 @@ export function zerlegungZeigen(zerlegung) {
   return kasten;
 }
 
-export const ESCAPE = (text) => String(text ?? '');
+// Der frühere `ESCAPE` ist ersatzlos weg: er maskierte nichts, sondern
+// gab den Text unverändert zurück. In Verbindung mit einer HTML-Senke
+// hätte `h('p', { html: ESCAPE(wert) })` sicher ausgesehen und wäre
+// eine Lücke gewesen. Beides gibt es nicht mehr.

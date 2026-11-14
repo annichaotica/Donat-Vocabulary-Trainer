@@ -5,7 +5,7 @@
  * bekommt genau diese Felder — und nicht alle fünfzehn Zeiten. */
 
 import { api } from './api.js';
-import { h, leeren, meldung, sprechen } from './hilfen.js';
+import { h, leeren, meldung, sprechen, tun } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 
@@ -170,11 +170,11 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
                        + (b.uebersetzungen.length === 1 ? '' : 'en') })),
         h('button', {
           class: 'schlicht gefahr',
-          onclick: async () => {
-            if (!confirm('Diese Bedeutung löschen?')) return;
-            await api.bedeutungLoeschen(b.id);
-            zeichnenEinzeln(behaelter, lexemId);
-          },
+          onclick: () => tun(async () => {
+              if (!confirm('Diese Bedeutung löschen?')) return;
+              await api.bedeutungLoeschen(b.id);
+              zeichnenEinzeln(behaelter, lexemId);
+          }),
         }, 'Löschen'))));
   }
   el.append(teilNeueBedeutung(behaelter, lexem));
@@ -202,15 +202,15 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
           f.geprueft ? null : h('button', {
             class: 'schlicht',
             title: 'Als geprüft markieren — erst dann wird sie abgefragt',
-            onclick: async () => { await api.formBestaetigen(f.id); zeichnenEinzeln(behaelter, lexemId); },
-          }, '✓ Bestätigen'),
+            onclick: () => tun(async () => {   await api.formBestaetigen(f.id); zeichnenEinzeln(behaelter, lexemId); },
+          }), '✓ Bestätigen'),
           h('button', {
             class: 'schlicht gefahr',
-            onclick: async () => {
-              if (!confirm(`Form „${f.text}" löschen?`)) return;
-              await api.formLoeschen(f.id);
-              zeichnenEinzeln(behaelter, lexemId);
-            },
+            onclick: () => tun(async () => {
+                if (!confirm(`Form „${f.text}" löschen?`)) return;
+                await api.formLoeschen(f.id);
+                zeichnenEinzeln(behaelter, lexemId);
+            }),
           }, 'Löschen'))));
     }
     tafel.append(koerper);
@@ -256,12 +256,12 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
     h('button', { onclick: () => { location.hash = '#/wortschatz'; } }, 'Zurück zur Liste'),
     h('button', {
       class: 'schlicht gefahr',
-      onclick: async () => {
-        if (!confirm(`„${lexem.lemma}" mit allen Formen und dem Lernstand löschen?`)) return;
-        await api.lexemLoeschen(lexem.id);
-        meldung('Gelöscht.');
-        location.hash = '#/wortschatz';
-      },
+      onclick: () => tun(async () => {
+          if (!confirm(`„${lexem.lemma}" mit allen Formen und dem Lernstand löschen?`)) return;
+          await api.lexemLoeschen(lexem.id);
+          meldung('Gelöscht.');
+          location.hash = '#/wortschatz';
+      }),
     }, 'Wort löschen')));
 
   async function bestaetigenUndWeiter(ungeprueft) {

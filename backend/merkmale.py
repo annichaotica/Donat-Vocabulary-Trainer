@@ -180,19 +180,21 @@ EINFACH: dict[str, dict[str, str]] = {
         "nom": "wer oder was?", "gen": "wessen?", "dat": "wem?",
         "akk": "wen oder was?", "vok": "Anrede", "abl": "womit?",
     },
-    "numerus": {"sg": "Einzahl", "pl": "Mehrzahl", "dual": "Zweizahl"},
+    # Kein "dual": das Inventar kennt ihn nicht, und mk.pruefen() weist
+    # ihn ab. Ein Eintrag, der nie greift, täuscht eine Fähigkeit vor.
+    "numerus": {"sg": "Einzahl", "pl": "Mehrzahl"},
     "genus": {"m": "männlich", "f": "weiblich", "n": "sächlich",
               "mf": "männlich und weiblich"},
     "tempus": {
         "praesens": "jetzt", "imperfekt": "früher, immer wieder",
         "aorist": "früher, einmal", "praeteritum": "früher",
         "perfekt": "schon geschehen", "plusquamperfekt": "davor geschehen",
-        "futur": "später", "futur_ii": "bis dann geschehen",
+        "futur": "später", "futur_perfekt": "bis dann geschehen",
+        "verlaufsform": "gerade dabei",
     },
     "modus": {
         "indikativ": "Aussage", "konjunktiv": "Möglichkeit oder Wunsch",
         "imperativ": "Aufforderung", "konditional": "Bedingung",
-        "optativ": "Wunsch",
     },
     "genus_verbi": {"aktiv": "tut selbst", "passiv": "wird getan",
                     "medium": "an sich selbst"},
@@ -238,7 +240,6 @@ BEISPIELE: dict[str, dict[str, str]] = {
     "modus": {
         "indikativ": "ich gehe", "konjunktiv": "dass ich gehe",
         "imperativ": "geh!", "konditional": "ich würde gehen",
-        "optativ": "ginge ich doch",
     },
     "genus_verbi": {"aktiv": "ich sehe", "passiv": "ich werde gesehen",
                     "medium": "ich wasche mich"},
@@ -246,10 +247,13 @@ BEISPIELE: dict[str, dict[str, str]] = {
         "praesens": "ich gehe", "imperfekt": "ich ging immer wieder",
         "aorist": "ich ging (einmal)", "praeteritum": "ich ging",
         "perfekt": "ich bin gegangen", "plusquamperfekt": "ich war gegangen",
-        "futur": "ich werde gehen", "futur_ii": "ich werde gegangen sein",
+        "futur": "ich werde gehen", "futur_perfekt": "ich werde gegangen sein",
+        "verlaufsform": "ich bin am Gehen",
     },
     "numerus": {"sg": "der Hund", "pl": "die Hunde"},
-    "genus": {"m": "der Hund", "f": "die Katze", "n": "das Pferd"},
+    "genus": {"m": "der Hund", "f": "die Katze", "n": "das Pferd",
+              # ο/η γιατρός — dasselbe Wort für beide.
+              "mf": "der oder die Angestellte"},
 }
 
 # Person und Zahl am Beispiel durchkonjugiert — genau die Reihe, die man
@@ -286,8 +290,6 @@ _EINFACH = {
 _UMSCHRIEBEN = {
     "futur": (("werde", "wirst", "wird", "werden", "werdet", "werden"),
               "gehen"),
-    "futur_ii": (("werde", "wirst", "wird", "werden", "werdet", "werden"),
-                 "gegangen sein"),
     "futur_perfekt": (("werde", "wirst", "wird", "werden", "werdet",
                        "werden"), "gegangen sein"),
     "perfekt": (("bin", "bist", "ist", "sind", "seid", "sind"), "gegangen"),
@@ -339,6 +341,22 @@ def _verbbeispiel(merkmale: dict) -> str | None:
     if modus == "konjunktiv":
         return f"dass {satz}"
     return satz
+
+# Wie eine Dimension auf Deutsch heißt. Stand zweimal in aufgaben.py,
+# mit verschiedenem Inhalt: einmal mit `genus_verbi: "Form"`, einmal
+# ohne — das Auswahlfeld hieß also »Form«, und die Rückmeldung bei
+# falscher Antwort sagte »genus_verbi stimmt nicht«.
+NAMEN: dict[str, str] = {
+    "person": "Person", "numerus": "Zahl", "genus": "Geschlecht",
+    "kasus": "Fall", "stufe": "Steigerung", "tempus": "Zeit",
+    "modus": "Modus", "nonfinit": "Nennform", "genus_verbi": "Form",
+    "aspekt": "Aspekt", "flexion": "Beugung", "diathese": "Diathese",
+}
+
+
+def name_der_dimension(dimension: str) -> str:
+    return NAMEN.get(dimension, dimension)
+
 
 # In dieser Reihenfolge wird nach einem Beispiel gesucht. Erklärt wird
 # EINE Sache, nicht alle: "ich sehe den Hund, der Hund" wäre keine Hilfe.

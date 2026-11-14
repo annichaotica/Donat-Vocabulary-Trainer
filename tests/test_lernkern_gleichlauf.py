@@ -164,3 +164,29 @@ def test_beide_tabellenpaare_sind_wirklich_deckungsgleich(klient):
             assert not fehlt, f"{b} fehlen gegenüber {a}: {sorted(fehlt)}"
     finally:
         db.close()
+
+
+def test_alle_module_fragen_dieselbe_uhr(monkeypatch):
+    """`lernziele` hatte eine eigene `_heute()` mit `dt.date.today()`.
+
+    Wer die Uhr für einen Test vorstellt, stellte damit nur die eine —
+    die Lernzielrechnung blieb im echten Heute stehen, und zwei Module
+    waren verschiedener Meinung darüber, welcher Tag ist.
+    """
+    import datetime as dt
+    import lernen, lernziele, lernkern
+    spaeter = dt.date.today() + dt.timedelta(days=30)
+    monkeypatch.setattr(lernen, "heute", lambda: spaeter)
+    assert lernziele._heute() == spaeter
+    assert lernkern.heute() == spaeter
+
+
+def test_ein_fehlender_termin_gilt_nirgends_als_faellig():
+    """In SQL ist `faellig <= heute` für NULL unwahr. In Python stand
+    `(r["faellig"] or "") <= heute` — und das ist für NULL WAHR. Damit
+    waren Lernzielblock und Abfrage verschiedener Meinung darüber, was
+    heute dran ist."""
+    import pathlib
+    quelle = (pathlib.Path(__file__).resolve().parents[1]
+              / "backend" / "lernziele.py").read_text()
+    assert '(r["faellig"] or "")' not in quelle

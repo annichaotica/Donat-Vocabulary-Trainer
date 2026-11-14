@@ -27,11 +27,7 @@ export async function zeichnenProfile(behaelter, zurueckNach = null) {
       },
     },
       h('div', { style: 'display:flex;align-items:center;gap:.75rem' },
-        h('span', {
-          class: 'profil-knopf', style: `background:${p.farbe}`,
-          text: p.name.slice(0, 1).toUpperCase(),
-        }),
-        h('strong', { text: p.name }))))));
+        profilpunkt(p), h('strong', { text: p.name }))))));
 
   const name = h('input', { type: 'text', placeholder: 'Name', maxlength: '60' });
   const farbe = h('input', { type: 'color', value: '#6b7fd7', style: 'width:3rem;padding:.2rem' });
@@ -65,6 +61,23 @@ function wartendes(s) {
     teile.push(`${s.offene_regeln} ${s.offene_regeln === 1 ? 'Regel' : 'Regeln'}`);
   }
   return teile;
+}
+
+/* Der farbige Punkt mit dem Anfangsbuchstaben.
+ *
+ * Die Farbe geht über das CSSOM, nicht über ein style-ATTRIBUT. Im
+ * Attribut stünde sie in einer ganzen Deklarationsliste, und ein
+ * Semikolon darin genügte: »#fff;position:fixed;inset:0;…« legte eine
+ * bildschirmfüllende Fläche über die Oberfläche und könnte obendrein
+ * ein Bild von einer fremden Adresse nachladen. `.style.background`
+ * nimmt dagegen nur eine gültige Farbe an und verwirft alles andere.
+ * (Im Modell steht zusätzlich ein Muster — zwei Schlösser.)
+ */
+function profilpunkt(p) {
+  const punkt = h('span', { class: 'profil-knopf',
+                            text: (p.name || '?').slice(0, 1).toUpperCase() });
+  punkt.style.background = p.farbe || '';
+  return punkt;
 }
 
 export async function zeichnen(behaelter) {

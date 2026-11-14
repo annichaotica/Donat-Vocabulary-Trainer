@@ -19,7 +19,7 @@
  * ungefährlich. */
 
 import { api } from './api.js';
-import { h, leeren, meldung } from './hilfen.js';
+import { h, leeren, meldung, tun } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 
@@ -403,18 +403,18 @@ async function tabelle(karte, sammlungId, text) {
     ausgabe.append(h('div', { class: 'freigabe-knoepfe' },
       h('button', {
         class: 'wichtig',
-        onclick: async () => {
-          if (!window.confirm(`${v.brauchbar} Zeilen wirklich eintragen?`)) return;
-          const bericht = await api.importUebernehmen(sammlungId, {
-            text, zuordnung, hat_kopfzeile: hatKopfzeile,
-            doppelte: doppelte.value,
-          });
-          meldung(`${bericht.angelegt ?? bericht.eingetragen ?? 0} eingetragen.`);
-          leeren(ausgabe).append(
-            h('p', { text: 'Eingetragen.' }),
-            h('button', {
-              onclick: () => { merken({ sammlungId }); location.hash = '#/wortschatz'; },
-            }, 'Zum Wortschatz'));
+        onclick: () => tun(async () => {
+            if (!window.confirm(`${v.brauchbar} Zeilen wirklich eintragen?`)) return;
+            const bericht = await api.importUebernehmen(sammlungId, {
+              text, zuordnung, hat_kopfzeile: hatKopfzeile,
+              doppelte: doppelte.value,
+            });
+            meldung(`${bericht.angelegt ?? bericht.eingetragen ?? 0} eingetragen.`);
+            leeren(ausgabe).append(
+              h('p', { text: 'Eingetragen.' }),
+              h('button', {
+                onclick: () => { merken({ sammlungId }); location.hash = '#/wortschatz'; },
+            }), 'Zum Wortschatz'));
         },
       }, 'Eintragen')));
   };

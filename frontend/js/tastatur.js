@@ -191,7 +191,7 @@ function lernen(code, taste, zeichen) {
 }
 
 export function hatBelegung(code) {
-  return Boolean(BELEGUNGEN[code]);
+  return Object.hasOwn(BELEGUNGEN, code);
 }
 
 /** Nur die Tasten — Grundlage für die große Tafel und die kleine beim Tippen.
@@ -212,9 +212,9 @@ function tastenbild(code, { klein = false, beiKlick = null } = {}) {
     for (const [taste, aufdruck] of reihe) {
       const zeichen = gemessen[taste] ?? b.tasten[taste] ?? '';
       const knopf = h('button', {
-        class: 'taste' + (b.tot[taste] ? ' tot' : '') + (zeichen ? '' : ' leer'),
+        class: 'taste' + (b.tot?.[taste] ? ' tot' : '') + (zeichen ? '' : ' leer'),
         type: 'button',
-        title: b.tot[taste] ? b.tot[taste]
+        title: b.tot?.[taste] ? b.tot?.[taste]
                             : (zeichen ? `${zeichen} auf ${aufdruck}` : aufdruck),
         // Kein Fokusverlust im Antwortfeld — sonst ist die Einfügemarke weg,
         // und genau da wollte man ja weiterschreiben.
@@ -234,7 +234,7 @@ function tastenbild(code, { klein = false, beiKlick = null } = {}) {
 
 /** Die Abbildung samt Suche und Probefeld. */
 export function belegung(code) {
-  const b = BELEGUNGEN[code];
+  const b = Object.hasOwn(BELEGUNGEN, code) ? BELEGUNGEN[code] : null;
   if (!b) return null;
   const el = h('div', { class: 'karte' });
   let gemessen = gelernt(code);
@@ -287,15 +287,31 @@ export function belegung(code) {
       if (!e.key || e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) {
         return;
       }
-      const zeichen = e.shiftKey ? e.key.toLowerCase() : e.key;
+      // Mit Umschalt wird NICHT gelernt. Die Umkehrung über
+      // toLowerCase() ist nicht verlässlich: auf W liegt unverschoben ς,
+      // verschoben Σ — und 'Σ'.toLowerCase() ist σ. Ein einziges
+      // Umschalt+W schrieb damit »KeyW: σ« in die gelernte Belegung und
+      // widersprach der Tafel, die zwei Zeilen weiter sagt, auf W liege
+      // das Wortende-ς. Und zwar dauerhaft, bis jemand »Gemessenes
+      // verwerfen« drückt.
+      if (e.shiftKey) return;
+      const zeichen = e.key;
       // Nur lernen, was in der Schrift der Sprache steht. Sonst schriebe
       // ein Tippversuch mit deutscher Tastatur lauter lateinische
       // Buchstaben in die Abbildung — und die wäre hinterher falsch.
-      if (b.schrift && !b.schrift.test(zeichen)) {
+      //
+      // Satzzeichen sind dabei ausgenommen: auf dem griechischen Layout
+      // liefern Komma, Punkt und Bindestrich dieselben Zeichen wie auf
+      // dem deutschen. Wer »Τι κάνεις;« tippte — also genau das
+      // Beispiel aus der Hilfe —, bekam beim Strichpunkt zu lesen, das
+      // sehe noch nach der deutschen Tastatur aus.
+      const istBuchstabe = /\p{L}/u.test(zeichen);
+      if (b.schrift && istBuchstabe && !b.schrift.test(zeichen)) {
         warnung.textContent = b.falschesLayout || '';
         warnung.hidden = false;
         return;
       }
+      if (!istBuchstabe) { warnung.hidden = true; return; }
       warnung.hidden = true;
       if (lernen(code, e.code, zeichen)) {
         gemessen = gelernt(code);

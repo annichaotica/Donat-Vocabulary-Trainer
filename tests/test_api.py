@@ -750,3 +750,52 @@ def test_die_namen_der_zeiten_bleiben_stehen(klient):
     einfach = sprachen.beschriften_form("el", "verb", bund, stil="einfach")
     assert einfach.startswith("Αόριστος")
     assert "ich" in einfach
+
+
+def test_die_merkmalstabellen_bleiben_deckungsgleich():
+    """INVENTAR, EINFACH und BEISPIELE nennen dieselben Werte dreimal.
+
+    Sie waren auseinandergelaufen, und zwar still: `futur_ii` stand in
+    zwei der drei Tabellen, im Inventar hieß es `futur_perfekt`. Der
+    Eintrag griff also nie — im Stil »einfach« erschien unter dem Futur
+    II die Fachbezeichnung. Umgekehrt hatten `optativ` und `dual`
+    Beschriftungen, die mk.pruefen() gar nicht durchlässt.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import merkmale as mk
+    for name, tabelle in (("EINFACH", mk.EINFACH), ("BEISPIELE", mk.BEISPIELE)):
+        for dimension, werte in tabelle.items():
+            gueltig = set(mk.INVENTAR.get(dimension, {}))
+            if not gueltig:
+                continue
+            ueberzaehlig = set(werte) - gueltig
+            assert not ueberzaehlig, (
+                f"{name}[{dimension!r}]: {sorted(ueberzaehlig)} gibt es im "
+                "Inventar nicht — die Einträge greifen nie")
+            fehlend = gueltig - set(werte)
+            assert not fehlend, (
+                f"{name}[{dimension!r}]: {sorted(fehlend)} fehlen")
+
+
+def test_das_schema_zeigt_die_ganze_tabelle(tmp_path, monkeypatch):
+    """Eine frische Datenbank muss ohne Wanderung vollständig sein.
+
+    21 Spalten standen nur in NACHRUESTEN und nicht in schema.sql —
+    darunter die halbe `text`-Tabelle, die der Kommentarblock darüber
+    ausführlich beschrieb. Wer das Schema las, sah sie nicht; die
+    Wanderung hat es im Betrieb geradegebogen.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+    monkeypatch.setattr(dbm, "PFAD", tmp_path / "frisch.db")
+    db = dbm.verbindung()
+    # NUR das Schemaskript, ohne wandern().
+    db.executescript((tmp_path.parent and __import__("pathlib").Path(
+        "backend/schema.sql")).read_text())
+    for tabelle, felder in dbm.NACHRUESTEN.items():
+        da = dbm.spalten(db, tabelle)
+        fehlt = sorted(f for f in felder if f not in da)
+        assert not fehlt, f"{tabelle}: {fehlt} fehlen im Schemaskript"
+    db.close()

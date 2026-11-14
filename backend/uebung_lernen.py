@@ -295,8 +295,12 @@ def ausbauen(db: sqlite3.Connection, textaufgabe_id: int, benutzer_id: int,
         "schwierigkeit": z["schwierigkeit"],
         "anzahl": z["anzahl"],
         "anzahl_fehler": z["anzahl_fehler"],
-        "begruendung": lernmodul._begruendung(z) if hasattr(
-            lernmodul, "_begruendung") else None,
+        # Dieselbe Begründung wie bei den Vokabeln: »warum kommt das
+        # jetzt?«. Hier stand ein Aufruf auf `lernmodul._begruendung`,
+        # das es nie gab — durch ein hasattr abgesichert und damit
+        # dauerhaft null, ohne dass es auffiel.
+        "begruendung": fsrs.erklaeren(vorher, verstrichen,
+                                      wunschretention)["text"],
         "vorschau": {str(b): fsrs.tage_in_text(
             fsrs.vorschau(vorher, verstrichen, wunschretention,
                           saat=textaufgabe_id,

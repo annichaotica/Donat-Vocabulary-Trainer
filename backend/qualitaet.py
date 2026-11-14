@@ -55,8 +55,9 @@ def pruefen(db: sqlite3.Connection, lexem_id: int) -> dict:
     befunde: list[dict] = []
     befunde += _bedeutungen_pruefen(uebersetzungen, grund)
     befunde += _lemma_pruefen(db, lexem)
-    befunde += _formen_pruefen(formen, code, wortart, e, luecken)
-    befunde += _staemme_pruefen(formen, code, wortart, luecken)
+    lex_merkmale = dbm.j_lesen(lexem["merkmale"])
+    befunde += _formen_pruefen(formen, code, wortart, e, luecken, lex_merkmale)
+    befunde += _staemme_pruefen(formen, code, wortart, luecken, lex_merkmale)
     befunde += _aufgaben_pruefen(aktive, formen, uebersetzungen)
 
     schwer = [b for b in befunde if b["schwere"] == "fehler"]
@@ -114,9 +115,24 @@ def _lemma_pruefen(db: sqlite3.Connection, lexem: dict) -> list[dict]:
     return []
 
 
+def _gruppe_gilt(gruppe: dict, lex_merkmale: dict) -> bool:
+    """Ist diese Formgruppe bei diesem Wort überhaupt zu erwarten?
+
+    Deponentien (θυμάμαι, έρχομαι, κοιμάμαι) haben nur Passivformen,
+    bedeuten aber nichts Passives. Ihre Aktivgruppen fehlen nicht — es gibt
+    sie schlicht nicht. Ohne diese Unterscheidung meldete der Trainer bei
+    achtundzwanzig griechischen Verben lauter Mängel, die keine sind.
+    """
+    if lex_merkmale.get("diathese") == "deponens":
+        return gruppe["merkmale"].get("genus_verbi") != "aktiv"
+    return True
+
+
 def _formen_pruefen(formen: list[dict], code: str, wortart: str,
-                    einstellungen: dict, luecken: list | None = None) -> list[dict]:
+                    einstellungen: dict, luecken: list | None = None,
+                    lex_merkmale: dict | None = None) -> list[dict]:
     luecken = luecken or []
+    lex_merkmale = lex_merkmale or {}
     befunde = []
     if not formen:
         # Für unveränderliche Wörter (το ταξί, μπλε) ist "keine Formen"
@@ -182,6 +198,8 @@ def _formen_pruefen(formen: list[dict], code: str, wortart: str,
     for gruppe in sprachen.formgruppen(code, wortart):
         if gruppe["kennung"] not in aktive_gruppen:
             continue
+        if not _gruppe_gilt(gruppe, lex_merkmale):
+            continue
         belegt = 0
         fehlende = []
         erklaert = 0
@@ -189,7 +207,8 @@ def _formen_pruefen(formen: list[dict], code: str, wortart: str,
             if mk.ist_erklaerte_luecke(luecken, zelle):
                 erklaert += 1
                 continue
-            if any(all(str(f["merkmale"].get(d)) == str(w) for d, w in zelle.items())
+            if any(all(str(mk.normieren(f["merkmale"], wortart).get(d)) == str(w)
+                       for d, w in zelle.items())
                    for f in formen):
                 belegt += 1
             else:
@@ -210,19 +229,21 @@ def _formen_pruefen(formen: list[dict], code: str, wortart: str,
 
 
 def _staemme_pruefen(formen: list[dict], code: str, wortart: str,
-                     luecken: list | None = None) -> list[dict]:
+                     luecken: list | None = None,
+                     lex_merkmale: dict | None = None) -> list[dict]:
     """Lässt sich der Stamm je Formgruppe ableiten?
 
     Davon hängt die Zerlegung in Stamm und Endung ab — die Hilfe, die der
     Legastheniemodus anbietet und die kein Kartenstapel geben kann.
     """
     befunde = []
+    lex_merkmale = lex_merkmale or {}
     for gruppe in sprachen.formgruppen(code, wortart):
-        if len(gruppe["zellen"]) < 2:
+        if len(gruppe["zellen"]) < 2 or not _gruppe_gilt(gruppe, lex_merkmale):
             continue
         dazu = [f["text"] for f in formen
                 if not f.get("ist_variante")
-                and all(str(f["merkmale"].get(d)) == str(w)
+                and all(str(mk.normieren(f["merkmale"], wortart).get(d)) == str(w)
                         for d, w in gruppe["merkmale"].items())]
         if len(dazu) < 2:
             continue

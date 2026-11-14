@@ -220,6 +220,26 @@ def vergleichbar(text: str) -> str:
     return unicodedata.normalize("NFC", text)
 
 
+# ----------------------------------------------- Stillschweigende Vorgaben
+
+def normieren(merkmale: dict, wortart: str) -> dict:
+    """Ergänzt, was ungesagt gilt.
+
+    Eine Verbform ohne Angabe zum Genus verbi ist **aktiv**. Das muss
+    ausgesprochen werden, sobald es auch Passivgruppen gibt: sonst passte
+    eine Passivform auch auf die Aktivzelle, weil die das Merkmal gar nicht
+    verlangt — und ein Deponens sähe aus, als hätte es ein vollständiges
+    Aktivparadigma.
+
+    Nur zum VERGLEICHEN gedacht, nicht zum Speichern: die Datensätze
+    bleiben, wie sie eingetragen wurden.
+    """
+    if (wortart == "verb" and "genus_verbi" not in merkmale
+            and any(d in merkmale for d in ("tempus", "modus", "nonfinit"))):
+        return {**merkmale, "genus_verbi": "aktiv"}
+    return dict(merkmale)
+
+
 # --------------------------------------------------------- Erklärte Lücken
 
 def passt_muster(muster: dict, zelle: dict) -> bool:

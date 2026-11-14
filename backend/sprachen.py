@@ -15,7 +15,7 @@ Eine neue Sprache ist ein neuer Eintrag hier, keine Änderung am Code.
 from __future__ import annotations
 
 from merkmale import (INVENTAR, WORTARTEN, MerkmalFehler, beschriften,
-                      pruefen as pruefen_merkmale)
+                      normieren, pruefen as pruefen_merkmale)
 
 PERSONEN = (("1", "sg"), ("2", "sg"), ("3", "sg"),
             ("1", "pl"), ("2", "pl"), ("3", "pl"))
@@ -272,7 +272,8 @@ GRIECHISCH = {
     # Zerlegung in Stamm und Endung zeigte das θα als Teil des Wortstamms.
     "partikeln": ["θα", "να", "ας", "δεν", "μην"],
     "formgruppen_standard": {
-        "verb": ["enestotas", "aoristos", "mellontas_stigmiaios"],
+        "verb": ["enestotas", "aoristos", "mellontas_stigmiaios",
+                 "enestotas_pass", "aoristos_pass"],
         "substantiv": ["subst_nom_sg", "subst_gen_sg", "subst_akk_sg",
                        "subst_nom_pl", "subst_gen_pl", "subst_akk_pl"],
         "adjektiv": "alle",
@@ -297,40 +298,93 @@ GRIECHISCH = {
     },
     "formgruppen": {
         "verb": [
+            # Aktiv. Das genus_verbi steht ausdrücklich dabei, seit es auch
+            # Passivgruppen gibt — sonst passte eine Passivform auch hierher.
             _finit("enestotas", "Ενεστώτας (Präsens)",
-                   {"modus": "indikativ", "tempus": "praesens"}, kurz="Ενεστώτας"),
+                   {"modus": "indikativ", "tempus": "praesens",
+                    "genus_verbi": "aktiv"}, kurz="Ενεστώτας"),
             _finit("paratatikos", "Παρατατικός (Imperfekt)",
-                   {"modus": "indikativ", "tempus": "imperfekt"}, kurz="Παρατατικός"),
+                   {"modus": "indikativ", "tempus": "imperfekt",
+                    "genus_verbi": "aktiv"}, kurz="Παρατατικός"),
             _finit("aoristos", "Αόριστος (Aorist)",
-                   {"modus": "indikativ", "tempus": "aorist"}, kurz="Αόριστος"),
+                   {"modus": "indikativ", "tempus": "aorist",
+                    "genus_verbi": "aktiv"}, kurz="Αόριστος"),
             # Das Futur unterscheidet den Aspekt, und das ist kein Feinsinn:
             # θα γράψω heißt "ich werde schreiben", θα γράφω "ich werde
             # schreibend sein". Zwei Formen, zwei Bedeutungen.
             _finit("mellontas_stigmiaios", "Μέλλοντας στιγμιαίος (Futur, punktuell)",
                    {"modus": "indikativ", "tempus": "futur",
-                    "aspekt": "perfektiv"}, kurz="Μέλλ. στιγμ."),
+                    "aspekt": "perfektiv", "genus_verbi": "aktiv"},
+                   kurz="Μέλλ. στιγμ."),
             _finit("mellontas_exakolouthitikos",
                    "Μέλλοντας εξακολουθητικός (Futur, fortgesetzt)",
                    {"modus": "indikativ", "tempus": "futur",
-                    "aspekt": "imperfektiv"}, kurz="Μέλλ. εξακ."),
+                    "aspekt": "imperfektiv", "genus_verbi": "aktiv"},
+                   kurz="Μέλλ. εξακ."),
             _finit("parakeimenos", "Παρακείμενος (Perfekt)",
-                   {"modus": "indikativ", "tempus": "perfekt"}, kurz="Παρακείμενος"),
+                   {"modus": "indikativ", "tempus": "perfekt",
+                    "genus_verbi": "aktiv"}, kurz="Παρακείμενος"),
             _finit("ypotaktiki", "Υποτακτική (Konjunktiv)",
-                   {"modus": "konjunktiv", "tempus": "praesens"}, kurz="Υποτακτική"),
-            _finit("prostaktiki", "Προστακτική (Imperativ)", {"modus": "imperativ"},
+                   {"modus": "konjunktiv", "tempus": "praesens",
+                    "genus_verbi": "aktiv"}, kurz="Υποτακτική"),
+            _finit("prostaktiki", "Προστακτική (Imperativ)",
+                   {"modus": "imperativ", "genus_verbi": "aktiv"},
                    personen=(("2", "sg"), ("2", "pl")), kurz="Προστακτική"),
+
+            # Passiv. Eigene Gruppen, nicht bloß ein Merkmal an den
+            # Aktivformen: die Endungen sind andere, und bei Deponentien
+            # gibt es das Aktiv überhaupt nicht.
+            _finit("enestotas_pass", "Ενεστώτας Παθητικής (Präsens Passiv)",
+                   {"modus": "indikativ", "tempus": "praesens",
+                    "genus_verbi": "passiv"}, kurz="Ενεστ. Παθ."),
+            _finit("aoristos_pass", "Αόριστος Παθητικής (Aorist Passiv)",
+                   {"modus": "indikativ", "tempus": "aorist",
+                    "genus_verbi": "passiv"}, kurz="Αόρ. Παθ."),
+            _finit("paratatikos_pass", "Παρατατικός Παθητικής (Imperfekt Passiv)",
+                   {"modus": "indikativ", "tempus": "imperfekt",
+                    "genus_verbi": "passiv"}, kurz="Παρατ. Παθ."),
+            _finit("mellontas_pass", "Μέλλοντας Παθητικής (Futur Passiv, punktuell)",
+                   {"modus": "indikativ", "tempus": "futur",
+                    "aspekt": "perfektiv", "genus_verbi": "passiv"},
+                   kurz="Μέλλ. Παθ."),
+            _finit("ypotaktiki_pass", "Υποτακτική Παθητικής (Konjunktiv Passiv)",
+                   {"modus": "konjunktiv", "tempus": "praesens",
+                    "genus_verbi": "passiv"}, kurz="Υποτ. Παθ."),
+
+            # Nicht nach Person gebeugt
+            _einzeln("metochi_pass", "Μετοχή παθητικού παρακειμένου "
+                                     "(Partizip Perfekt Passiv)",
+                     {"nonfinit": "partizip_perfekt", "genus_verbi": "passiv"},
+                     kurz="Μετοχή Παθ."),
+            _einzeln("gerundio", "Γερούνδιο (Gerundium, -οντας)",
+                     {"nonfinit": "gerundium", "genus_verbi": "aktiv"},
+                     kurz="Γερούνδιο"),
         ],
         "substantiv": _kasusreihe("subst", "Deklination", _EL_KASUS),
         "adjektiv": [
             _einzeln(f"adj_{g}", f"{INVENTAR['genus'][g][0]} Nominativ Singular",
                      {"genus": g, "kasus": "nom", "numerus": "sg"})
             for g in ("m", "f", "n")
+        ] + [
+            # καλός – καλύτερος – ο καλύτερος
+            _einzeln("adj_komparativ", "Συγκριτικός (Komparativ)",
+                     {"stufe": "komparativ"}, kurz="Συγκριτικός"),
+            _einzeln("adj_superlativ", "Υπερθετικός (Superlativ)",
+                     {"stufe": "superlativ"}, kurz="Υπερθετικός"),
         ],
     },
     "stammformen": ["enestotas", "aoristos", "mellontas_stigmiaios"],
     "lexemmerkmale": {
         "substantiv": {"genus": ["m", "f", "n", "mf"]},
-        "verb": {"klasse": ["Α-Konjugation", "Β1", "Β2", "unregelmäßig"]},
+        "verb": {
+            "klasse": ["Α-Konjugation", "Β1", "Β2", "unregelmäßig",
+                       # Passivtypen nach der Endung der 1. Person Singular
+                       "-ομαι", "-άμαι", "-ούμαι", "-ιέμαι"],
+            # Deponentien (θυμάμαι, έρχομαι, κοιμάμαι) haben nur Passivformen,
+            # bedeuten aber nichts Passives. Ihre Aktivgruppen gelten darum
+            # nicht als fehlend.
+            "diathese": ["aktiv", "medial", "deponens"],
+        },
     },
 }
 
@@ -576,9 +630,15 @@ def formgruppe(code: str, kennung: str) -> dict | None:
     return None
 
 
-def _passt(gruppe: dict, merkmale: dict) -> bool:
-    """Gehört die Form in diese Gruppe? Alle Gruppenmerkmale müssen stimmen."""
-    return all(merkmale.get(d) == w for d, w in gruppe["merkmale"].items())
+def _passt(gruppe: dict, merkmale: dict, wortart: str = "") -> bool:
+    """Gehört die Form in diese Gruppe? Alle Gruppenmerkmale müssen stimmen.
+
+    Verglichen wird über die Normalform: eine Verbform ohne Angabe zum
+    Genus verbi gilt als aktiv. Ohne das passte eine Passivform auch auf
+    die Aktivgruppe.
+    """
+    voll = normieren(merkmale, wortart) if wortart else merkmale
+    return all(voll.get(d) == w for d, w in gruppe["merkmale"].items())
 
 
 def beschriften_form(code: str, wortart: str, merkmale: dict,
@@ -591,7 +651,8 @@ def beschriften_form(code: str, wortart: str, merkmale: dict,
 
     Ohne Formgruppen fällt es auf die allgemeine Beschriftung zurück.
     """
-    kandidaten = [g for g in formgruppen(code, wortart) if _passt(g, merkmale)]
+    kandidaten = [g for g in formgruppen(code, wortart)
+                  if _passt(g, merkmale, wortart)]
     if not kandidaten:
         return beschriften(merkmale, kurz=kurz)
     # Die spezifischste Gruppe gewinnt (die mit den meisten festen Merkmalen).

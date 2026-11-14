@@ -123,14 +123,21 @@ Stammformen, das Kernpensum: **Ενεστώτας (Präsens) – Αόριστο�
 
 | Kennung | Name | Zellen | Merkmale |
 |---|---|---|---|
-| `enestotas` | Ενεστώτας (Präsens) (Standard) | 6 | `{"modus": "indikativ", "tempus": "praesens"}` |
-| `paratatikos` | Παρατατικός (Imperfekt) | 6 | `{"modus": "indikativ", "tempus": "imperfekt"}` |
-| `aoristos` | Αόριστος (Aorist) (Standard) | 6 | `{"modus": "indikativ", "tempus": "aorist"}` |
-| `mellontas_stigmiaios` | Μέλλοντας στιγμιαίος (Futur, punktuell) (Standard) | 6 | `{"aspekt": "perfektiv", "modus": "indikativ", "tempus": "futur"}` |
-| `mellontas_exakolouthitikos` | Μέλλοντας εξακολουθητικός (Futur, fortgesetzt) | 6 | `{"aspekt": "imperfektiv", "modus": "indikativ", "tempus": "futur"}` |
-| `parakeimenos` | Παρακείμενος (Perfekt) | 6 | `{"modus": "indikativ", "tempus": "perfekt"}` |
-| `ypotaktiki` | Υποτακτική (Konjunktiv) | 6 | `{"modus": "konjunktiv", "tempus": "praesens"}` |
-| `prostaktiki` | Προστακτική (Imperativ) | 2 | `{"modus": "imperativ"}` |
+| `enestotas` | Ενεστώτας (Präsens) (Standard) | 6 | `{"genus_verbi": "aktiv", "modus": "indikativ", "tempus": "praesens"}` |
+| `paratatikos` | Παρατατικός (Imperfekt) | 6 | `{"genus_verbi": "aktiv", "modus": "indikativ", "tempus": "imperfekt"}` |
+| `aoristos` | Αόριστος (Aorist) (Standard) | 6 | `{"genus_verbi": "aktiv", "modus": "indikativ", "tempus": "aorist"}` |
+| `mellontas_stigmiaios` | Μέλλοντας στιγμιαίος (Futur, punktuell) (Standard) | 6 | `{"aspekt": "perfektiv", "genus_verbi": "aktiv", "modus": "indikativ", "tempus": "futur"}` |
+| `mellontas_exakolouthitikos` | Μέλλοντας εξακολουθητικός (Futur, fortgesetzt) | 6 | `{"aspekt": "imperfektiv", "genus_verbi": "aktiv", "modus": "indikativ", "tempus": "futur"}` |
+| `parakeimenos` | Παρακείμενος (Perfekt) | 6 | `{"genus_verbi": "aktiv", "modus": "indikativ", "tempus": "perfekt"}` |
+| `ypotaktiki` | Υποτακτική (Konjunktiv) | 6 | `{"genus_verbi": "aktiv", "modus": "konjunktiv", "tempus": "praesens"}` |
+| `prostaktiki` | Προστακτική (Imperativ) | 2 | `{"genus_verbi": "aktiv", "modus": "imperativ"}` |
+| `enestotas_pass` | Ενεστώτας Παθητικής (Präsens Passiv) (Standard) | 6 | `{"genus_verbi": "passiv", "modus": "indikativ", "tempus": "praesens"}` |
+| `aoristos_pass` | Αόριστος Παθητικής (Aorist Passiv) (Standard) | 6 | `{"genus_verbi": "passiv", "modus": "indikativ", "tempus": "aorist"}` |
+| `paratatikos_pass` | Παρατατικός Παθητικής (Imperfekt Passiv) | 6 | `{"genus_verbi": "passiv", "modus": "indikativ", "tempus": "imperfekt"}` |
+| `mellontas_pass` | Μέλλοντας Παθητικής (Futur Passiv, punktuell) | 6 | `{"aspekt": "perfektiv", "genus_verbi": "passiv", "modus": "indikativ", "tempus": "futur"}` |
+| `ypotaktiki_pass` | Υποτακτική Παθητικής (Konjunktiv Passiv) | 6 | `{"genus_verbi": "passiv", "modus": "konjunktiv", "tempus": "praesens"}` |
+| `metochi_pass` | Μετοχή παθητικού παρακειμένου (Partizip Perfekt Passiv) | 1 | `{"genus_verbi": "passiv", "nonfinit": "partizip_perfekt"}` |
+| `gerundio` | Γερούνδιο (Gerundium, -οντας) | 1 | `{"genus_verbi": "aktiv", "nonfinit": "gerundium"}` |
 
 *Substantiv*
 
@@ -152,11 +159,24 @@ Stammformen, das Kernpensum: **Ενεστώτας (Präsens) – Αόριστο�
 | `adj_m` | maskulin Nominativ Singular (Standard) | 1 | `{"genus": "m", "kasus": "nom", "numerus": "sg"}` |
 | `adj_f` | feminin Nominativ Singular (Standard) | 1 | `{"genus": "f", "kasus": "nom", "numerus": "sg"}` |
 | `adj_n` | neutrum Nominativ Singular (Standard) | 1 | `{"genus": "n", "kasus": "nom", "numerus": "sg"}` |
+| `adj_komparativ` | Συγκριτικός (Komparativ) (Standard) | 1 | `{"stufe": "komparativ"}` |
+| `adj_superlativ` | Υπερθετικός (Superlativ) (Standard) | 1 | `{"stufe": "superlativ"}` |
 
 *Lexemmerkmale* — beschreiben das Wort, nicht eine Form:
 
-- Substantiv, `genus`: `m`, `f`, `n`
-- Verb, `klasse`: `Α-Konjugation`, `Β1`, `Β2`, `unregelmäßig`
+- Substantiv, `genus`: `m`, `f`, `n`, `mf`
+- Verb, `klasse`: `Α-Konjugation`, `Β1`, `Β2`, `unregelmäßig`, `-ομαι`, `-άμαι`, `-ούμαι`, `-ιέμαι`
+- Verb, `diathese`: `aktiv`, `medial`, `deponens`
+
+Das Griechische hat **eigene Passivgruppen**, nicht bloß ein Merkmal an den
+Aktivformen: γράφομαι ist keine Variante von γράφω, die Endungen sind andere.
+Darum trägt jede Aktivgruppe ausdrücklich `"genus_verbi": "aktiv"` — ohne das
+passte eine Passivform in beide Tabellen.
+
+**Deponentien** (θυμάμαι, έρχομαι, κοιμάμαι) haben *nur* Passivformen,
+bedeuten damit aber nichts Passives. Sie brauchen das Lexemmerkmal
+`{"diathese": "deponens"}`; dann gelten die Aktivgruppen, die es bei ihnen
+gar nicht gibt, nicht als fehlend.
 
 
 ### Französisch (`fr`)

@@ -180,8 +180,9 @@ def test_formgruppen_zeigen_liefert_abschreibbare_merkmale(mcp):
     praesens = next(g for g in ergebnis["wortarten"]["verb"]
                     if g["kennung"] == "enestotas")
     assert len(praesens["zellen"]) == 6
+    # genus_verbi steht ausdrücklich dabei, seit es Passivgruppen gibt
     assert praesens["zellen"][0]["merkmale"] == {
-        "modus": "indikativ", "tempus": "praesens",
+        "modus": "indikativ", "tempus": "praesens", "genus_verbi": "aktiv",
         "person": "1", "numerus": "sg"}
     assert praesens["zellen"][0]["beschriftung"].startswith("Ενεστώτας")
     assert praesens["voreingestellt"] is True

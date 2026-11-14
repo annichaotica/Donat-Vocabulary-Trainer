@@ -74,8 +74,9 @@ def sammlung_einstellungen(db: sqlite3.Connection, sammlung_id: int) -> dict:
 
 def _gruppe_der_form(code: str, wortart: str, merkmale: dict) -> dict | None:
     """Zu welcher Formgruppe gehört diese Form? Die spezifischste gewinnt."""
+    voll = mk.normieren(merkmale, wortart)
     treffer = [g for g in sprachen.formgruppen(code, wortart)
-               if all(merkmale.get(d) == w for d, w in g["merkmale"].items())]
+               if all(voll.get(d) == w for d, w in g["merkmale"].items())]
     return max(treffer, key=lambda g: len(g["merkmale"])) if treffer else None
 
 
@@ -307,7 +308,8 @@ def geschwisterformen(db: sqlite3.Connection, form_id: int) -> list[str]:
                 if all(dbm.j_lesen(z["merkmale"]).get(d) == w
                        for d, w in schluessel.items())]
     return [z["text"] for z in alle
-            if all(dbm.j_lesen(z["merkmale"]).get(d) == w
+            if all(mk.normieren(dbm.j_lesen(z["merkmale"]),
+                                lexem["wortart"]).get(d) == w
                    for d, w in gruppe["merkmale"].items())]
 
 

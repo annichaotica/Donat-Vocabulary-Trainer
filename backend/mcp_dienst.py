@@ -100,7 +100,10 @@ def formgruppen_zeigen(db: sqlite3.Connection, person: dict, sprache: str):
             "hinweis": "Jede Form braucht das Merkmalsbündel ihrer Zelle, genau "
                        "so wie es hier steht. Nicht voreingestellte Formgruppen "
                        "dürfen trotzdem befüllt werden — sie lassen sich später "
-                       "zuschalten."}
+                       "zuschalten. Hat ein Wort eine ganze Gruppe nicht, gehört "
+                       "das in die Lexemmerkmale (griechische Deponentien: "
+                       "diathese = deponens) oder in luecken — nicht "
+                       "unausgesprochen bleiben."}
 
 
 def merkmale_zeigen(db: sqlite3.Connection, person: dict):
@@ -360,7 +363,10 @@ WERKZEUGE: list[dict] = [
             "merkmale": _s("object",
                 "Merkmale des WORTES, nicht einer Form: genus beim Substantiv, "
                 "klasse (Ablautreihe, Konjugationsklasse) beim Verb. Was "
-                "erlaubt ist, sagt formgruppen_zeigen unter lexemmerkmale."),
+                "erlaubt ist, sagt formgruppen_zeigen unter lexemmerkmale. "
+                "Griechische Deponentien (θυμάμαι, έρχομαι) brauchen hier "
+                "diathese = deponens: dann zählen die Aktivgruppen, die es "
+                "bei ihnen gar nicht gibt, nicht als fehlend."),
             "notiz": _s("string", "freier Vermerk"),
             "als_geprueft": _s("boolean",
                 "Nur auf ausdrücklichen Wunsch der Benutzerin auf true setzen. "

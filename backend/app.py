@@ -1481,11 +1481,22 @@ def lernziel_aendern(lernziel_id: int, eingabe: LernzielAendern,
                      db: sqlite3.Connection = DB):
     _holen(db, "lernziel", lernziel_id)
     felder, werte = [], []
+    # `None` heißt hier »nicht genannt, also unverändert« — sonst würde
+    # eine Teiländerung alles andere löschen. Für das Leeren eines
+    # Feldes gibt es darum den leeren String: ohne ihn ließe sich ein
+    # einmal gesetzter Termin nie wieder entfernen, und das Ziel bliebe
+    # für immer unter Zeitdruck.
+    gesetzt = eingabe.model_dump(exclude_unset=True)
     for feld in ("name", "termin", "ziel", "notiz"):
-        wert = getattr(eingabe, feld)
-        if wert is not None:
-            felder.append(f"{feld} = ?")
-            werte.append(wert)
+        if feld not in gesetzt:
+            continue
+        wert = gesetzt[feld]
+        if wert == "":
+            wert = None               # ausdrücklich leeren
+        elif wert is None:
+            continue                  # nicht genannt
+        felder.append(f"{feld} = ?")
+        werte.append(wert)
     if eingabe.umfang is not None:
         felder.append("umfang = ?")
         werte.append(dbm.j_schreiben(eingabe.umfang))

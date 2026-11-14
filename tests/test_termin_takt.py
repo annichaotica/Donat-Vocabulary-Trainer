@@ -136,3 +136,24 @@ def test_woerter_und_aufgaben_werden_nicht_verwechselt(bestand, klient):
     assert f["neue_woerter"] == len(VERBEN)
     assert f["neu"] > f["neue_woerter"] * 2, (f["neu"], f["neue_woerter"])
     assert f["woerter_taeglich_noetig"] < f["neu_taeglich_noetig"]
+
+
+def test_ein_termin_laesst_sich_auch_wieder_entfernen(bestand, klient):
+    """`null` heißt bei einer Teiländerung »unverändert« — sonst löschte
+    jede Teiländerung alles andere mit. Zum Leeren gibt es den leeren
+    String. Ohne ihn bliebe ein Ziel für immer unter Zeitdruck."""
+    b, s = bestand
+    ziel = _ziel(klient, b, s, tage=5)
+    assert _fortschritt(klient, b, ziel)["termin"] is not None
+
+    klient.patch(f"/api/lernziele/{ziel['id']}",
+                 json={"benutzer_id": b["id"], "termin": None})
+    assert _fortschritt(klient, b, ziel)["termin"] is not None, \
+        "null darf nicht löschen"
+
+    klient.patch(f"/api/lernziele/{ziel['id']}",
+                 json={"benutzer_id": b["id"], "termin": ""})
+    f = _fortschritt(klient, b, ziel)
+    assert f["termin"] is None
+    assert f["lage"] == "ohne Termin"
+    assert f["schaffbar"] is True

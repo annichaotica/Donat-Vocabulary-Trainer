@@ -445,7 +445,11 @@ class LernzielAnlegen(BaseModel):
 class LernzielAendern(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     umfang: dict[str, Any] | None = None
-    termin: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    # Leerer String heißt ausdrücklich »Termin entfernen«; None heißt
+    # »nicht genannt«. Ohne diese Unterscheidung ließe sich ein einmal
+    # gesetzter Termin nie wieder loswerden.
+    termin: str | None = Field(default=None,
+                               pattern=r"^(\d{4}-\d{2}-\d{2})?$")
 
     @field_validator("termin")
     @classmethod
@@ -453,7 +457,7 @@ class LernzielAendern(BaseModel):
         # Das Muster allein lässt 2026-13-45 durch. Ein solches Lernziel wäre
         # danach dauerhaft unbenutzbar: Fortschritt, Block und die Übersicht
         # würden daran scheitern.
-        if wert is not None:
+        if wert:            # leerer String heißt: entfernen
             import datetime
             datetime.date.fromisoformat(wert)
         return wert

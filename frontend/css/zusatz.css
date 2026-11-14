@@ -12,11 +12,16 @@
 .zeichenleiste button.zeichen {
   font-family: var(--schrift-wort);
   font-size: 1.1em; line-height: 1;
-  min-width: 2.4rem; min-height: 2.4rem;
+  /* 44 px ist die Fingergrenze; die em-Grenze lässt es im
+     Legastheniemodus mitwachsen. */
+  min-width: max(44px, 2.6em); min-height: max(44px, 2.6em);
   padding: .3rem .4rem;
   background: var(--grund-3); border-color: transparent;
 }
 .zeichenleiste button.zeichen:active { background: var(--akzent-grund); }
+@media (hover: hover) and (pointer: fine) {
+  .zeichenleiste button.zeichen:hover { border-color: var(--akzent); }
+}
 .zeichenleiste .leiste-hinweis { font-size: .82em; color: var(--leise); }
 
 /* Bei nichtlateinischer Schrift ersetzt keine Leiste ein Layout. */
@@ -53,3 +58,23 @@
   background: var(--akzent); transition: width .3s ease;
 }
 @media (prefers-reduced-motion: reduce) { .zielbalken i { transition: none; } }
+
+/* Beschriftung neben dem Feld — auf schmalen Geräten darüber.
+ * Vorher stand das als Inline-Stil im JavaScript und war von außen nicht
+ * zu erreichen; Zeilen wie "Μέλλοντας στιγμιαίος (Futur, punktuell),
+ * 2. Person Singular" brachen dann auf vier Zeilen um. */
+.feldzeile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: .5rem;
+  align-items: center;
+}
+.feldzeile > label { overflow-wrap: anywhere; }
+
+@media (max-width: 34rem) {
+  .feldzeile {
+    grid-template-columns: 1fr;
+    gap: .2rem;
+    margin-bottom: .4rem;
+  }
+}

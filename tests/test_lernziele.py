@@ -181,3 +181,67 @@ def test_ziel_einmal_richtig_zaehlt_anders_als_reif(klient):
                           params={"benutzer_id": b["id"]}).json()
     assert f_locker["geschafft"] == 3
     assert f_streng["geschafft"] < f_locker["geschafft"]
+
+
+def test_wackliges_kommt_auch_bei_rueckstand_dran(klient):
+    """Der Wacklig-Anteil wird vor dem Neuen reserviert. Sonst bliebe er
+    gerade dann leer, wenn er am wichtigsten ist: bei Rückstand braucht man
+    viel Neues, und genau dann schleppt man die Lücken mit."""
+    import datetime as dt
+    b, s, _l = _aufbau(klient, woerter=40)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Viel vor",
+        "termin": (dt.date.today() + dt.timedelta(days=5)).isoformat()}).json()
+
+    # Ein paar Aufgaben wacklig machen: gelernt, aber mehrfach daneben,
+    # und auf einen Termin in der Zukunft gesetzt.
+    erste = klient.get(f"/api/lernziele/{ziel['id']}/block",
+                       params={"benutzer_id": b["id"], "anzahl": 4}).json()
+    for a in erste["aufgaben"]:
+        for _ in range(3):
+            klient.post("/api/lernen/bewerten", json={
+                "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+                "urteil": "falsch"})
+        klient.post("/api/lernen/bewerten", json={
+            "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+            "urteil": "richtig", "denkzeit_ms": 900})
+        klient.post("/api/lernen/termin", json={
+            "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+            "datum": (dt.date.today() + dt.timedelta(days=20)).isoformat()})
+
+    block = klient.get(f"/api/lernziele/{ziel['id']}/block",
+                       params={"benutzer_id": b["id"], "anzahl": 20}).json()
+    assert block["zusammensetzung"]["wacklig"] > 0, block["zusammensetzung"]
+    assert block["zusammensetzung"]["neu"] > 0
+    assert "wacklig" in block["begruendung"]
+
+
+def test_block_bleibt_bei_grossem_bestand_schnell(klient):
+    """Der Zuschnitt darf nicht quadratisch sein — bei fünfzehn Zeiten je
+    französischem Verb sind einige tausend Aufgaben schnell erreicht."""
+    import time
+    b, s, _l = _aufbau(klient, woerter=250)        # 500 Aufgaben
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alles"}).json()
+    begonnen = time.perf_counter()
+    for _ in range(5):
+        klient.get(f"/api/lernziele/{ziel['id']}/block",
+                   params={"benutzer_id": b["id"], "anzahl": 20})
+    dauer = (time.perf_counter() - begonnen) / 5
+    assert dauer < 0.5, f"{dauer * 1000:.0f} ms je Block"
+
+
+def test_ungueltiger_termin_wird_abgelehnt(klient):
+    """Das Muster allein lässt 2026-13-45 durch — ein solches Ziel wäre
+    danach dauerhaft unbenutzbar."""
+    b, _s, _l = _aufbau(klient, woerter=1)
+    assert klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Kaputt",
+        "termin": "2026-13-45"}).status_code == 422
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Gut"}).json()
+    assert klient.patch(f"/api/lernziele/{ziel['id']}",
+                        json={"termin": "2026-02-30"}).status_code == 422
+    # und das Ziel ist danach weiterhin benutzbar
+    assert klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
+                      params={"benutzer_id": b["id"]}).status_code == 200

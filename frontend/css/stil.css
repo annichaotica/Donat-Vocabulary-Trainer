@@ -33,6 +33,9 @@
   --rand-stark: #c3bbac;
   --akzent: #35558a;
   --akzent-grund: #e4ebf7;
+  /* Schrift auf der Akzentfläche. Im Dunkeln ist der Akzent hell, dann muss
+     die Schrift darauf dunkel werden — sonst steht Weiß auf Hellblau. */
+  --auf-akzent: #ffffff;
   --richtig: #2a6a4a;
   --richtig-grund: #e0f0e6;
   --fast: #80590f;
@@ -62,6 +65,7 @@
     --rand-stark: #514d46;
     --akzent: #9cbbe6;
     --akzent-grund: #232e3c;
+    --auf-akzent: #141a21;
     --richtig: #8fd6ab;
     --richtig-grund: #1c2d23;
     --fast: #e5c47f;
@@ -87,7 +91,7 @@
   color-scheme: dark;
   --grund: #131619; --grund-2: #1d2024; --grund-3: #262a2f;
   --text: #e8eaec; --leise: #a2a8ae; --rand: #353a40; --rand-stark: #4c525a;
-  --akzent: #9cbbe6; --akzent-grund: #212b38;
+  --akzent: #9cbbe6; --akzent-grund: #212b38; --auf-akzent: #121820;
   --richtig: #8fd6ab; --richtig-grund: #1b2922;
   --fast: #e5c47f; --fast-grund: #2a2416;
   --falsch: #f0a8a1; --falsch-grund: #2d1d1b;
@@ -98,9 +102,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
-  /* Wenn der Browser ein Feld in den Blick scrollt, soll über und unter dem
-     Feld Luft bleiben — unten viel, dort steht die Bildschirmtastatur. */
-  scroll-padding-block: 5rem 40vh;
+  /* Holt der Browser ein Feld in den Blick, soll die festgeheftete Kopfzeile
+     nicht davorstehen. */
+  scroll-padding-block: 4.5rem 1.5rem;
 }
 
 body {
@@ -128,7 +132,8 @@ em, i { font-style: normal; font-weight: 600; }
 .sprungmarke {
   position: absolute; top: 0; left: 0;
   clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden;
-  background: var(--akzent); color: #fff; padding: .5rem 1rem; z-index: 60;
+  background: var(--akzent); color: var(--auf-akzent);
+  padding: .5rem 1rem; z-index: 60;
   border-radius: 0 0 var(--rund-klein) 0;
 }
 .sprungmarke:focus {
@@ -253,7 +258,7 @@ button:not(:disabled):active { background: var(--grund-3); transform: scale(.985
 }
 
 button.wichtig {
-  background: var(--akzent); border-color: var(--akzent); color: #fff;
+  background: var(--akzent); border-color: var(--akzent); color: var(--auf-akzent);
   font-weight: 600;
 }
 button.wichtig:not(:disabled):active { background: var(--akzent); filter: brightness(.9); }
@@ -286,6 +291,11 @@ input[type=color], select, textarea {
   width: 100%; min-width: 0; min-height: max(var(--tipp), 2.4em);
 }
 input[type=search] { -webkit-appearance: none; appearance: none; }
+/* Der Farbwähler steht im Profilformular auf schmalen 3 rem — ohne diese
+   Zeilen schrumpft das Farbfeld darin auf einen Streifen. */
+input[type=color] { min-width: 3rem; cursor: pointer; }
+input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type=color]::-webkit-color-swatch { border: none; border-radius: 5px; }
 input[type=checkbox] { accent-color: var(--akzent); }
 input[type=range] {
   width: 100%; min-height: var(--tipp); accent-color: var(--akzent);
@@ -315,15 +325,23 @@ input[type=range] {
   .karte.klickbar:hover { border-color: var(--akzent); }
 }
 
+/* Aufklappbare Karte. Das eigene Dreieck fällt mit display:flex weg, also
+   zeichnen wir den Winkel selbst — ohne ihn sieht niemand, dass da etwas
+   aufgeht. */
 details.karte > summary {
-  list-style-position: inside;
   cursor: pointer; padding: .2rem 0; margin: -.2rem 0;
   min-height: var(--tipp); display: flex; align-items: center; gap: .5rem;
   font-weight: 500; border-radius: var(--rund-klein);
 }
 details.karte[open] > summary { margin-bottom: .5rem; }
 details.karte > summary::-webkit-details-marker { display: none; }
-details.karte > summary::marker { color: var(--leise); }
+details.karte > summary::before {
+  content: "›"; flex: none; width: 1ch; color: var(--leise);
+  font-size: 1.25em; line-height: 1; letter-spacing: normal;
+  transition: transform .15s ease;
+}
+details.karte[open] > summary::before { transform: rotate(90deg); }
+details.karte > summary:active { background: var(--grund-3); }
 
 .zahlen {
   display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; margin-top: .6rem;
@@ -568,9 +586,9 @@ details.warum[open] > summary::before { transform: rotate(90deg); }
       left / 2.5rem 100% no-repeat local,
     linear-gradient(to left, var(--grund-2) 40%, transparent)
       right / 2.5rem 100% no-repeat local,
-    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 16%), transparent)
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 22%), transparent)
       left / .7rem 100% no-repeat scroll,
-    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 16%), transparent)
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 22%), transparent)
       right / .7rem 100% no-repeat scroll,
     var(--grund-2);
 }
@@ -589,7 +607,7 @@ table.paradigma th:first-child, table.paradigma td.form {
   position: sticky; left: 0; z-index: 1; background: var(--grund-2);
   box-shadow: 1px 0 0 var(--rand);
 }
-table.paradigma td:nth-child(2) { min-width: 8rem; }
+table.paradigma td:nth-child(2) { min-width: 11rem; }
 table.paradigma tr.ungeprueft td { background: var(--fast-grund); }
 table.paradigma tr.ungeprueft td.form { background: var(--fast-grund); }
 table.paradigma td:last-child { white-space: nowrap; }
@@ -665,21 +683,34 @@ table.paradigma .marke { align-self: auto; }
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     box-shadow: 0 -1px 12px rgb(0 0 0 / 6%);
   }
+  /* Die Beschriftung der Leiste ist Wegweiser, kein Lesetext: sie bleibt in
+     rem und ohne Zeichenabstand, sonst stoßen die vier Reiter im
+     Legastheniemodus aneinander. Lesbar bleibt sie durch das Zeichen darüber
+     und den Titel am Knopf. */
   .kopf-knoepfe button {
     flex-direction: column; justify-content: center; gap: .1rem;
-    border: none; border-radius: 0;
+    border: none; border-radius: 0; min-width: 0;
     padding: .3rem .2rem; min-height: 3.4rem;
-    font-size: .68em; font-weight: 500; line-height: 1.2;
+    font-size: .7rem; font-weight: 500; line-height: 1.2;
+    letter-spacing: normal; word-spacing: normal;
   }
   .kopf-knoepfe button:not(:disabled):active {
     background: var(--grund-3); transform: none;
   }
-  .kopf-zeichen { width: 1.5em; height: 1.5em; }
-  .kopf-wort { font-size: 1em; }
+  .kopf-zeichen { width: 1.5rem; height: 1.5rem; }
+  .kopf-wort {
+    display: block; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  /* Das Profilzeichen bleibt ein runder Punkt, kein Reiter mit Beschriftung —
+     min-height der Reiter darf es nicht in die Länge ziehen. */
+  /* Der Knopf bleibt 44 px groß — der sichtbare Punkt wird nur durch einen
+     Ring in der Farbe der Leiste kleiner gezeichnet. So stimmt das Tippziel,
+     ohne dass das Profilzeichen die halbe Leiste einnimmt. */
   .kopf-knoepfe .profil-knopf {
-    width: 2rem; height: 2rem; margin: 0 auto;
-    align-self: center; justify-self: center;
-    font-size: .95rem;
+    width: var(--tipp); height: var(--tipp); min-height: 0; margin: 0 auto;
+    border-radius: 50%; align-self: center; justify-self: center;
+    font-size: .95rem; box-shadow: inset 0 0 0 5px var(--grund-2);
   }
 
   h2 { margin-top: 1.5em; }
@@ -693,30 +724,26 @@ table.paradigma .marke { align-self: auto; }
 
 /* Sehr schmal: die Beschriftungen der unteren Leiste dürfen nicht umbrechen. */
 @media (max-width: 22rem) {
-  .kopf-wort { font-size: .9em; }
+  .kopf-knoepfe button { font-size: .64rem; }
 }
 
 /* -------------------------------------------------- Bildschirmtastatur */
 
-/* Beim Tippen soll nichts das Antwortfeld verdecken: die untere Leiste
-   fährt weg, und unter dem Inhalt entsteht Platz zum Hochscrollen.
-   Zusammen mit scroll-padding am html-Element landet das Feld über der
-   Tastatur statt dahinter. */
+/* Die untere Leiste steht fest am unteren Rand des Layout-Fensters. Klappt
+   die Tastatur auf, schrumpft nur das sichtbare Fenster — die Leiste liegt
+   also hinter der Tastatur und verdeckt das Antwortfeld nicht.
+   Was fehlen kann, ist Platz zum Hochscrollen: unter einer kurzen Seite ist
+   nichts, wohin das Feld ausweichen könnte. Darum entsteht dieser Platz,
+   solange ein Feld den Fokus hat, und verschwindet danach wieder. */
 @supports selector(:has(*)) {
-  @media (max-width: 44rem) {
-    body:has(.inhalt input:focus, .inhalt select:focus, .inhalt textarea:focus)
-      .kopf-knoepfe {
-      transform: translateY(110%);
-      transition: transform .18s ease;
-      pointer-events: none;
-    }
+  @media (max-width: 60rem) {
     body:has(.inhalt input:focus, .inhalt textarea:focus) .inhalt {
-      padding-bottom: 55vh;
+      padding-bottom: 45vh;
     }
   }
 }
-.antwortfeld input, .inhalt input, .inhalt select, .inhalt textarea {
-  scroll-margin-block: 4rem 45vh;
+.inhalt input, .inhalt select, .inhalt textarea {
+  scroll-margin-block: 4.5rem 1.5rem;
 }
 
 /* Wer Bewegung nicht mag, bekommt keine. */

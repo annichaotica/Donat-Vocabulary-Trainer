@@ -25,6 +25,10 @@ from dataclasses import dataclass, field, asdict
 
 # Satzzeichen, die am Rand einer Antwort nichts bedeuten.
 _RAND = " \t\n\r.,;:!?¡¿\"'»«“”„’…-–—"
+# Typografische Apostrophe. iOS und macOS ersetzen den geraden Apostroph
+# selbsttätig — ohne diese Gleichsetzung gilt »l’école« als falsch, und zwar
+# ohne jeden Hinweis, weil es zeichengleich die richtige Antwort ist.
+_APOSTROPHE = str.maketrans({"’": "'", "‘": "'", "ʼ": "'", "´": "'"})
 _MEHRFACH_LEERRAUM = re.compile(r"\s+")
 _KLAMMERTEIL = re.compile(r"\s*\(([^()]*)\)\s*")
 
@@ -61,6 +65,7 @@ def normalisieren(text: str, profil: dict) -> str:
     je nach Profil Groß/Klein eingezogen."""
     r = _regeln(profil)
     text = unicodedata.normalize("NFC", text or "")
+    text = text.translate(_APOSTROPHE)
     text = _MEHRFACH_LEERRAUM.sub(" ", text).strip()
     if r.get("satzzeichen", "ignorieren") == "ignorieren":
         text = text.strip(_RAND)
@@ -206,7 +211,8 @@ def _anzeige(text: str) -> str:
     geglättet. Niemals kleingeschrieben — die Kleinschreibung nach Unicode
     verwandelt das griechische Schluss-Sigma (ς -> σ), und dann steht in der
     Rückmeldung ein falsch geschriebenes Wort."""
-    return _MEHRFACH_LEERRAUM.sub(" ", unicodedata.normalize("NFC", text or "")).strip()
+    return _MEHRFACH_LEERRAUM.sub(
+        " ", unicodedata.normalize("NFC", text or "").translate(_APOSTROPHE)).strip()
 
 
 def _besser(neu: Urteil, alt: Urteil | None) -> bool:
@@ -235,7 +241,10 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
       2. andere gültige Form desselben Wortes           -> klar falsch
       3. Tippfehler                                     -> "fast richtig"
     """
-    if not (eingabe or "").strip():
+    if not (eingabe or "").strip() or not normalisieren(eingabe, profil):
+        # Auch eine Antwort aus lauter Satzzeichen ist keine Antwort. Ohne
+        # diese zweite Prüfung zählte ein versehentlich abgeschickter Punkt
+        # als "nicht gewusst".
         return Urteil("falsch", hinweis="Keine Antwort eingegeben.")
 
     def abschluss(urteil: Urteil) -> Urteil:

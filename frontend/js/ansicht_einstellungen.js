@@ -143,14 +143,34 @@ async function teilLernen(behaelter) {
   kasten.append(h('div', { class: 'regler' },
     h('label', { text: 'Neue Aufgaben je Tag' }), h('span', {}), neu, h('span', {})));
 
+  // Im Legastheniemodus sind diese Werte ABGELEITET (0,95 statt 0,9 und
+  // 8 statt 20). Würde man sie unverändert zurückschreiben, wären sie
+  // fortan ausdrücklich gesetzt — und die Ableitung bliebe für immer
+  // eingefroren, auch nach Abschalten des Modus. Darum wird nur gesendet,
+  // was wirklich bewegt wurde.
+  const ausgangswerte = { retention: e.wunschretention, neu: e.neu_je_sitzung };
+  if (e.legasthenie?.aktiv) {
+    kasten.append(h('p', { class: 'leise',
+      text: 'Diese Werte leitet der Legastheniemodus gerade ab. Wer sie hier '
+          + 'bewegt, setzt sie fest — danach wirkt die Ableitung nicht mehr.' }));
+  }
+
   kasten.append(h('button', {
     class: 'wichtig', style: 'margin-top:.6rem',
     onclick: async () => {
+      const aenderungen = {};
+      if (Number(retention.value) !== ausgangswerte.retention) {
+        aenderungen.wunschretention = Number(retention.value);
+      }
+      if (Number(neu.value) !== ausgangswerte.neu) {
+        aenderungen.neu_je_sitzung = Number(neu.value);
+      }
+      if (!Object.keys(aenderungen).length) {
+        meldung('Nichts geändert.');
+        return;
+      }
       try {
-        await api.benutzerAendern(zustand.benutzerId, {
-          wunschretention: Number(retention.value),
-          neu_je_sitzung: Number(neu.value),
-        });
+        await api.benutzerAendern(zustand.benutzerId, aenderungen);
         meldung('Gespeichert.');
       } catch (fehler) { meldung(fehler.message); }
     },

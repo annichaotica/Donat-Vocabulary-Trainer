@@ -422,10 +422,16 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
         artikel = sprachen.profil(code)["artikel"]["genus_artikel"]
         soll_genus = dbm.j_lesen(lexem["merkmale"]).get("genus")
         soll_artikel = artikel.get(soll_genus)
+        if soll_artikel is None:
+            # Das Geschlecht wurde nachträglich entfernt. Dann ist die Aufgabe
+            # nicht beantwortbar — das soll dastehen und nicht "Richtig ist None".
+            return Urteil("falsch", None,
+                          "Zu diesem Wort ist kein Geschlecht hinterlegt. "
+                          "Die Aufgabe wird beim nächsten Durchrechnen "
+                          "abgeschaltet.", ["unbeantwortbar"]), {"erwartet": []}
         gegeben = str(eingabe).strip()
         # Sowohl das Kürzel ("f") als auch der Artikel selbst ("la") gelten.
-        richtig = gegeben == soll_genus or (
-            soll_artikel and gegeben.casefold() == soll_artikel.casefold())
+        richtig = gegeben == soll_genus or gegeben.casefold() == soll_artikel.casefold()
         urteil = (Urteil("richtig", soll_artikel) if richtig
                   else Urteil("falsch", soll_artikel,
                               f"Richtig ist {soll_artikel}.", ["genus"]))
@@ -441,20 +447,30 @@ def _merkmale_pruefen(db: sqlite3.Connection, lexem: dict, form: dict,
     Mehrdeutige Formen sind der Normalfall — französisch "parle" ist
     1. und 3. Person Singular und Imperativ. Jede zutreffende Lesart gilt.
     """
-    if not isinstance(eingabe, dict):
-        return Urteil("falsch", hinweis="Keine Auswahl getroffen."), {}
+    # Die Lesarten immer ermitteln — auch ohne Eingabe. Sonst liefert
+    # "Lösung zeigen" bei dieser Aufgabenart nichts.
+    lesarten_alle = [dbm.j_lesen(z["merkmale"]) for z in
+                     dbm.zeilen(db, """SELECT * FROM form
+                                        WHERE lexem_id = ? AND text = ?""",
+                                (lexem["id"], form["text"]))]
+    beschriftungen_alle = [sprachen.beschriften_form(code, lexem["wortart"], l)
+                           for l in lesarten_alle]
+    auflösung_leer = {"lesarten": lesarten_alle,
+                      "beschriftungen": beschriftungen_alle,
+                      "erwartet": beschriftungen_alle}
+
+    if not isinstance(eingabe, dict) or not eingabe:
+        return (Urteil("falsch", " / ".join(beschriftungen_alle),
+                       "Keine Auswahl getroffen.", ["keine_auswahl"]),
+                auflösung_leer)
     try:
         gegeben = mk.pruefen(eingabe)
     except mk.MerkmalFehler as fehler:
-        return Urteil("falsch", hinweis=str(fehler)), {}
+        return Urteil("falsch", hinweis=str(fehler)), auflösung_leer
     gegeben = {d: w for d, w in gegeben.items() if w}
 
-    lesarten = [dbm.j_lesen(z["merkmale"]) for z in
-                dbm.zeilen(db, "SELECT * FROM form WHERE lexem_id = ? AND text = ?",
-                           (lexem["id"], form["text"]))]
-    beschriftungen = [sprachen.beschriften_form(code, lexem["wortart"], l)
-                      for l in lesarten]
-    auflösung = {"lesarten": lesarten, "beschriftungen": beschriftungen}
+    lesarten, beschriftungen = lesarten_alle, beschriftungen_alle
+    auflösung = dict(auflösung_leer)
 
     if gegeben in lesarten:
         return Urteil("richtig", " / ".join(beschriftungen)), auflösung

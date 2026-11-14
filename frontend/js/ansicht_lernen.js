@@ -34,6 +34,13 @@ export class Sitzung {
     this.denkzeit = null;       // bis zum ERSTEN Tastendruck
     this.versuche = 1;
     this.wertungOffen = false;  // "anders werten" aufgeklappt?
+    // Riegel gegen Doppelauslösung. Ohne ihn wertet eine gedrückt gehaltene
+    // Eingabetaste dieselbe Aufgabe mehrfach: der Phasenwechsel kommt erst
+    // nach dem await, bis dahin kommt jeder weitere Tastendruck durch. Das
+    // schreibt Phantomwiederholungen ins Protokoll und bläht die Stabilität.
+    this.laeuft = false;
+    this.abgebrochen = false;
+    this.aufgedeckt = false;
     this.eingabeWert = '';
     this.merkmalsWahl = {};
     this.lg = {};
@@ -49,6 +56,9 @@ export class Sitzung {
   }
 
   beenden() {
+    // Auch das Zeichnen stilllegen: sonst schreibt eine Sitzung, die noch
+    // auf eine Antwort wartet, in den Inhaltsbereich der neuen Ansicht.
+    this.abgebrochen = true;
     document.removeEventListener('keydown', this.tastatur);
   }
 
@@ -61,6 +71,7 @@ export class Sitzung {
     this.denkzeit = null;
     this.versuche = 1;
     this.wertungOffen = false;
+    this.aufgedeckt = false;      // sonst wirkt "Weiß ich nicht" fort
     this.zeichneLade();
     let reihe;
     try {
@@ -79,6 +90,7 @@ export class Sitzung {
       this.zeichneFertig();
       return;
     }
+    if (this.abgebrochen) return;
     this.aufgabe = reihe[0];
     this.begonnen = performance.now();
     this.denkzeitStart = this.begonnen;
@@ -178,6 +190,7 @@ export class Sitzung {
   }
 
   zeichnen() {
+    if (this.abgebrochen) return;
     const a = this.aufgabe;
     const el = leeren(this.behaelter);
     el.append(h('div', { class: 'abfrage' },
@@ -264,8 +277,11 @@ export class Sitzung {
         feld,
         fertig ? null : h('button', { class: 'wichtig', onclick: () => this.absenden() }, 'Prüfen')));
     // Gerüst statt leeres Feld: nur im Legastheniemodus und nur vor der Prüfung.
-    if (this.lg.aktiv && !this.ergebnis && this._maske) {
-      kasten.append(h('p', { class: 'maske', text: this._maske }));
+    // Das Gerüst kommt mit der Aufgabe vom Server — dort ist die erwartete
+    // Antwort bekannt.
+    if (this.lg.aktiv && !this.ergebnis && a.maske) {
+      kasten.append(h('p', { class: 'maske', title: 'Gerüst zum Schreiben',
+                             text: a.maske }));
     }
     // Zeichenleiste für Akzente und dergleichen — erspart den Layoutwechsel,
     // solange es um einzelne Zeichen in lateinischer Schrift geht.
@@ -565,13 +581,14 @@ export class Sitzung {
   }
 
   async absenden() {
-    if (this.phase === 'rueckmeldung') return;
+    if (this.phase === 'rueckmeldung' || this.laeuft) return;
     const antwort = this.antwortWert();
     const leerEingabe = typeof antwort === 'string'
       ? !antwort.trim() : !Object.keys(antwort).length;
     if (leerEingabe) { meldung('Noch keine Antwort eingegeben.'); return; }
 
     let ergebnis;
+    this.laeuft = true;
     try {
       ergebnis = await api.pruefen({
         benutzer_id: zustand.benutzerId,
@@ -580,7 +597,13 @@ export class Sitzung {
         denkzeit_ms: this.denkzeit,
         versuche: this.versuche,
       });
-    } catch (fehler) { meldung(fehler.message); return; }
+    } catch (fehler) {
+      meldung(fehler.message);
+      return;
+    } finally {
+      this.laeuft = false;
+    }
+    if (this.abgebrochen) return;
 
     this.ergebnis = ergebnis;
     if (ergebnis.nochmal_tippen && this.phase === 'frage') {
@@ -601,6 +624,8 @@ export class Sitzung {
   }
 
   async weissNicht() {
+    if (this.laeuft || this.phase === 'rueckmeldung') return;
+    this.laeuft = true;
     try {
       const gezeigt = await api.aufdecken({
         benutzer_id: zustand.benutzerId, aufgabe_id: this.aufgabe.aufgabe_id,
@@ -622,14 +647,20 @@ export class Sitzung {
       this.phase = 'rueckmeldung';
       this.gezaehlt.falsch += 1;
       this.zeichnen();
-    } catch (fehler) { meldung(fehler.message); }
+    } catch (fehler) {
+      meldung(fehler.message);
+    } finally {
+      this.laeuft = false;
+    }
   }
 
   /** Weiter zur nächsten Aufgabe. Ohne `note` gilt die automatische
    *  Bewertung; mit `note` ist es ein Eingriff von Hand. */
   async weiter(note = null) {
-    if (this.phase !== 'rueckmeldung') return;
+    if (this.phase !== 'rueckmeldung' || this.laeuft) return;
     const u = this.ergebnis?.urteil || {};
+    this.laeuft = true;
+    this.phase = 'wird_gewertet';      // gleich hier, nicht erst nach dem await
     try {
       const ergebnis = await api.bewerten({
         benutzer_id: zustand.benutzerId,
@@ -648,7 +679,13 @@ export class Sitzung {
       this.gezaehlt.gesamt += 1;
       meldung(`${ergebnis.einschaetzung ? ergebnis.einschaetzung.name : 'Gewertet'}`
             + ` · wieder dran ${ergebnis.termin_text}.`, 1800);
-    } catch (fehler) { meldung(fehler.message); return; }
+    } catch (fehler) {
+      meldung(fehler.message);
+      this.phase = 'rueckmeldung';     // noch einmal versuchbar
+      this.laeuft = false;
+      return;
+    }
+    this.laeuft = false;
     this.aufgedeckt = false;
     await this.naechste();
   }

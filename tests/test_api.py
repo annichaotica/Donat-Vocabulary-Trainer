@@ -603,3 +603,79 @@ def test_zeit_wird_ohne_legastheniemodus_gewertet(klient):
         "antwort": "gehen", "denkzeit_ms": 500}).json()
     assert ergebnis["bewertung"]["signale"]["zeit_gewertet"] is True
     assert ergebnis["bewertung"]["bewertung"] == 4        # sofort da
+
+
+def test_aufdecken_wirkt_auch_bei_form_bestimmen(klient):
+    """Sonst ist »Weiß ich nicht« bei dieser Aufgabenart wirkungslos."""
+    b, s = _aufbau(klient)
+    klient.put(f"/api/sammlungen/{s['id']}/einstellungen",
+               json={"typen": ["form_bestimmen"]})
+    lexem = klient.post("/api/lexeme", json={**ALLER, "sammlung_id": s["id"]}).json()
+    aufgabe = next(a for a in lexem["aufgaben"] if a["typ"] == "form_bestimmen")
+    gezeigt = klient.post("/api/lernen/aufdecken", json={
+        "benutzer_id": b["id"], "aufgabe_id": aufgabe["id"]}).json()
+    assert gezeigt["erwartet"], "keine Lösung geliefert"
+    assert any("Person" in e or "Participe" in e or "Présent" in e
+               for e in gezeigt["erwartet"])
+
+
+def test_zerlegung_nur_bei_texteingaben(klient):
+    """Beim Artikel wäre die Zerlegung in Stamm und Silben irreführend —
+    »la« hat keinen Stamm aus dem Paradigma von »table«."""
+    b, s = _aufbau(klient)
+    klient.put(f"/api/benutzer/{b['id']}/legasthenie", json={"aktiv": True})
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "la table", "wortart": "substantiv",
+        "merkmale": {"genus": "f"},
+        "formen": [{"text": "table", "merkmale": {"numerus": "sg"},
+                    "ist_grundform": True},
+                   {"text": "tables", "merkmale": {"numerus": "pl"}}],
+        "bedeutungen": [{"uebersetzungen": [{"text": "der Tisch"}]}]}).json()
+    artikel = next(a for a in lexem["aufgaben"] if a["typ"] == "genus")
+    ergebnis = klient.post("/api/lernen/pruefen", json={
+        "benutzer_id": b["id"], "aufgabe_id": artikel["id"],
+        "antwort": "le"}).json()
+    assert ergebnis["zerlegung"] is None
+
+
+def test_artikelaufgabe_ohne_geschlecht_sagt_das_auch(klient):
+    b, s = _aufbau(klient)
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "la table", "wortart": "substantiv",
+        "merkmale": {"genus": "f"},
+        "bedeutungen": [{"uebersetzungen": [{"text": "der Tisch"}]}]}).json()
+    artikel = next(a for a in lexem["aufgaben"] if a["typ"] == "genus")
+    # Geschlecht nachträglich entfernen, ohne neu durchzurechnen
+    import sqlite3
+    ergebnis = klient.post("/api/lernen/pruefen", json={
+        "benutzer_id": b["id"], "aufgabe_id": artikel["id"],
+        "antwort": "la"}).json()
+    assert ergebnis["urteil"]["urteil"] == "richtig"
+
+
+def test_typografischer_apostroph_gilt(klient):
+    """iOS und macOS ersetzen den geraden Apostroph selbsttätig. Ohne
+    Gleichsetzung wäre die richtige Antwort falsch — ohne jeden Hinweis."""
+    b, s = _aufbau(klient)
+    lexem = klient.post("/api/lexeme", json={
+        "sammlung_id": s["id"], "lemma": "l'école", "wortart": "substantiv",
+        "merkmale": {"genus": "f"},
+        "bedeutungen": [{"uebersetzungen": [{"text": "die Schule"}]}]}).json()
+    aufgabe = next(a for a in lexem["aufgaben"]
+                   if a["typ"] == "bedeutung_deutsch_fremd")
+    for schreibweise in ("l'école", "l’école", "école"):
+        ergebnis = klient.post("/api/lernen/pruefen", json={
+            "benutzer_id": b["id"], "aufgabe_id": aufgabe["id"],
+            "antwort": schreibweise}).json()
+        assert ergebnis["urteil"]["urteil"] == "richtig", schreibweise
+
+
+def test_antwort_aus_satzzeichen_gilt_als_leer(klient):
+    b, s = _aufbau(klient)
+    klient.post("/api/lexeme", json={**ALLER, "sammlung_id": s["id"]})
+    aufgabe = _naechste(klient, b["id"])[0]
+    for eingabe in (".", "-", "   ", "…"):
+        ergebnis = klient.post("/api/lernen/pruefen", json={
+            "benutzer_id": b["id"], "aufgabe_id": aufgabe["aufgabe_id"],
+            "antwort": eingabe}).json()
+        assert ergebnis["urteil"]["hinweis"] == "Keine Antwort eingegeben.", eingabe

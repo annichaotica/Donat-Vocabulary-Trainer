@@ -231,11 +231,46 @@ class LernzielAnlegen(BaseModel):
     ziel: Literal["reif", "einmal_richtig"] = "reif"
     notiz: str | None = None
 
+    @field_validator("termin")
+    @classmethod
+    def termin_pruefen(cls, wert: str | None) -> str | None:
+        if wert is not None:
+            import datetime
+            datetime.date.fromisoformat(wert)
+        return wert
+
 
 class LernzielAendern(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     umfang: dict[str, Any] | None = None
     termin: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    @field_validator("termin")
+    @classmethod
+    def termin_pruefen(cls, wert: str | None) -> str | None:
+        # Das Muster allein lässt 2026-13-45 durch. Ein solches Lernziel wäre
+        # danach dauerhaft unbenutzbar: Fortschritt, Block und die Übersicht
+        # würden daran scheitern.
+        if wert is not None:
+            import datetime
+            datetime.date.fromisoformat(wert)
+        return wert
     ziel: Literal["reif", "einmal_richtig"] | None = None
     aktiv: bool | None = None
     notiz: str | None = None
+
+
+class ImportEingabe(BaseModel):
+    """Import in zwei Schritten: erst Vorschau, dann Übernahme.
+
+    Ein Import, der ungefragt 800 Zeilen in den Bestand kippt, ist schlimmer
+    als keiner — darum sieht man vorher, was herauskäme, und kann die
+    Spaltenzuordnung berichtigen.
+    """
+    text: str = Field(min_length=1, max_length=5_000_000)
+    trenner: str | None = Field(default=None, max_length=4)
+    # Spaltennummer -> Rolle: lemma, uebersetzung, wortart, lektion, notiz,
+    # ignorieren. Fehlt sie, wird geraten.
+    zuordnung: dict[str, str] | None = None
+    hat_kopfzeile: bool | None = None
+    doppelte: Literal["ueberspringen", "ergaenzen", "trotzdem"] = "ueberspringen"

@@ -128,3 +128,77 @@ def test_termintext():
 def test_stabilitaet_bleibt_in_grenzen():
     z = Zustand(stabilitaet=36000.0, schwierigkeit=1.0)
     assert bewerten(z, LEICHT, 36000.0).stabilitaet <= fsrs.S_MAX
+
+
+# ------------------------------------------ Festwerte gegen die Referenz
+
+def test_die_alte_schwierigkeit_geht_in_die_stabilitaetsformel():
+    """Festgehalten, weil es leicht falsch gemacht wird — und einmal
+    falsch behauptet wurde.
+
+    Die Referenzumsetzung (open-spaced-repetition/fsrs-rs, `model_v6.rs`,
+    `next_state_scalar`) reicht die ALTE Schwierigkeit in
+    `stability_after_success_scalar` beziehungsweise
+    `stability_after_failure_scalar` und berechnet die neue Schwierigkeit
+    daneben:
+
+        stability_after_success_scalar(w, s, r, d, rating)
+        MemoryState { stability, difficulty: next_difficulty_scalar(w, d, rating) }
+
+    Würde stattdessen die neue Schwierigkeit eingesetzt, lägen die
+    Intervalle bei "Leicht" rund zehn Prozent zu kurz und bei "Schwer"
+    und "Nochmal" zu lang — und der Fehler potenzierte sich über die
+    Wiederholungen.
+    """
+    z = Zustand(stabilitaet=10.0, schwierigkeit=5.0)
+    r = fsrs.abrufwahrscheinlichkeit(10.0, 10.0)
+
+    # "Leicht", weil sich dort die Schwierigkeit deutlich bewegt (5,0 -> 4,18)
+    # und der Unterschied damit sichtbar wird. Bei "Gut" ändert sie sich kaum.
+    mit_alter = bewerten(z, LEICHT, verstrichen_tage=10.0).stabilitaet
+    erwartet = fsrs.stabilitaet_nach_erfolg(10.0, 5.0, r, LEICHT)
+    assert mit_alter == pytest.approx(round(erwartet, 4))
+
+    # Und zum Beweis, dass die Wahl überhaupt etwas ausmacht:
+    d_neu = fsrs.neue_schwierigkeit(5.0, LEICHT)
+    assert d_neu < 4.5
+    anders = fsrs.stabilitaet_nach_erfolg(10.0, d_neu, r, LEICHT)
+    assert anders > erwartet + 5.0, (
+        "Mit der neuen Schwierigkeit kämen deutlich längere Intervalle heraus "
+        "— darum ist die Reihenfolge nicht gleichgültig.")
+
+
+def test_festwerte_bleiben_stabil():
+    """Riegel gegen stille Änderungen an den Formeln. Die Werte stammen aus
+    dieser Umsetzung mit den FSRS-5-Standardparametern; wer sie ändert,
+    ändert den Lernplan aller Beteiligten."""
+    z = Zustand(stabilitaet=10.0, schwierigkeit=5.0)
+    werte = {g: bewerten(z, g, verstrichen_tage=10.0) for g in (1, 2, 3, 4)}
+    assert werte[1].stabilitaet == pytest.approx(2.1077, abs=1e-4)
+    assert werte[2].stabilitaet == pytest.approx(15.3139, abs=1e-4)
+    assert werte[3].stabilitaet == pytest.approx(32.9543, abs=1e-4)
+    assert werte[4].stabilitaet == pytest.approx(78.6287, abs=1e-4)
+    assert werte[3].schwierigkeit == pytest.approx(4.9918, abs=1e-4)
+    assert werte[1].schwierigkeit == pytest.approx(6.6070, abs=1e-4)
+    # Bei zehn Tagen Abstand und Stabilität zehn liegt R genau bei 90 %.
+    assert fsrs.abrufwahrscheinlichkeit(10.0, 10.0) == pytest.approx(0.9, abs=1e-9)
+
+
+def test_verfaelschter_lernzustand_stuerzt_nicht_ab():
+    """Der Lernzustand wird auch vom MCP-Server und von Hand beschrieben.
+    Ein Serverfehler mitten in der Sitzung ist teurer als eine Klemmung."""
+    for schlecht in (Zustand(0.0, 5.0), Zustand(5.0, 0.0), Zustand(-1.0, 5.0),
+                     Zustand(1e9, 99.0)):
+        for note in (NOCHMAL, GUT):
+            e = bewerten(schlecht, note, verstrichen_tage=5.0)
+            assert fsrs.S_MIN <= e.stabilitaet <= fsrs.S_MAX
+            assert 1.0 <= e.schwierigkeit <= 10.0
+
+
+def test_erklaerung_bleibt_ein_satz():
+    """Ein .replace(".", ",") über den ganzen Satz verwandelt auch die
+    Satzpunkte in Kommata."""
+    text = fsrs.erklaeren(Zustand(10.0, 5.0), 12.0)["text"]
+    assert text.endswith(".")
+    assert ", Die " not in text
+    assert "10,0 Tagen" in text and "12,0 Tagen" in text

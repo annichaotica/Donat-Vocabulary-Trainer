@@ -43,8 +43,13 @@ export async function zeichnen(behaelter) {
   el.append(liste);
 
   let uhr = null;
+  let lauf = 0;
   const nachladen = async () => {
+    // Laufende Nummer gegen überholende Antworten: ohne sie kann die
+    // Trefferliste zu "ab" unter dem Suchwort "abc" stehenbleiben.
+    const meine = ++lauf;
     const ergebnis = await api.lexeme(sammlungId, { suche: suche.value, anzahl: 200 });
+    if (meine !== lauf) return;
     leeren(liste);
     if (!ergebnis.lexeme.length) {
       liste.append(h('div', { class: 'leer' },
@@ -66,6 +71,8 @@ export async function zeichnen(behaelter) {
     }
   };
   suche.addEventListener('input', () => { clearTimeout(uhr); uhr = setTimeout(nachladen, 220); });
+  // Beim Verlassen der Ansicht die wartende Suche abräumen.
+  window.addEventListener('hashchange', () => clearTimeout(uhr), { once: true });
   await nachladen();
 }
 
@@ -239,8 +246,6 @@ async function teilNeueForm(behaelter, lexem) {
     leeren(felder);
     const gruppe = fuerWortart.find((g) => g.kennung === wahl.value);
     if (!gruppe) return;
-    const voll = await api.formgruppen(lexem.sprache);
-    void voll;
     // Zellen aus der Schnittstelle: eine Zeile je Zelle, beschriftet.
     const zellen = await zellenHolen(lexem.sprache, lexem.wortart, gruppe.kennung);
     for (const z of zellen) {
@@ -250,7 +255,7 @@ async function teilNeueForm(behaelter, lexem) {
         type: 'text', lang: lexem.sprache, value: vorhanden ? vorhanden.text : '',
         placeholder: z.beschriftung,
       });
-      felder.append(h('div', { style: 'display:grid;grid-template-columns:1fr 1.4fr;gap:.5rem;align-items:center' },
+      felder.append(h('div', { class: 'feldzeile' },
         h('label', { class: 'leise', text: z.beschriftung }), feld));
       z._feld = feld; z._vorhanden = vorhanden;
     }
@@ -316,13 +321,20 @@ async function zellenHolen(sprache, wortart, kennung) {
 
 export async function zeichnenNeu(behaelter) {
   const sammlungId = await sammlungSichern();
-  const [gruppen, merkmale, einstellungen] = await Promise.all([
-    api.formgruppen((await api.sammlungEinstellungen(sammlungId)).sprache),
-    stammdaten.merkmale(),
-    api.sammlungEinstellungen(sammlungId),
-  ]);
-  const sprache = einstellungen.sprache;
   const el = leeren(behaelter);
+  if (!sammlungId) {
+    el.append(h('div', { class: 'leer' },
+      h('p', { text: 'Es gibt noch keine Sammlung, in die das Wort könnte.' }),
+      h('button', { class: 'wichtig', onclick: () => { location.hash = '#/uebersicht'; } },
+        'Sammlung anlegen')));
+    return;
+  }
+  // Die Einstellungen nur EINMAL holen; die Sprache daraus.
+  const einstellungen = await api.sammlungEinstellungen(sammlungId);
+  const sprache = einstellungen.sprache;
+  const [gruppen, merkmale] = await Promise.all([
+    api.formgruppen(sprache), stammdaten.merkmale(),
+  ]);
   el.append(h('h1', { text: 'Neues Wort' }),
             h('p', { class: 'leise', text: `${gruppen.sprache} · Bedeutungen und Formen `
                                          + 'in einem Zug — die Aufgaben entstehen daraus '
@@ -346,7 +358,7 @@ export async function zeichnenNeu(behaelter) {
         werte.map((w) => h('option', {
           value: w, text: merkmale.inventar[dim]?.[w]?.lang || w,
         })));
-      lexemfelder.append(h('div', { style: 'display:grid;grid-template-columns:1fr 1.4fr;gap:.5rem;align-items:center' },
+      lexemfelder.append(h('div', { class: 'feldzeile' },
         h('label', { class: 'leise', text: beschriftung(dim) }), auswahl));
     }
     // Formfelder aus den abgefragten Formgruppen
@@ -365,7 +377,7 @@ export async function zeichnenNeu(behaelter) {
       for (const z of zellen) {
         const feld = h('input', { type: 'text', lang: sprache, placeholder: '—' });
         z._feld = feld;
-        raster.append(h('div', { style: 'display:grid;grid-template-columns:1fr 1.4fr;gap:.5rem;align-items:center' },
+        raster.append(h('div', { class: 'feldzeile' },
           h('label', { class: 'leise', text: z.beschriftung }), feld));
       }
       formfelder.append(h('details', { class: 'karte', open: g.kennung === fuer[0].kennung },

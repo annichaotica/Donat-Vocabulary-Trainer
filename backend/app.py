@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 import aufgaben
+import einlesen
 import datenbank as dbm
 import legasthenie
 import lernen as lernmodul
@@ -28,7 +29,7 @@ import sprachen
 from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
-                     LernzielAendern, LernzielAnlegen,
+                     ImportEingabe, LernzielAendern, LernzielAnlegen,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
                      SammlungEinstellungen, SpracheAnlegen,
@@ -665,6 +666,39 @@ def uebersetzung_loeschen(uebersetzung_id: int, db: sqlite3.Connection = DB):
     b = _holen(db, "bedeutung", u["bedeutung_id"])
     db.execute("DELETE FROM uebersetzung WHERE id = ?", (uebersetzung_id,))
     aufgaben.erzeugen(db, b["lexem_id"])
+
+
+# ============================================================ Import
+
+@app.post("/api/sammlungen/{sammlung_id}/import/vorschau")
+def import_vorschau(sammlung_id: int, eingabe: ImportEingabe,
+                    db: sqlite3.Connection = DB):
+    """Liest die Datei und zeigt, was dabei herauskäme — ohne etwas zu ändern.
+
+    Erkennt Trennzeichen, Kopfzeile und Spaltenrollen selbst; die Zuordnung
+    lässt sich in der Antwort ablesen und beim Übernehmen berichtigen.
+    """
+    _holen(db, "sammlung", sammlung_id)
+    try:
+        return einlesen.vorschau(db, sammlung_id, eingabe.text, eingabe.trenner,
+                                 eingabe.zuordnung, eingabe.hat_kopfzeile)
+    except KeyError as fehler:
+        raise HTTPException(404, str(fehler))
+
+
+@app.post("/api/sammlungen/{sammlung_id}/import")
+def import_uebernehmen(sammlung_id: int, eingabe: ImportEingabe,
+                       db: sqlite3.Connection = DB):
+    """Übernimmt die Datei in den Bestand."""
+    _holen(db, "sammlung", sammlung_id)
+    try:
+        return einlesen.uebernehmen(db, sammlung_id, eingabe.text,
+                                    eingabe.trenner, eingabe.zuordnung,
+                                    eingabe.hat_kopfzeile, eingabe.doppelte)
+    except mk.MerkmalFehler as fehler:
+        raise HTTPException(400, str(fehler))
+    except KeyError as fehler:
+        raise HTTPException(404, str(fehler))
 
 
 # ============================================================ Lernziele

@@ -50,6 +50,25 @@ async function kopfzeile() {
     } catch { /* nichts */ }
   }
   document.getElementById('kopf-zusatz').textContent = zusatz;
+
+  // Auf dem schmalen Gerät deckt die untere Leiste den Programmnamen ab —
+  // dort ist der Name der Ansicht nützlicher.
+  const weg = (location.hash || '#/').slice(1).split('/').filter(Boolean);
+  document.getElementById('kopf-name').textContent = {
+    uebersicht: 'Übersicht', wortschatz: 'Wortschatz', wort: 'Wort',
+    neu: 'Neues Wort', lernen: 'Abfrage', ziele: 'Lernziele',
+    einstellungen: 'Einstellungen', tastatur: 'Tastatur',
+    profile: 'Profil wählen',
+  }[weg[0]] || 'Vokabeltrainer';
+
+  // Den laufenden Reiter kennzeichnen.
+  for (const knopf of document.querySelectorAll('.kopf-knoepfe button[data-ziel]')) {
+    const aktiv = knopf.dataset.ziel === '#/' + (weg[0] || 'uebersicht');
+    knopf.classList.toggle('aktiv', aktiv);
+    if (aktiv) knopf.setAttribute('aria-current', 'page');
+    else knopf.removeAttribute('aria-current');
+  }
+
   const istStart = (location.hash || '#/').startsWith('#/uebersicht')
                  || location.hash === '#/' || !location.hash;
   document.getElementById('zurueck').hidden = istStart;
@@ -91,18 +110,19 @@ async function wegweisen() {
         return await uebersicht.zeichnenProfile(inhalt);
       case 'lernen':
         // #/lernen/ziel/7 zieht aus einem Lernziel, #/lernen/frei übt frei.
-        if (teile[1] === 'ziel' && teile[2]) {
-          laufendeSitzung = await lernansicht.zeichnen(inhalt, {
-            lernzielId: Number(teile[2]),
-          });
+        {
+          // Die Sitzung SYNCHRON anlegen und merken, bevor sie lädt. Sonst
+          // bleibt beim Wegnavigieren während des Ladens eine verwaiste
+          // Sitzung zurück, deren Tastaturbehandler weiterläuft.
+          const optionen = (teile[1] === 'ziel' && teile[2])
+            ? { lernzielId: Number(teile[2]) }
+            : { nur: teile[1] || null, sammlungId: zustand.sammlungId,
+                lektionId: zustand.lektionId };
+          const sitzung = new lernansicht.Sitzung(inhalt, optionen);
+          laufendeSitzung = sitzung;
+          await sitzung.start();
           return;
         }
-        laufendeSitzung = await lernansicht.zeichnen(inhalt, {
-          nur: teile[1] || null,
-          sammlungId: zustand.sammlungId,
-          lektionId: zustand.lektionId,
-        });
-        return;
       case 'ziele':
         return await ziele.zeichnen(inhalt);
       case 'wortschatz':

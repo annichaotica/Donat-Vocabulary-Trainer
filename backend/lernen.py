@@ -15,7 +15,7 @@ import aufgaben
 import bewertung as bewertungsmodul
 import datenbank as dbm
 import fsrs
-import legasthenie
+import legasthenie as legasthenie_modul
 
 # Reihenfolge, in der fällige Aufgaben genommen werden.
 #   verlernt  — was zuletzt schiefging, zuerst
@@ -47,7 +47,7 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
     if b is None:
         raise KeyError(f"Benutzer {benutzer_id} gibt es nicht")
     e = dbm.j_lesen(b["einstellungen"])
-    lg = {**legasthenie.VOREINSTELLUNG, **(e.get("legasthenie") or {})}
+    lg = {**legasthenie_modul.VOREINSTELLUNG, **(e.get("legasthenie") or {})}
 
     retention = float(e.get("wunschretention", 0.9))
     neu = int(e.get("neu_je_sitzung", NEU_JE_SITZUNG))
@@ -139,7 +139,10 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # und Sammlungen. Der Block entscheidet dann über die Reihenfolge.
     if lernziel_id is not None:
         import lernziele
-        plan = lernziele.block(db, benutzer_id, lernziel_id, anzahl)
+        # Der Block wird in brauchbarer Größe gerechnet, auch wenn nur eine
+        # Aufgabe abgeholt wird: bei Blockgröße 1 kann die Verschränkung
+        # nichts verschränken und der Zuschnitt verliert seinen Sinn.
+        plan = lernziele.block(db, benutzer_id, lernziel_id, max(anzahl, 20))
         e = benutzer_einstellungen(db, benutzer_id)
         ergebnis = []
         for eintrag in plan["aufgaben"][:anzahl]:
@@ -148,7 +151,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                 **_aufgabe_ausbauen(db, {**dict(z),
                                          "aufgabe_id": eintrag["aufgabe_id"],
                                          "typ": eintrag["typ"]},
-                                    e["wunschretention"]),
+                                    e["wunschretention"], e["legasthenie"]),
                 "herkunft": eintrag["herkunft"],
                 "lernziel": {"id": lernziel_id, "name": plan["name"],
                              "begruendung": plan["begruendung"]},
@@ -220,10 +223,15 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
 
     # Neue begrenzen, sonst überschwemmt ein frischer Import die Sitzung.
     if nur is None:
+        # Tagesgrenzen statt date() auf der Spalte: so greift der Index
+        # idx_wiederholung_zeit. Mit date() wird bei jedem Aufgabenabruf das
+        # ganze Protokoll des Benutzers gelesen, und das wird nie geleert.
         schon_neu = dbm.wert(db, """
             SELECT COUNT(DISTINCT w.aufgabe_id) FROM wiederholung w
-             WHERE w.benutzer_id = ? AND date(w.zeitpunkt) = ?
-               AND w.stabilitaet_vor IS NULL""", (benutzer_id, heute_text)) or 0
+             WHERE w.benutzer_id = ?
+               AND w.zeitpunkt >= ? AND w.zeitpunkt < ?
+               AND w.stabilitaet_vor IS NULL""",
+            (benutzer_id, heute_text, (heute() + dt.timedelta(days=1)).isoformat())) or 0
         rest_neu = max(0, e["neu_je_sitzung"] - schon_neu)
         gefiltert, genommen_neu = [], 0
         for r in reihe:
@@ -238,14 +246,28 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     ergebnis = []
     for r in reihe[:anzahl]:
         _zustand_sichern(db, r["aufgabe_id"], benutzer_id)
-        ergebnis.append(_aufgabe_ausbauen(db, r, e["wunschretention"]))
+        ergebnis.append(_aufgabe_ausbauen(db, r, e["wunschretention"],
+                                          e["legasthenie"]))
     return ergebnis
 
 
-def _aufgabe_ausbauen(db: sqlite3.Connection, r: dict,
-                      wunschretention: float) -> dict:
-    """Aufgabe plus Begründung plus Terminvorschau."""
+def _aufgabe_ausbauen(db: sqlite3.Connection, r: dict, wunschretention: float,
+                      legasthenie: dict | None = None) -> dict:
+    """Aufgabe plus Begründung plus Terminvorschau.
+
+    Im Legastheniemodus kommt das Schreibgerüst gleich mit: ins leere Feld zu
+    tippen ist genau der Teil, der schwerfällt. Es wird hier erzeugt und nicht
+    in der Oberfläche, weil nur hier die erwartete Antwort bekannt ist.
+    """
     f = aufgaben.frage(db, r["aufgabe_id"])
+    lg = legasthenie or {}
+    if (lg.get("aktiv") and lg.get("maske_stufe") is not None
+            and f.get("eingabeart") == "text"):
+        _u, aufloesung = aufgaben.antwort_pruefen(db, r["aufgabe_id"], "",
+                                                  fehler_benennen=False)
+        ziel = next(iter(aufloesung.get("erwartet") or []), None)
+        if ziel:
+            f["maske"] = legasthenie_modul.maske(ziel, int(lg["maske_stufe"]))
     z = fsrs.Zustand(r["stabilitaet"], r["schwierigkeit"])
     verstrichen = _tage_seit(r["letzte_wiederholung"])
     vorschau = fsrs.vorschau(z, verstrichen, wunschretention)
@@ -316,6 +338,12 @@ def _zerlegung(db: sqlite3.Connection, aufgabe_id: int, urteil, aufloesung: dict
     lg = einstellungen["legasthenie"]
     if not lg.get("aktiv") or urteil.urteil == "richtig":
         return None
+    # Nur bei Texteingaben. Bei "Form bestimmen" ist die Antwort ein
+    # Merkmalsbündel, beim Artikel ein einzelnes Wörtchen — da wäre die
+    # Zerlegung in Stamm und Silben sinnlos bis irreführend.
+    a0 = dbm.zeile(db, "SELECT typ FROM aufgabe WHERE id = ?", (aufgabe_id,))
+    if a0 is None or aufgaben.TYPEN[a0["typ"]]["eingabeart"] != "text":
+        return None
     # Ohne Treffer — also bei klar falscher Antwort — die erwartete Lösung
     # zerlegen. Gerade dann ist die Hilfe am nötigsten.
     ziel = urteil.treffer or next(iter(aufloesung.get("erwartet") or []), None)
@@ -324,14 +352,14 @@ def _zerlegung(db: sqlite3.Connection, aufgabe_id: int, urteil, aufloesung: dict
     formen = _stammformen(db, aufgabe_id)
     ergebnis: dict = {}
     if lg.get("stamm_hervorheben"):
-        st = legasthenie.stamm(formen)
+        st = legasthenie_modul.stamm(formen)
         if st:
             ergebnis["stamm"] = st
-            ergebnis["teile"] = legasthenie.teilen(ziel, st)
+            ergebnis["teile"] = legasthenie_modul.teilen(ziel, st)
     if lg.get("silben_faerben"):
-        ergebnis["silben"] = legasthenie.silben(ziel)
+        ergebnis["silben"] = legasthenie_modul.silben(ziel)
     if lg.get("maske_stufe") is not None:
-        ergebnis["maske"] = legasthenie.maske(ziel, int(lg["maske_stufe"]))
+        ergebnis["maske"] = legasthenie_modul.maske(ziel, int(lg["maske_stufe"]))
     return ergebnis or None
 
 
@@ -380,15 +408,17 @@ def aufdecken(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int) -> dict
                                                    fehler_benennen=False)
     erwartet = list(aufloesung.get("erwartet") or [])
     ziel = erwartet[0] if erwartet else None
+    a0 = dbm.zeile(db, "SELECT typ FROM aufgabe WHERE id = ?", (aufgabe_id,))
+    nur_text = a0 is not None and aufgaben.TYPEN[a0["typ"]]["eingabeart"] == "text"
     zerlegung = None
-    if ziel:
+    if ziel and nur_text:
         lg = e["legasthenie"]
-        st = legasthenie.stamm(_stammformen(db, aufgabe_id))
+        st = legasthenie_modul.stamm(_stammformen(db, aufgabe_id))
         zerlegung = {
-            "silben": legasthenie.silben(ziel),
+            "silben": legasthenie_modul.silben(ziel),
             "stamm": st or None,
-            "teile": legasthenie.teilen(ziel, st) if st else [ziel],
-            "maske": legasthenie.maske(ziel, int(lg.get("maske_stufe", 2))),
+            "teile": legasthenie_modul.teilen(ziel, st) if st else [ziel],
+            "maske": legasthenie_modul.maske(ziel, int(lg.get("maske_stufe", 2))),
         }
     return {"erwartet": erwartet, "aufloesung": aufloesung,
             "zerlegung": zerlegung}

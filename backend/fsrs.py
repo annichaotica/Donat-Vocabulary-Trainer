@@ -55,6 +55,12 @@ def _klemmen(wert: float, unten: float, oben: float) -> float:
     return max(unten, min(oben, wert))
 
 
+def _zahl(wert: float, stellen: int = 1) -> str:
+    """Deutsche Zahlschreibung. Nur die Zahl — ein .replace(".", ",") über
+    einen ganzen Satz verwandelt auch die Satzpunkte in Kommata."""
+    return f"{wert:.{stellen}f}".replace(".", ",")
+
+
 @dataclass
 class Zustand:
     """Der Gedächtniszustand einer Aufgabe bei einem Benutzer."""
@@ -169,7 +175,12 @@ def bewerten(zustand: Zustand, bewertung: int, verstrichen_tage: float = 0.0,
         d = anfangsschwierigkeit(bewertung, w)
         r_vorher = 0.0
     else:
-        s_alt, d_alt = zustand.stabilitaet, zustand.schwierigkeit
+        # Wie in der Referenzumsetzung: die ALTE Schwierigkeit geht in die
+        # Stabilitätsformeln, und beide Werte werden vorher geklemmt. Ein von
+        # Hand oder über den MCP verfälschter Lernzustand soll keinen
+        # Serverfehler mitten in der Sitzung auslösen.
+        s_alt = _klemmen(float(zustand.stabilitaet), S_MIN, S_MAX)
+        d_alt = _klemmen(float(zustand.schwierigkeit), 1.0, 10.0)
         r_vorher = abrufwahrscheinlichkeit(verstrichen_tage, s_alt)
         d = neue_schwierigkeit(d_alt, bewertung, w)
         if verstrichen_tage < 1.0:
@@ -227,10 +238,8 @@ def tage_in_text(tage: float) -> str:
     if tage < 31:
         return f"in {round(tage)} Tagen"
     if tage < 365:
-        monate = tage / 30.44
-        return f"in {monate:.1f} Monaten".replace(".", ",")
-    jahre = tage / 365.25
-    return f"in {jahre:.1f} Jahren".replace(".", ",")
+        return f"in {_zahl(tage / 30.44)} Monaten"
+    return f"in {_zahl(tage / 365.25)} Jahren"
 
 
 def erklaeren(zustand: Zustand, verstrichen_tage: float,
@@ -248,7 +257,7 @@ def erklaeren(zustand: Zustand, verstrichen_tage: float,
     faellig_nach = intervall(zustand.stabilitaet, wunschretention)
     rest = faellig_nach - verstrichen_tage
     if rest <= 0:
-        lage = f"fällig seit {abs(rest):.1f} Tagen".replace(".", ",")
+        lage = f"fällig seit {_zahl(abs(rest))} Tagen"
     else:
         lage = f"planmäßig erst {tage_in_text(rest)}"
     return {
@@ -259,8 +268,8 @@ def erklaeren(zustand: Zustand, verstrichen_tage: float,
         "verstrichen_tage": round(verstrichen_tage, 2),
         "intervall_tage": round(faellig_nach, 2),
         "text": (
-            f"Zuletzt vor {verstrichen_tage:.1f} Tagen abgefragt. "
-            f"Die Stabilität liegt bei {zustand.stabilitaet:.1f} Tagen, "
+            f"Zuletzt vor {_zahl(verstrichen_tage)} Tagen abgefragt. "
+            f"Die Stabilität liegt bei {_zahl(zustand.stabilitaet)} Tagen, "
             f"die Erinnerung heute also bei etwa {r * 100:.0f} % — {lage}."
-        ).replace(".", ","),
+        ),
     }

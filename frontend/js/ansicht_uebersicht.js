@@ -105,8 +105,12 @@ export async function zeichnen(behaelter) {
     el.append(h('p', { class: 'leise', text: 'Noch keine Sammlung. Unten anlegen.' }));
   }
   const reihe = h('div', { class: 'karte-reihe' });
-  for (const s of sammlungen) {
-    const stand = await api.stand(zustand.benutzerId, s.id);
+  // Alle Zählungen auf einmal statt ein Rundlauf je Sammlung — das ist der
+  // Startbildschirm, der soll nicht nach Sammlungszahl langsamer werden.
+  const staende = await Promise.all(
+    sammlungen.map((s) => api.stand(zustand.benutzerId, s.id).catch(() => ({}))));
+  for (const [i, s] of sammlungen.entries()) {
+    const stand = staende[i];
     const sprache = sprachen.find((x) => x.code === s.sprache);
     reihe.append(h('div', { class: 'karte' },
       h('div', { style: 'display:flex;justify-content:space-between;gap:.5rem' },

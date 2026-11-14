@@ -179,11 +179,16 @@ def _geschafft(r: dict, ziel: str) -> bool:
     return r["zustand"] == "reif"
 
 
-def fortschritt(db: sqlite3.Connection, benutzer_id: int,
-                lernziel_id: int) -> dict:
-    """Wie weit ist das Ziel, und was heißt das für heute?"""
-    ziel = lesen(db, lernziel_id)
-    reihe = aufgaben_im_umfang(db, benutzer_id, ziel["umfang"])
+def fortschritt(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
+                reihe: list[dict] | None = None, ziel: dict | None = None) -> dict:
+    """Wie weit ist das Ziel, und was heißt das für heute?
+
+    `reihe` und `ziel` dürfen mitgegeben werden, wenn der Aufrufer sie schon
+    hat — sonst liefe die vollständige Abfrage zweimal je Blockaufruf.
+    """
+    ziel = ziel or lesen(db, lernziel_id)
+    if reihe is None:
+        reihe = aufgaben_im_umfang(db, benutzer_id, ziel["umfang"])
     heute = _heute().isoformat()
 
     gesamt = len(reihe)
@@ -279,66 +284,86 @@ def verschraenken(reihe: list[dict]) -> list[dict]:
 
 def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
           anzahl: int = 20) -> dict:
-    """Stellt den nächsten Lernblock zusammen und begründet den Zuschnitt."""
+    """Stellt den nächsten Lernblock zusammen und begründet den Zuschnitt.
+
+    Reihenfolge der Platzvergabe:
+
+      1. **Fälliges** — es hat Vorrang, sonst wächst der Rückstand.
+      2. **Wackliges** — ein fester Anteil, VOR dem Neuen reserviert. Sonst
+         kommt es nie dran: wer im Rückstand ist, braucht viel Neues, und
+         genau dann wären die Lücken am wichtigsten.
+      3. **Neues** — so viel, wie der Termin verlangt.
+      4. Was dann noch frei ist, wird mit weiterem Wackligem und Neuem
+         aufgefüllt.
+    """
     ziel = lesen(db, lernziel_id)
     reihe = aufgaben_im_umfang(db, benutzer_id, ziel["umfang"])
     heute = _heute().isoformat()
-    stand = fortschritt(db, benutzer_id, lernziel_id)
+    stand = fortschritt(db, benutzer_id, lernziel_id, reihe, ziel)
 
-    faellig = [r for r in reihe
-               if r["zustand"] == "verlernt"
-               or (r["zustand"] in ("lernen", "reif") and (r["faellig"] or "") <= heute)]
+    faellig, nicht_faellig, neu = [], [], []
+    for r in reihe:
+        if r["zustand"] in (None, "neu"):
+            neu.append(r)
+        elif r["zustand"] == "ausgesetzt":
+            continue
+        elif (r["zustand"] == "verlernt"
+              or (r["faellig"] or "") <= heute):
+            faellig.append(r)
+        else:
+            nicht_faellig.append(r)
+
     faellig.sort(key=lambda r: _dringlichkeit(r, heute))
-
-    nicht_faellig = [r for r in reihe
-                     if r not in faellig and r["zustand"] not in (None, "neu",
-                                                                  "ausgesetzt")]
-    wacklig = sorted(nicht_faellig, key=_wackligkeit, reverse=True)
-    wacklig = [r for r in wacklig if _wackligkeit(r) > 0.5]
-
-    neu = [r for r in reihe if r["zustand"] in (None, "neu")]
-    # Reihenfolge der Neuen: nach Lektion und Wort, damit Zusammengehöriges
-    # zusammen eingeführt wird — verschränkt wird erst danach.
+    wacklig = [r for r in sorted(nicht_faellig, key=_wackligkeit, reverse=True)
+               if _wackligkeit(r) > 0.5]
+    # Zusammengehöriges zusammen einführen; verschränkt wird erst danach.
     neu.sort(key=lambda r: (r["lektion_id"] or 0, r["lexem_id"], r["typ"]))
 
-    # --- Zuschnitt
-    platz = anzahl
-    genommen_faellig = faellig[:platz]
-    platz -= len(genommen_faellig)
-
     tagesbedarf = stand["neu_taeglich_noetig"]
-    hoechstens_neu = platz if tagesbedarf is None else min(platz, max(
-        MINDESTENS_NEU, tagesbedarf))
 
-    genommen_wacklig = []
-    if platz > hoechstens_neu:
-        raum = min(int(anzahl * ANTEIL_WACKLIG), platz - hoechstens_neu)
-        genommen_wacklig = wacklig[:max(0, raum)]
-        platz -= len(genommen_wacklig)
+    genommen: list[tuple[dict, str]] = []
+    platz = anzahl
 
-    genommen_neu = neu[:min(platz, hoechstens_neu)]
-    platz -= len(genommen_neu)
+    def nimm(quelle: list[dict], hoechstens: int, herkunft: str) -> None:
+        nonlocal platz
+        for r in quelle[:max(0, min(hoechstens, platz))]:
+            genommen.append((r, herkunft))
+            platz -= 1
 
-    # Bleibt Platz, mit weiterem Wackligem auffüllen.
-    if platz > 0:
-        weitere = [r for r in wacklig if r not in genommen_wacklig][:platz]
-        genommen_wacklig += weitere
+    nimm(faellig, platz, "faellig")
+    # Der Wacklig-Anteil wird VOR dem Neuen reserviert — sonst bliebe er
+    # gerade bei Rückstand immer leer.
+    rest_wacklig = wacklig[:]
+    nimm(rest_wacklig, int(anzahl * ANTEIL_WACKLIG), "wacklig")
+    genommen_wacklig = sum(1 for _r, h in genommen if h == "wacklig")
+    rest_wacklig = wacklig[genommen_wacklig:]
 
-    zusammen = genommen_faellig + genommen_wacklig + genommen_neu
-    gemischt = verschraenken(zusammen)
+    hoechstens_neu = platz if tagesbedarf is None else max(MINDESTENS_NEU,
+                                                           tagesbedarf)
+    nimm(neu, hoechstens_neu, "neu")
+    genommen_neu = sum(1 for _r, h in genommen if h == "neu")
+
+    # Rest auffüllen: erst weiteres Wackliges, dann weiteres Neues.
+    nimm(rest_wacklig, platz, "wacklig")
+    nimm(neu[genommen_neu:], platz, "neu")
+
+    herkunft_nach_id = {r["aufgabe_id"]: h for r, h in genommen}
+    gemischt = verschraenken([r for r, _h in genommen])
+
+    zusammensetzung = {"faellig": 0, "wacklig": 0, "neu": 0}
+    for h in herkunft_nach_id.values():
+        zusammensetzung[h] += 1
 
     begruendung = []
-    if genommen_faellig:
-        begruendung.append(f"{len(genommen_faellig)} planmäßig fällig")
-    if genommen_wacklig:
-        begruendung.append(f"{len(genommen_wacklig)} wacklig "
+    if zusammensetzung["faellig"]:
+        begruendung.append(f"{zusammensetzung['faellig']} planmäßig fällig")
+    if zusammensetzung["wacklig"]:
+        begruendung.append(f"{zusammensetzung['wacklig']} wacklig "
                            f"(oft daneben oder dünn)")
-    if genommen_neu:
-        if tagesbedarf:
-            begruendung.append(f"{len(genommen_neu)} neu — so viel verlangt "
-                               f"der Termin")
-        else:
-            begruendung.append(f"{len(genommen_neu)} neu")
+    if zusammensetzung["neu"]:
+        begruendung.append(f"{zusammensetzung['neu']} neu"
+                           + (" — so viel verlangt der Termin"
+                              if tagesbedarf else ""))
 
     return {
         "lernziel_id": lernziel_id,
@@ -346,16 +371,10 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
         "aufgaben": [{"aufgabe_id": r["aufgabe_id"], "typ": r["typ"],
                       "lexem_id": r["lexem_id"], "lemma": r["lemma"],
                       "zustand": r["zustand"] or "neu",
-                      "herkunft": ("faellig" if r in genommen_faellig
-                                   else "wacklig" if r in genommen_wacklig
-                                   else "neu")}
+                      "herkunft": herkunft_nach_id[r["aufgabe_id"]]}
                      for r in gemischt],
         "anzahl": len(gemischt),
-        "zusammensetzung": {
-            "faellig": len(genommen_faellig),
-            "wacklig": len(genommen_wacklig),
-            "neu": len(genommen_neu),
-        },
+        "zusammensetzung": zusammensetzung,
         "begruendung": ("Zusammengestellt aus " + ", ".join(begruendung) + ". "
                         "Verschränkt gemischt: aufeinanderfolgende Aufgaben "
                         "gehören nicht zum selben Wort."

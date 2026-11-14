@@ -7,7 +7,7 @@
 # in sich stimmigen Abzug, auch während gelernt wird.
 #
 # Vor die bestehende /srv-Sicherung hängen, etwa in
-# /usr/local/sbin/familienserver-sichern vor dem borg-Aufruf:
+# das eigene Sicherungsskript vor dem Hochladen:
 #
 #     /srv/vokabeltrainer/werkzeuge/sicherung.sh
 #

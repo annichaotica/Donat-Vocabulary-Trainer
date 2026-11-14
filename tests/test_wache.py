@@ -35,13 +35,13 @@ def test_im_heimnetz_greift_die_wache_nicht(klient):
 
 
 def test_profil_entsteht_bei_der_ersten_anfrage(klient, mit_access):
-    antwort = klient.get("/api/ich", headers=als("maxi.brenner@example.de"))
+    antwort = klient.get("/api/ich", headers=als("erika.muster@example.de"))
     d = antwort.json()
     assert d["gebunden"] is True
-    assert d["email"] == "maxi.brenner@example.de"
-    assert d["benutzer"]["name"] == "Maxi Brenner"
+    assert d["email"] == "erika.muster@example.de"
+    assert d["benutzer"]["name"] == "Erika Muster"
     # Beim zweiten Mal dasselbe Profil, nicht ein neues
-    zweite = klient.get("/api/ich", headers=als("maxi.brenner@example.de")).json()
+    zweite = klient.get("/api/ich", headers=als("erika.muster@example.de")).json()
     assert zweite["benutzer"]["id"] == d["benutzer"]["id"]
 
 

@@ -14,7 +14,7 @@ Skript reicht nur durch — für Clients, die MCP über stdio sprechen
 Sonst müsste jede neue Fähigkeit zweimal geschrieben und zweimal geprüft
 werden, und die beiden Fassungen liefen auseinander.
 
-    VOKABEL_URL=http://familienserver:8030 \
+    VOKABEL_URL=http://dein-server:8030 \
     VOKABEL_MCP_TOKEN=... \
     python3 vokabeltrainer_mcp.py
 

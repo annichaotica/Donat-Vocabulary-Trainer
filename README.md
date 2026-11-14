@@ -42,13 +42,13 @@ Dann <http://localhost:8030>. Tests: `.venv/bin/python -m pytest tests/ -q`
 ### Auf dem Familienserver
 
 ```sh
-ssh familienserver
+ssh <dein-server>
 sudo mkdir -p /srv/vokabeltrainer && sudo chown "$USER" /srv/vokabeltrainer
 # Projekt dorthin kopieren, dann:
 cd /srv/vokabeltrainer && docker compose up -d --build
 ```
 
-Erreichbar unter <http://familienserver:8030>, nur im Heimnetz.
+Erreichbar unter `http://<dein-server>:8030`, nur im Heimnetz.
 
 Port 8030, weil die näherliegenden belegt sind: 80 und **8020** gehören dem
 Caddy (Startseite und der Autodesk-Spiegel), 2283 Immich, 8010 Paperless,
@@ -59,24 +59,22 @@ dann startet sie wie eine App.
 
 ### Sicherung
 
-**Ist eingerichtet.** Die Datenbank läuft im WAL-Modus; sie einfach
-mitzukopieren ergäbe während eines Schreibvorgangs einen unvollständigen
-Stand. Darum schreibt `/usr/local/sbin/familienserver-sichern` seit dem
-14.11.2026 einen eigenen Abzug — nach demselben Muster wie bei Mealie:
+Die Datenbank läuft im **WAL-Modus**. Sie einfach mitzukopieren ergibt
+während eines Schreibvorgangs einen unvollständigen Stand — die Änderungen
+stehen dann noch im Begleitprotokoll. Für eine Sicherung gehört darum ein
+Abzug über die Sicherungsschnittstelle von SQLite davor:
 
-* Abzug über die Sicherungsschnittstelle von SQLite nach
-  `/var/backups/familienserver/vokabeltrainer.db`, auf `journal_mode=delete`
-  gestellt, damit keine Begleitdateien danebenliegen.
-* Die laufende Datei samt `-wal` und `-shm` ist aus dem Borg-Archiv
-  ausgeschlossen.
-* Schlägt der Abzug fehl, setzt das nur den Fehlerstand — die Sicherung von
-  Immich und Paperless läuft trotzdem durch.
+```sh
+werkzeuge/sicherung.sh [zieldatei]
+```
 
-Die Fassung vor der Ergänzung liegt daneben als
-`familienserver-sichern.vor-vokabeltrainer-2026-11-14`.
+Das Skript nimmt einen in sich stimmigen Abzug, auch während gelernt wird,
+stellt ihn auf `journal_mode=delete` (damit keine Begleitdateien
+danebenliegen), prüft ihn und behält die letzten sieben.
 
-Für den Mac oder einen Abzug von Hand gibt es zusätzlich
-`werkzeuge/sicherung.sh`.
+Wer ein eigenes Sicherungsskript hat, hängt es dort ein und **schließt die
+laufende Datei samt `-wal` und `-shm` aus dem Archiv aus** — sonst sichert
+man zweimal, einmal davon unbrauchbar.
 
 ### Von außen erreichbar
 
@@ -97,7 +95,7 @@ Er braucht **keine Fremdpakete**, nur Python 3.
 
 ```sh
 claude mcp add vokabeltrainer \
-  --env VOKABEL_URL=http://familienserver:8030 \
+  --env VOKABEL_URL=http://<dein-server>:8030 \
   -- python3 ~/Projects/Vokabeltrainer/mcp/vokabeltrainer_mcp.py
 ```
 
@@ -111,7 +109,7 @@ In `~/Library/Application Support/Claude/claude_desktop_config.json`:
     "vokabeltrainer": {
       "command": "python3",
       "args": ["~/Projects/Vokabeltrainer/mcp/vokabeltrainer_mcp.py"],
-      "env": { "VOKABEL_URL": "http://familienserver:8030" }
+      "env": { "VOKABEL_URL": "http://<dein-server>:8030" }
     }
   }
 }

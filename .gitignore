@@ -10,3 +10,5 @@ daten/*.db-shm
 # Geheimnisse gehören nicht ins Verzeichnis
 .env
 deploy/cloudflared/.env
+BETRIEB-PRIVAT.md
+/LICENSE-pruefung.txt

@@ -245,3 +245,79 @@ def test_ungueltiger_termin_wird_abgelehnt(klient):
     # und das Ziel ist danach weiterhin benutzbar
     assert klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
                       params={"benutzer_id": b["id"]}).status_code == 200
+
+
+def test_ein_verbstamm_zaehlt_als_ein_wort(klient):
+    """Der Einwand aus dem Betrieb: ein griechisches Verb bringt vierzig
+    Formen mit. Zählte jede als eigenes »neues Wort«, wäre ein Tagesvorrat
+    von zwanzig nach einem halben Verb aufgebraucht — und man übte einen
+    Tag lang nichts als dessen Präsens.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Vielformige"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    P = [("1", "sg"), ("2", "sg"), ("3", "sg"),
+         ("1", "pl"), ("2", "pl"), ("3", "pl")]
+
+    def verb(stamm, b1, b2):
+        formen = []
+        for zeit, endungen in (("praesens", ["ω", "εις", "ει", "ουμε", "ετε", "ουν"]),
+                               ("aorist", ["α", "ες", "ε", "αμε", "ατε", "αν"])):
+            for e, (pp, nn) in zip(endungen, P):
+                formen.append({"text": stamm + e, "merkmale": {
+                    "modus": "indikativ", "tempus": zeit,
+                    "person": pp, "numerus": nn}})
+        return {"lemma": stamm + "ω", "wortart": "verb", "lektion_nr": 1,
+                "bedeutungen": [{"uebersetzungen": [b1, b2]}],
+                "formen": formen}
+
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [verb("γράφ", "schreiben", "aufschreiben"),
+                      verb("διαβάζ", "lesen", "vorlesen"),
+                      verb("παίζ", "spielen", "aufführen")]})
+    klient.post(f"/api/sammlungen/{s['id']}/freigabe", json={"lektion_nr": 1})
+
+    # Zwölf Formen je Verb, drei Verben — aber nur drei WÖRTER.
+    aufgaben = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"], "anzahl": 12}).json()
+    assert len(aufgaben) == 12
+    woerter = [a["lexem_id"] for a in aufgaben]
+    # Alle drei Verben kommen vor, und nicht zwölfmal dasselbe.
+    assert len(set(woerter)) == 3, woerter
+    # Und zwei aufeinanderfolgende Aufgaben gehören selten zum selben Wort.
+    gleich = sum(1 for i in range(1, len(woerter))
+                 if woerter[i] == woerter[i - 1])
+    assert gleich <= 2, woerter
+
+
+def test_der_tagesvorrat_zaehlt_woerter_nicht_formen(klient):
+    """»20 neue Wörter am Tag« heißt 20 Wörter, auch wenn eines davon
+    vierzig Formen hat."""
+    b = klient.post("/api/benutzer", json={"name": "Zählerin"}).json()
+    klient.patch(f"/api/benutzer/{b['id']}", json={"neu_je_sitzung": 2})
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    P = [("1", "sg"), ("2", "sg"), ("3", "sg"),
+         ("1", "pl"), ("2", "pl"), ("3", "pl")]
+    eintraege = []
+    for stamm, b1, b2 in (("γράφ", "schreiben", "aufschreiben"),
+                          ("διαβάζ", "lesen", "vorlesen"),
+                          ("παίζ", "spielen", "aufführen")):
+        eintraege.append({
+            "lemma": stamm + "ω", "wortart": "verb", "lektion_nr": 1,
+            "bedeutungen": [{"uebersetzungen": [b1, b2]}],
+            "formen": [{"text": stamm + e, "merkmale": {
+                "modus": "indikativ", "tempus": "praesens",
+                "person": pp, "numerus": nn}}
+                for e, (pp, nn) in zip(
+                    ["ω", "εις", "ει", "ουμε", "ετε", "ουν"], P)]})
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln",
+                json={"eintraege": eintraege})
+    klient.post(f"/api/sammlungen/{s['id']}/freigabe", json={"lektion_nr": 1})
+
+    aufgaben = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"], "anzahl": 40}).json()
+    woerter = {a["lexem_id"] for a in aufgaben}
+    # Zwei Wörter, aber deren sämtliche Aufgaben — nicht zwei Aufgaben.
+    assert len(woerter) == 2, woerter
+    assert len(aufgaben) > 2, len(aufgaben)

@@ -27,10 +27,10 @@ NEU_JE_SITZUNG = 20
 # In welcher Folge Neues eingeführt wird: nach Lektion, dann nach der
 # Lernreihenfolge innerhalb der Lektion, dann nach Eingabedatum. Wörter
 # ohne Lektion kommen zuletzt — sie sind meist selbst nachgetragen.
-LERNREIHENFOLGE = ("(SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id) "
-                   "IS NULL, "
-                   "(SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id), "
-                   "l.reihenfolge, l.id, a.typ")
+# Die Lernreihenfolge des Lehrwerks: erst nach Lektion, darin nach der
+# vorgegebenen Folge. Die Felder holt die Unterabfrage heraus, damit hier
+# außen danach sortiert werden kann.
+LERNREIHENFOLGE = ("lektion_nr IS NULL, lektion_nr, wort_folge, lexem_id, typ")
 
 
 def heute() -> dt.date:
@@ -201,15 +201,15 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # vollständig und ist in der Oberfläche als "Warum jetzt?" nachlesbar.
     if nur == "neu":
         bedingungen.append("(z.zustand IS NULL OR z.zustand = 'neu')")
-        ordnung = LERNREIHENFOLGE
+        ordnung = f"rang_im_wort, {LERNREIHENFOLGE}"
     elif nur == "faellig":
         bedingungen.append(
             "z.zustand IN ('lernen','reif','verlernt') AND z.faellig <= ?")
         werte.append(heute_text)
-        ordnung = "z.faellig, z.stabilitaet"
+        ordnung = "faellig, stabilitaet"
     elif nur == "fehler":
         bedingungen.append("z.anzahl_fehler > 0 AND z.zustand != 'ausgesetzt'")
-        ordnung = "z.anzahl_fehler DESC, z.faellig"
+        ordnung = "anzahl_fehler DESC, faellig"
     elif nur == "frei":
         bedingungen.append("(z.zustand IS NULL OR z.zustand != 'ausgesetzt')")
         ordnung = "RANDOM()"
@@ -221,47 +221,71 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
             OR (z.zustand IN ('lernen','reif') AND z.faellig <= ?)
         )""")
         werte.append(heute_text)
-        # verlernt zuerst, dann nach Fälligkeit, Neues zuletzt
+        # verlernt zuerst, dann nach Fälligkeit, Neues zuletzt — und
+        # innerhalb des Neuen von jedem Wort erst die erste Aufgabe.
         ordnung = """
-            CASE z.zustand WHEN 'verlernt' THEN 0
-                           WHEN 'lernen' THEN 1
-                           WHEN 'reif' THEN 1
-                           ELSE 3 END,
-            z.faellig,
+            CASE zustand WHEN 'verlernt' THEN 0
+                         WHEN 'lernen' THEN 1
+                         WHEN 'reif' THEN 1
+                         ELSE 3 END,
+            faellig,
+            rang_im_wort,
             """ + LERNREIHENFOLGE
 
+    # rang_im_wort nummeriert die Aufgaben INNERHALB eines Wortes. Wird
+    # danach zuerst sortiert, kommt von jedem Wort erst die erste Aufgabe,
+    # dann von jedem die zweite — statt vierzig Formen desselben Verbs
+    # hintereinander. Blockweises Üben fühlt sich leichter an und behält
+    # schlechter; verschränktes ist mühsamer und sitzt.
     sql = f"""
-        SELECT a.id AS aufgabe_id, a.typ, l.id AS lexem_id, l.lemma,
-               l.sammlung_id, z.zustand, z.stabilitaet, z.schwierigkeit,
-               z.faellig, z.letzte_wiederholung, z.anzahl, z.anzahl_fehler
-          FROM aufgabe a
-          JOIN lexem l ON l.id = a.lexem_id
-          LEFT JOIN lernzustand z
-                 ON z.aufgabe_id = a.id AND z.benutzer_id = ?
-         WHERE {' AND '.join(bedingungen)}
+        SELECT * FROM (
+          SELECT a.id AS aufgabe_id, a.typ, l.id AS lexem_id, l.lemma,
+                 l.sammlung_id, z.zustand, z.stabilitaet, z.schwierigkeit,
+                 z.faellig, z.letzte_wiederholung, z.anzahl, z.anzahl_fehler,
+                 l.reihenfolge AS wort_folge,
+                 (SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id)
+                     AS lektion_nr,
+                 ROW_NUMBER() OVER (PARTITION BY l.id
+                                    ORDER BY a.typ, a.id) AS rang_im_wort
+            FROM aufgabe a
+            JOIN lexem l ON l.id = a.lexem_id
+            LEFT JOIN lernzustand z
+                   ON z.aufgabe_id = a.id AND z.benutzer_id = ?
+           WHERE {' AND '.join(bedingungen)}
+        )
          ORDER BY {ordnung}
          LIMIT ?"""
     reihe = dbm.zeilen(db, sql, (*werte, anzahl * 4))
 
     # Neue begrenzen, sonst überschwemmt ein frischer Import die Sitzung.
+    #
+    # Gezählt werden WÖRTER, nicht Aufgaben. Ein griechisches Verb bringt
+    # vierzig Formen mit; zählte jede einzeln, wäre ein Tagesvorrat von
+    # zwanzig nach einem halben Verb aufgebraucht — und man übte einen
+    # Tag lang nichts als dessen Präsens. Ein Verbstamm ist ein Wort,
+    # auch wenn viel daran hängt.
     if nur is None:
+        morgen = (heute() + dt.timedelta(days=1)).isoformat()
         # Tagesgrenzen statt date() auf der Spalte: so greift der Index
         # idx_wiederholung_zeit. Mit date() wird bei jedem Aufgabenabruf das
         # ganze Protokoll des Benutzers gelesen, und das wird nie geleert.
-        schon_neu = dbm.wert(db, """
-            SELECT COUNT(DISTINCT w.aufgabe_id) FROM wiederholung w
+        heute_begonnen = {z["lexem_id"] for z in dbm.zeilen(db, """
+            SELECT DISTINCT a.lexem_id FROM wiederholung w
+              JOIN aufgabe a ON a.id = w.aufgabe_id
              WHERE w.benutzer_id = ?
                AND w.zeitpunkt >= ? AND w.zeitpunkt < ?
                AND w.stabilitaet_vor IS NULL""",
-            (benutzer_id, heute_text, (heute() + dt.timedelta(days=1)).isoformat())) or 0
-        rest_neu = max(0, e["neu_je_sitzung"] - schon_neu)
-        gefiltert, genommen_neu = [], 0
+            (benutzer_id, heute_text, morgen))}
+        rest_neu = max(0, e["neu_je_sitzung"] - len(heute_begonnen))
+        gefiltert, dazu = [], set()
         for r in reihe:
-            ist_neu = r["zustand"] in (None, "neu")
-            if ist_neu:
-                if genommen_neu >= rest_neu:
-                    continue
-                genommen_neu += 1
+            if r["zustand"] in (None, "neu"):
+                bekannt = (r["lexem_id"] in heute_begonnen
+                           or r["lexem_id"] in dazu)
+                if not bekannt:
+                    if len(dazu) >= rest_neu:
+                        continue      # das Tagespensum an Wörtern ist voll
+                    dazu.add(r["lexem_id"])
             gefiltert.append(r)
         reihe = gefiltert
 

@@ -12,6 +12,7 @@ import * as tastatur from './tastatur.js';
 import * as ziele from './ansicht_ziele.js';
 import * as freigabe from './ansicht_freigabe.js';
 import * as einlesen from './ansicht_import.js';
+import * as uebungen from './ansicht_uebungen.js';
 
 // Zusätzliche Stildatei (Zeichenleiste, Tastaturhilfe) nachladen. Von hier
 // aus, damit index.html unberührt bleibt.
@@ -81,7 +82,7 @@ async function kopfzeile() {
   document.getElementById('kopf-name').textContent = {
     uebersicht: 'Übersicht', wortschatz: 'Wortschatz', wort: 'Wort',
     neu: 'Neues Wort', lernen: 'Abfrage', ziele: 'Lernziele',
-    freigabe: 'Freigabe', import: 'Datei einlesen',
+    freigabe: 'Freigabe', import: 'Datei einlesen', ueben: 'Sätze üben',
     einstellungen: 'Einstellungen',
     tastatur: 'Tastatur', profile: 'Profil wählen',
   }[weg[0]] || 'Vokabeltrainer';
@@ -193,6 +194,19 @@ async function wegweisen() {
         return await ziele.zeichnen(inhalt);
       case 'wortschatz':
         return await wortschatz.zeichnen(inhalt);
+      case 'ueben':
+        // #/ueben wählt aus, #/ueben/plan|frei|fehler übt, und
+        // #/ueben/lektion/12 grenzt auf eine Lektion ein.
+        {
+          if (!teile[1]) return await uebungen.zeichnen(inhalt);
+          const optionen = { sammlungId: zustand.sammlungId };
+          if (teile[1] === 'lektion') optionen.lektionNr = Number(teile[2]);
+          else if (teile[1] !== 'plan') optionen.nur = teile[1];
+          const sitzung = new uebungen.Uebungssitzung(inhalt, optionen);
+          laufendeSitzung = sitzung;
+          await sitzung.start();
+          return;
+        }
       case 'import':
         return await einlesen.zeichnen(inhalt);
       case 'freigabe':

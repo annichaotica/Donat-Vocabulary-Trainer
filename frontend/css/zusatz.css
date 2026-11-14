@@ -335,3 +335,38 @@ input[type="file"] { max-width: 100%; }
 .tastaturbild.klein .taste-aufdruck { font-size: clamp(.46rem, 1.6vw, .56rem); }
 .merktafel-fuss { margin: .2rem 0 0; font-size: .82em; }
 .merktafel-fuss a { margin-left: .4rem; }
+
+
+/* ------------------------------------------------------ Sätze üben
+   Ein Satz ist kein Wort: er braucht Platz zum Lesen und ein Feld, in das
+   mehrere Zeilen passen. */
+
+.satzfrage {
+  margin: 0;
+  font-size: clamp(1.15rem, 3.4vw, 1.5rem);
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.satzeingabe { margin-top: .8rem; }
+.satzfeld {
+  width: 100%;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 3.2rem;
+}
+.satzfeld.richtig { border-color: var(--richtig); background: var(--richtig-grund); }
+.satzfeld.fast    { border-color: var(--fast);    background: var(--fast-grund); }
+.satzfeld.falsch  { border-color: var(--falsch);  background: var(--falsch-grund); }
+.satzfeld:disabled { opacity: 1; -webkit-text-fill-color: var(--text); }
+
+/* Die Wortliste ist bei einem Satz die eigentliche Auskunft. */
+.stellen { margin: .5rem 0 0; padding-left: 1.1rem; }
+.stellen li { margin: .15rem 0; }
+.stellen s { opacity: .75; }
+.satzgegenstueck {
+  margin-top: .3rem;
+  padding-left: .7rem;
+  border-left: 2px solid var(--rand);
+}

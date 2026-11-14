@@ -263,6 +263,29 @@ def _wackligkeit(r: dict) -> float:
     return fehlerquote * 2 + duenn
 
 
+def _wortweise(reihe: list[dict]) -> list[dict]:
+    """Reihum über die Wörter: erst von jedem die erste Aufgabe, dann von
+    jedem die zweite.
+
+    So reicht ein Tagesvorrat über viele Wörter statt über ein einziges
+    Paradigma — und zwanzig neue Aufgaben sind zwanzig neue Wörter und
+    nicht ein halbes Verb.
+    """
+    nach_wort: dict = {}
+    for r in sorted(reihe, key=lambda r: (r["lektion_id"] or 0,
+                                          r["lexem_id"], r["typ"])):
+        nach_wort.setdefault(r["lexem_id"], []).append(r)
+    ergebnis: list[dict] = []
+    runde = 0
+    while True:
+        dazu = [liste[runde] for liste in nach_wort.values()
+                if runde < len(liste)]
+        if not dazu:
+            return ergebnis
+        ergebnis += dazu
+        runde += 1
+
+
 def verschraenken(reihe: list[dict]) -> list[dict]:
     """Mischt so, dass aufeinanderfolgende Aufgaben nicht zum selben Wort
     gehören.
@@ -316,8 +339,14 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
     faellig.sort(key=lambda r: _dringlichkeit(r, heute))
     wacklig = [r for r in sorted(nicht_faellig, key=_wackligkeit, reverse=True)
                if _wackligkeit(r) > 0.5]
-    # Zusammengehöriges zusammen einführen; verschränkt wird erst danach.
-    neu.sort(key=lambda r: (r["lektion_id"] or 0, r["lexem_id"], r["typ"]))
+    # Von jedem Wort erst die erste Aufgabe, dann von jedem die zweite.
+    #
+    # Vorher stand hier eine Sortierung nach Lexem — damit kamen alle
+    # vierzig Formen eines Verbs an einem Stück, der Tagesvorrat war nach
+    # einem halben Verb leer, und das anschließende Verschränken hatte
+    # nichts mehr zu mischen, weil alles aus demselben Wort stammte.
+    # Ein Verbstamm ist EIN Wort, auch wenn viel daran hängt.
+    neu = _wortweise(neu)
 
     tagesbedarf = stand["neu_taeglich_noetig"]
 

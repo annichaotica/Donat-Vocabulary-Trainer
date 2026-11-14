@@ -81,7 +81,23 @@ class SammlungEinstellungen(BaseModel):
 
 class LektionAnlegen(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+    # Die Nummer im Lehrwerk. Sie ist der Schlüssel, unter dem ein Import
+    # seine Lektion wiederfindet — Namen ändern sich, Nummern nicht.
+    nr: int | None = Field(default=None, ge=0, le=9999)
+    beschreibung: str | None = None
     reihenfolge: int = 0
+
+
+class SammelimportEingabe(BaseModel):
+    """Viele Wörter in einem Aufruf.
+
+    `nur_pruefen` schreibt nichts und liefert trotzdem alle Befunde — man
+    sieht also vorher, was herauskäme. Wiederholte Läufe bessern nach,
+    statt zu verdoppeln; geprüfte Formen werden nie überschrieben.
+    """
+    eintraege: list[dict[str, Any]] = Field(min_length=1, max_length=2000)
+    nur_pruefen: bool = False
+    quelle: Quelle = "ki"
 
 
 class FormEingabe(BaseModel):

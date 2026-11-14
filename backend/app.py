@@ -36,6 +36,7 @@ import identitaet
 import mcp_dienst
 import merkmale as mk
 import qualitaet
+import sammelimport
 import sprachen
 import wache
 import zugang
@@ -43,6 +44,7 @@ from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
                      ImportEingabe, LernzielAendern, LernzielAnlegen,
+                     SammelimportEingabe,
                      McpTokenAnlegen,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
@@ -501,20 +503,42 @@ def sammlung_einstellungen_setzen(sammlung_id: int, eingabe: SammlungEinstellung
 @app.get("/api/sammlungen/{sammlung_id}/lektionen")
 def lektionen_liste(sammlung_id: int, db: sqlite3.Connection = DB):
     _holen(db, "sammlung", sammlung_id)
-    return dbm.zeilen(db, """
-        SELECT k.*, (SELECT COUNT(*) FROM lexem l WHERE l.lektion_id = k.id) AS lexeme
-          FROM lektion k WHERE k.sammlung_id = ?
-         ORDER BY k.reihenfolge, k.name""", (sammlung_id,))
+    return sammelimport.lektionen(db, sammlung_id)
 
 
 @app.post("/api/sammlungen/{sammlung_id}/lektionen", status_code=201)
 def lektion_anlegen(sammlung_id: int, eingabe: LektionAnlegen,
                     db: sqlite3.Connection = DB):
+    """Legt eine Lektion an — oder zieht die vorhandene mit dieser Nummer nach."""
     _holen(db, "sammlung", sammlung_id)
-    cur = db.execute("""INSERT INTO lektion (sammlung_id, name, reihenfolge)
-                        VALUES (?, ?, ?)""",
-                     (sammlung_id, eingabe.name, eingabe.reihenfolge))
+    if eingabe.nr is not None:
+        kennung = sammelimport.lektion_sichern(db, sammlung_id, eingabe.nr,
+                                               eingabe.name, eingabe.beschreibung)
+        return _holen(db, "lektion", kennung)
+    cur = db.execute("""INSERT INTO lektion
+                          (sammlung_id, name, beschreibung, reihenfolge)
+                        VALUES (?, ?, ?, ?)""",
+                     (sammlung_id, eingabe.name, eingabe.beschreibung,
+                      eingabe.reihenfolge))
     return _holen(db, "lektion", cur.lastrowid)
+
+
+@app.post("/api/sammlungen/{sammlung_id}/import/vokabeln")
+def vokabeln_importieren(sammlung_id: int, eingabe: SammelimportEingabe,
+                         request: Request = None,
+                         db: sqlite3.Connection = DB):
+    """Viele Wörter in einem Aufruf — mit Probelauf und wiederholbar.
+
+    Berichtet wird knapp: je Eintrag nur, wenn es etwas zu sagen gibt.
+    Bei sechzehnhundert Wörtern will niemand sechzehnhundert Zeilen lesen.
+    """
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    _holen(db, "sammlung", sammlung_id)
+    try:
+        return sammelimport.importieren(db, sammlung_id, eingabe.eintraege,
+                                        eingabe.nur_pruefen, eingabe.quelle)
+    except (sammelimport.ImportFehler, mk.MerkmalFehler) as fehler:
+        raise HTTPException(400, str(fehler))
 
 
 # ============================================================ Wortschatz
@@ -1000,6 +1024,11 @@ def lern_stand(benutzer_id: int, sammlung_id: int | None = None,
 @app.get("/api/lernen/naechste")
 def lern_naechste(benutzer_id: int, sammlung_id: int | None = None,
                   lektion_id: int | None = None,
+                  bis_lektion: int | None = Query(
+                      default=None,
+                      description="nur Wörter aus Lektionen bis zu dieser "
+                                  "Nummer — der übliche Schnitt beim "
+                                  "Mitlernen mit einem Lehrwerk"),
                   typ: list[str] | None = Query(default=None),
                   nur: str | None = None,
                   anzahl: int = Query(default=1, ge=1, le=50),
@@ -1013,7 +1042,7 @@ def lern_naechste(benutzer_id: int, sammlung_id: int | None = None,
     if nur not in (None, "neu", "faellig", "fehler", "frei"):
         raise HTTPException(400, "nur muss neu, faellig, fehler oder frei sein")
     return lernmodul.naechste(db, benutzer_id, sammlung_id, lektion_id,
-                              typ, nur, anzahl, lernziel_id)
+                              typ, nur, anzahl, lernziel_id, bis_lektion)
 
 
 @app.post("/api/lernen/pruefen")

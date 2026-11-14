@@ -27,6 +27,7 @@ from typing import Any, Callable
 
 from fastapi import HTTPException
 
+import datenbank as dbm
 import zugang
 
 VERSION = "0.2.0"
@@ -156,6 +157,35 @@ def vokabel_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
                     "Freigabe durch einen Menschen in der Oberfläche oder mit "
                     "formen_bestaetigen.") if not als_geprueft else None,
     }
+
+
+def vokabeln_importieren(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                         eintraege: list, nur_pruefen: bool = False):
+    """Viele Wörter in einem Aufruf — mit Probelauf und wiederholbar."""
+    import sammelimport
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+    try:
+        return sammelimport.importieren(db, sammlung_id, eintraege, nur_pruefen)
+    except Exception as f:
+        raise WerkzeugFehler(str(f)) from f
+
+
+def lektion_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                    nr: int, titel: str | None = None,
+                    beschreibung: str | None = None):
+    """Legt eine Lektion an oder zieht die vorhandene mit dieser Nummer nach."""
+    import sammelimport
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+    kennung = sammelimport.lektion_sichern(db, sammlung_id, nr, titel,
+                                           beschreibung)
+    return dbm.zeile(db, "SELECT * FROM lektion WHERE id = ?", (kennung,))
+
+
+def lektionen_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int):
+    """Welche Lektionen gibt es, und wie viele Wörter hängen daran?"""
+    import sammelimport
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id)
+    return {"lektionen": sammelimport.lektionen(db, sammlung_id)}
 
 
 def vokabel_lesen(db: sqlite3.Connection, person: dict, lexem_id: int):
@@ -337,6 +367,61 @@ WERKZEUGE: list[dict] = [
                 "Sonst bleiben die Formen bis zur Freigabe unabgefragt."),
         }, "required": ["sammlung_id", "lemma", "wortart", "bedeutungen"]},
         "funktion": vokabel_anlegen,
+    },
+    {
+        "name": "vokabeln_importieren",
+        "description":
+            "Viele Wörter in EINEM Aufruf. Für größere Bestände der richtige "
+            "Weg — vokabel_anlegen ist für einzelne Wörter.\n\n"
+            "Drei Eigenschaften, auf die es ankommt:\n"
+            "• **Probelauf**: nur_pruefen=true schreibt nichts und meldet "
+            "trotzdem alle Befunde. Immer zuerst so laufen lassen.\n"
+            "• **Wiederholbar**: derselbe Eintrag landet nicht zweimal im "
+            "Bestand. Schlüssel ist die mitgegebene kennung, sonst lemma + "
+            "wortart. Ein zweiter Lauf mit berichtigten Daten bessert nach.\n"
+            "• **Geprüftes bleibt unangetastet**: hat ein Mensch eine Form "
+            "bestätigt, wird sie nie überschrieben — die Abweichung wird "
+            "gemeldet.\n\n"
+            "Je Eintrag dasselbe Format wie bei vokabel_anlegen, dazu "
+            "wahlweise lektion_nr, lektion_titel, reihenfolge und kennung. "
+            "Berichtet wird knapp: nur Einträge, zu denen es etwas zu sagen "
+            "gibt.\n\n" + MERKMALSHINWEIS,
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+            "eintraege": _s("array",
+                "Liste von Wörtern. Je Eintrag: lemma, wortart, bedeutungen, "
+                "formen, merkmale — dazu lektion_nr (Nummer im Lehrwerk), "
+                "lektion_titel, reihenfolge (Lernreihenfolge innerhalb der "
+                "Lektion) und kennung (eigener Schlüssel; nötig bei "
+                "Gleichlautern wie φορά »Mal« und »er trägt«).",
+                items={"type": "object"}),
+            "nur_pruefen": _s("boolean",
+                "true: nichts schreiben, nur berichten. Zuerst immer so.")},
+            "required": ["sammlung_id", "eintraege"]},
+        "funktion": vokabeln_importieren,
+    },
+    {
+        "name": "lektion_anlegen",
+        "description": "Eine Lektion anlegen oder die vorhandene mit dieser "
+                       "Nummer nachziehen. Die NUMMER ist der Schlüssel, "
+                       "nicht der Name — Lehrwerke benennen um, nummerieren "
+                       "aber nicht neu. Beim Import entstehen Lektionen auch "
+                       "von selbst, wenn lektion_nr mitgegeben wird.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", ""),
+            "nr": _s("integer", "Nummer im Lehrwerk"),
+            "titel": _s("string", "Überschrift der Lektion"),
+            "beschreibung": _s("string", "wahlweise")},
+            "required": ["sammlung_id", "nr"]},
+        "funktion": lektion_anlegen,
+    },
+    {
+        "name": "lektionen_auflisten",
+        "description": "Welche Lektionen gibt es in dieser Sammlung, und wie "
+                       "viele Wörter hängen daran?",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", "")}, "required": ["sammlung_id"]},
+        "funktion": lektionen_auflisten,
     },
     {
         "name": "vokabel_nachschlagen",

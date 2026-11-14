@@ -117,6 +117,13 @@ def _formen_pruefen(formen: list[dict], code: str, wortart: str,
                     einstellungen: dict) -> list[dict]:
     befunde = []
     if not formen:
+        # Nur melden, wo es überhaupt Formen geben KANN. Adverbien,
+        # Präpositionen, Konjunktionen und Wendungen haben keine — ein
+        # Mangel wäre das nur, wenn die Sprache für diese Wortart
+        # Formgruppen kennt. Eine feste Ausnahmeliste wäre hier falsch:
+        # was flektiert, entscheidet die Sprache, nicht eine Liste im Code.
+        if not sprachen.formgruppen(code, wortart):
+            return []
         return [_befund(
             "ohne_formen", "hinweis", "Keine Formen eingetragen.",
             rat=f"Für {mk.WORTARTEN.get(wortart, wortart)} in "

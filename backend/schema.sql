@@ -84,9 +84,16 @@ CREATE TABLE IF NOT EXISTS freigabe (
 CREATE TABLE IF NOT EXISTS lektion (
     id           INTEGER PRIMARY KEY,
     sammlung_id  INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
+    -- Die Nummer im Lehrwerk. Sie ist der Schlüssel, unter dem ein Import
+    -- seine Lektion wiederfindet — der Name darf sich ändern, die Nummer
+    -- nicht. Ohne sie ließe sich "bis Lektion 12" nicht abfragen.
+    nr           INTEGER,
     name         TEXT NOT NULL,
+    beschreibung TEXT,
     reihenfolge  INTEGER NOT NULL DEFAULT 0
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lektion_nr
+    ON lektion(sammlung_id, nr) WHERE nr IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_lektion_sammlung ON lektion(sammlung_id);
 
 -- ------------------------------------------------------------------ Lexeme
@@ -97,6 +104,14 @@ CREATE TABLE IF NOT EXISTS lexem (
     lektion_id   INTEGER REFERENCES lektion(id) ON DELETE SET NULL,
     lemma        TEXT NOT NULL,
     wortart      TEXT NOT NULL,
+    -- Lernreihenfolge innerhalb der Lektion. Neues wird in dieser Folge
+    -- eingeführt, nicht nach Zufall oder Eingabedatum.
+    reihenfolge  INTEGER NOT NULL DEFAULT 0,
+    -- Kennung aus der Quelle, falls es eine gibt. Sie entscheidet beim
+    -- wiederholten Import, ob ein Eintrag derselbe ist. Ohne sie dient
+    -- lemma + wortart als Schlüssel — was bei Gleichlautern (φορά "Mal"
+    -- und "er trägt") nicht reicht, darum diese Ausweichmöglichkeit.
+    kennung      TEXT,
     -- lexemfeste Merkmale, z.B. {"genus": "f"} beim Substantiv,
     -- {"klasse": "er", "hilfsverb": "etre"} beim französischen Verb
     merkmale     TEXT NOT NULL DEFAULT '{}',
@@ -107,6 +122,9 @@ CREATE TABLE IF NOT EXISTS lexem (
 CREATE INDEX IF NOT EXISTS idx_lexem_sammlung ON lexem(sammlung_id);
 CREATE INDEX IF NOT EXISTS idx_lexem_lektion  ON lexem(lektion_id);
 CREATE INDEX IF NOT EXISTS idx_lexem_lemma    ON lexem(sammlung_id, lemma);
+CREATE INDEX IF NOT EXISTS idx_lexem_folge    ON lexem(sammlung_id, lektion_id, reihenfolge);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lexem_kennung
+    ON lexem(sammlung_id, kennung) WHERE kennung IS NOT NULL;
 
 -- Eine Wortform mit ihrem Merkmalsbündel.
 -- quelle/geprueft: generierte oder von der KI ergänzte Formen werden erst

@@ -23,6 +23,14 @@ import legasthenie as legasthenie_modul
 #   neu       — Neues zuletzt, und mengenmäßig begrenzt
 NEU_JE_SITZUNG = 20
 
+# In welcher Folge Neues eingeführt wird: nach Lektion, dann nach der
+# Lernreihenfolge innerhalb der Lektion, dann nach Eingabedatum. Wörter
+# ohne Lektion kommen zuletzt — sie sind meist selbst nachgetragen.
+LERNREIHENFOLGE = ("(SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id) "
+                   "IS NULL, "
+                   "(SELECT k.nr FROM lektion k WHERE k.id = l.lektion_id), "
+                   "l.reihenfolge, l.id, a.typ")
+
 
 def heute() -> dt.date:
     return dt.date.today()
@@ -126,7 +134,8 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
              typen: list[str] | None = None,
              nur: str | None = None,
              anzahl: int = 1,
-             lernziel_id: int | None = None) -> list[dict]:
+             lernziel_id: int | None = None,
+             bis_lektion: int | None = None) -> list[dict]:
     """Die nächsten Aufgaben.
 
     nur:  None       — planmäßig: verlernt, dann fällig, dann neu
@@ -171,6 +180,14 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     if lektion_id is not None:
         bedingungen.append("l.lektion_id = ?")
         werte.append(lektion_id)
+    if bis_lektion is not None:
+        # Der übliche Schnitt beim Mitlernen: alles bis zur Lektion, die man
+        # im Unterricht hat. Wörter ohne Lektion zählen mit — sie sind meist
+        # selbst nachgetragen und nicht an das Lehrwerk gebunden.
+        bedingungen.append("""(l.lektion_id IS NULL OR EXISTS (
+            SELECT 1 FROM lektion k WHERE k.id = l.lektion_id
+              AND (k.nr IS NULL OR k.nr <= ?)))""")
+        werte.append(bis_lektion)
     if typen:
         bedingungen.append(f"a.typ IN ({','.join('?' * len(typen))})")
         werte += list(typen)
@@ -179,7 +196,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # vollständig und ist in der Oberfläche als "Warum jetzt?" nachlesbar.
     if nur == "neu":
         bedingungen.append("(z.zustand IS NULL OR z.zustand = 'neu')")
-        ordnung = "l.id, a.typ"
+        ordnung = LERNREIHENFOLGE
     elif nur == "faellig":
         bedingungen.append(
             "z.zustand IN ('lernen','reif','verlernt') AND z.faellig <= ?")
@@ -206,7 +223,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                            WHEN 'reif' THEN 1
                            ELSE 3 END,
             z.faellig,
-            l.id, a.typ"""
+            """ + LERNREIHENFOLGE
 
     sql = f"""
         SELECT a.id AS aufgabe_id, a.typ, l.id AS lexem_id, l.lemma,

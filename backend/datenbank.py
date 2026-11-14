@@ -18,7 +18,7 @@ from typing import Any, Iterable
 
 import sprachen
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 _WURZEL = pathlib.Path(__file__).resolve().parent.parent
 PFAD = pathlib.Path(os.environ.get("VOKABEL_DB", _WURZEL / "daten" / "vokabeltrainer.db"))
@@ -64,6 +64,14 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
     "sammlung": {
         "einstellungen": "TEXT NOT NULL DEFAULT '{}'",
     },
+    "lektion": {
+        "nr": "INTEGER",
+        "beschreibung": "TEXT",
+    },
+    "lexem": {
+        "reihenfolge": "INTEGER NOT NULL DEFAULT 0",
+        "kennung": "TEXT",
+    },
     "benutzer": {
         # Ohne UNIQUE: ALTER TABLE kann in SQLite keine eindeutige Spalte
         # nachrüsten. Der eindeutige Index steht darum eine Zeile tiefer.
@@ -90,6 +98,12 @@ def wandern(db: sqlite3.Connection, von: int) -> None:
                 db.execute(f"ALTER TABLE {tabelle} ADD COLUMN {name} {art}")
     db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_benutzer_email
                     ON benutzer(email) WHERE email IS NOT NULL""")
+    db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_lektion_nr
+                    ON lektion(sammlung_id, nr) WHERE nr IS NOT NULL""")
+    db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_lexem_kennung
+                    ON lexem(sammlung_id, kennung) WHERE kennung IS NOT NULL""")
+    db.execute("""CREATE INDEX IF NOT EXISTS idx_lexem_folge
+                    ON lexem(sammlung_id, lektion_id, reihenfolge)""")
     # Gibt es noch keinen Verwalter, wird es die erste angelegte Person.
     # Ohne das stünde ein bestehender Bestand nach der Aktualisierung ohne
     # jemanden da, der Sprachprofile pflegen darf.

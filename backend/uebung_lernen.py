@@ -129,6 +129,30 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
 
 # ----------------------------------------------------------- Was ist dran?
 
+# Wie viele zuletzt gefragte Sätze gemieden werden, solange es Auswahl
+# gibt. Gezählt wird der TEXT, nicht die einzelne Aufgabe: hin und
+# zurück sind zwei Aufgaben zu demselben Satz, und zweimal denselben
+# Satz hintereinander will auch niemand.
+ZULETZT_MEIDEN = 2
+
+
+def _zuletzt_gefragt(db: sqlite3.Connection, benutzer_id: int,
+                     anzahl: int = ZULETZT_MEIDEN) -> list[int]:
+    """Die Texte der zuletzt bearbeiteten Übungen dieser Person."""
+    # Nach der Protokollnummer, nicht nach dem Zeitstempel: der hat
+    # Sekundenauflösung, und wer zügig antwortet, erzeugt lauter
+    # gleiche Werte — dann ist "zuletzt" nicht entscheidbar und die
+    # Reihenfolge zufällig.
+    return [z["text_id"] for z in dbm.zeilen(db, """
+        SELECT x.text_id, MAX(b.id) AS zuletzt
+          FROM textbearbeitung b
+          JOIN textaufgabe x ON x.id = b.textaufgabe_id
+         WHERE b.benutzer_id = ?
+         GROUP BY x.text_id
+         ORDER BY zuletzt DESC
+         LIMIT ?""", (benutzer_id, anzahl))]
+
+
 def naechste(db: sqlite3.Connection, benutzer_id: int,
              sammlung_id: int | None = None,
              lektion_nr: int | None = None,
@@ -192,20 +216,43 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                                      WHEN 'reif' THEN 1
                                      ELSE 3 END, z.faellig, """ + folge)
 
-    reihe = dbm.zeilen(db, f"""
-        SELECT x.id AS textaufgabe_id
+    # Abstand halten — dieselbe Regel wie bei den Vokabeln, wo sie schon
+    # einmal aus dem Betrieb heraus nachgerüstet werden musste. Ohne sie
+    # kommt nach »nochmal« sofort wieder derselbe Satz: die Bewertung
+    # setzt ihn auf 'verlernt' und heute fällig, und 'verlernt' steht in
+    # der Sortierung auf Rang 0. Daneben liegen unangetastete Sätze.
+    #
+    # Die Bedingung gehört in die ABFRAGE, nicht hinterher ins Sieb.
+    # Nachgefiltert griff sie nicht: das Fenster enthält, nach Lektion
+    # und Reihenfolge sortiert, überwiegend Aufgaben derselben ersten
+    # Texte — also genau das, was gemieden werden soll, und dann bleibt
+    # nichts übrig und der Rückfall nimmt doch wieder den alten Satz.
+    meiden = ([] if nur in ("neu", "frei")
+              else _zuletzt_gefragt(db, benutzer_id))
+    rumpf = f"""
+        SELECT x.id AS textaufgabe_id, t.id AS text_id
           FROM textaufgabe x
           JOIN text t ON t.id = x.text_id
           LEFT JOIN textabschnitt s ON s.id = x.abschnitt_id
           LEFT JOIN lektion k ON k.id = t.lektion_id
           LEFT JOIN textlernzustand z
                  ON z.textaufgabe_id = x.id AND z.benutzer_id = ?
-         WHERE {' AND '.join(bedingungen)}
+         WHERE {' AND '.join(bedingungen)}"""
+    reihe = []
+    if meiden:
+        reihe = dbm.zeilen(db, f"""{rumpf}
+           AND t.id NOT IN ({','.join('?' * len(meiden))})
+         ORDER BY {ordnung}
+         LIMIT ?""", (*werte, *meiden, max(1, anzahl)))
+    if not reihe:
+        # Nichts anderes da — dann eben der zuletzt gefragte Satz. Mit
+        # einer einzigen Übung ist jede Abfrage eine Wiederholung.
+        reihe = dbm.zeilen(db, f"""{rumpf}
          ORDER BY {ordnung}
          LIMIT ?""", (*werte, max(1, anzahl)))
 
     ergebnis = []
-    for r in reihe:
+    for r in reihe[:max(1, anzahl)]:
         _zustand_sichern(db, r["textaufgabe_id"], benutzer_id)
         ergebnis.append(ausbauen(db, r["textaufgabe_id"], benutzer_id,
                                  e["wunschretention"]))
@@ -378,7 +425,17 @@ def zuruecksetzen(db: sqlite3.Connection, benutzer_id: int,
 def aussetzen(db: sqlite3.Connection, benutzer_id: int, textaufgabe_id: int,
               aussetzen_: bool = True) -> None:
     _zustand_sichern(db, textaufgabe_id, benutzer_id)
-    db.execute("""UPDATE textlernzustand SET zustand = ?
+    if aussetzen_:
+        db.execute("""UPDATE textlernzustand SET zustand = 'ausgesetzt'
+                       WHERE textaufgabe_id = ? AND benutzer_id = ?""",
+                   (textaufgabe_id, benutzer_id))
+        return
+    # Zurück in den Verkehr — aber nicht als »neu«: wer schon geübt hat,
+    # hat eine Stabilität, und die rechnet FSRS weiter. Als »neu« zählte
+    # der Satz gegen den Tagesvorrat an Neuem und würde noch einmal
+    # eingeführt. Die Vokabelseite macht es seit je richtig.
+    db.execute("""UPDATE textlernzustand
+                     SET zustand = CASE WHEN stabilitaet IS NULL
+                                        THEN 'neu' ELSE 'lernen' END
                    WHERE textaufgabe_id = ? AND benutzer_id = ?""",
-               ("ausgesetzt" if aussetzen_ else "neu",
-                textaufgabe_id, benutzer_id))
+               (textaufgabe_id, benutzer_id))

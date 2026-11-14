@@ -301,17 +301,34 @@ def gleichbedeutende(db: sqlite3.Connection, lexem: dict, bedeutung_id: int,
                         (bedeutung_id, grundsprache))]
     if not texte:
         return []
-    fragen = ",".join("?" * len(texte))
-    return dbm.zeilen(db, f"""
-        SELECT DISTINCT l.id AS lexem_id, l.lemma, b.kontext
+    # Verglichen wird in Python, nicht in SQL.
+    #
+    # Hier stand `LOWER(TRIM(u.text)) IN (…)`. SQLites eingebautes LOWER
+    # wirkt nur auf ASCII: lower('Öl') ist 'Öl', verglichen wurde aber
+    # gegen das Python-seitige casefold 'öl'. Jede Übersetzung mit
+    # Umlaut am Anfang — Öl, Übung, Äpfel, Ärmel — fiel damit durch, und
+    # das zweite richtige Wort wurde als Nichtwissen protokolliert.
+    # Genau das, was der Text oben ausschließen will.
+    gesucht = set(texte)
+    alle = dbm.zeilen(db, """
+        SELECT DISTINCT l.id AS lexem_id, l.lemma, b.kontext, u.text
           FROM uebersetzung u
           JOIN bedeutung b ON b.id = u.bedeutung_id
           JOIN lexem l ON l.id = b.lexem_id
          WHERE l.sammlung_id = ? AND l.id != ?
            AND u.sprache = ?
-           AND LOWER(TRIM(u.text)) IN ({fragen})
          ORDER BY l.lemma""",
-        (lexem["sammlung_id"], lexem["id"], grundsprache, *texte))
+        (lexem["sammlung_id"], lexem["id"], grundsprache))
+    gesehen, treffer = set(), []
+    for z in alle:
+        if z["text"].casefold().strip() not in gesucht:
+            continue
+        if z["lexem_id"] in gesehen:
+            continue
+        gesehen.add(z["lexem_id"])
+        treffer.append({"lexem_id": z["lexem_id"], "lemma": z["lemma"],
+                        "kontext": z["kontext"]})
+    return treffer
 
 
 def stamm_fuer_aufgabe(db: sqlite3.Connection, aufgabe_id: int) -> str:

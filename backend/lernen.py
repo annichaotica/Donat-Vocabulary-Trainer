@@ -524,6 +524,29 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     vorzug = None if _ohne_vorzug else _vorzug(rest)
     heute_text = heute().isoformat()
 
+    # Welche Wörter heute schon angefangen wurden, und wie viele noch
+    # dürfen. Muss VOR der Abfrage feststehen: der Vorrat gehört in die
+    # Bedingung, nicht hinterher ins Sieb (siehe tests/test_wortvorrat.py).
+    # Und je Sammlung gezählt, genau wie in stand() — sonst meldet die
+    # Übersicht für die zweite Sammlung offene Fragen, die nie kommen.
+    heute_begonnen: set[int] = set()
+    rest_neu = e["neu_je_sitzung"]
+    if nur is None:
+        morgen = (heute() + dt.timedelta(days=1)).isoformat()
+        # Tagesgrenzen statt date() auf der Spalte: so greift der Index
+        # idx_wiederholung_zeit. Mit date() wird bei jedem Aufgabenabruf das
+        # ganze Protokoll des Benutzers gelesen, und das wird nie geleert.
+        heute_begonnen = {z["lexem_id"] for z in dbm.zeilen(db, f"""
+            SELECT DISTINCT a.lexem_id FROM wiederholung w
+              JOIN aufgabe a ON a.id = w.aufgabe_id
+              JOIN lexem l ON l.id = a.lexem_id
+             WHERE w.benutzer_id = ?
+               AND w.zeitpunkt >= ? AND w.zeitpunkt < ?
+               AND w.stabilitaet_vor IS NULL
+               AND l.sammlung_id IN ({','.join('?' * len(sammlungen))})""",
+            (benutzer_id, heute_text, morgen, *sammlungen))}
+        rest_neu = max(0, e["neu_je_sitzung"] - len(heute_begonnen))
+
     bedingungen = [f"l.sammlung_id IN ({','.join('?' * len(sammlungen))})",
                    "a.aktiv = 1"]
     werte: list = [benutzer_id, *sammlungen]
@@ -574,12 +597,28 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
             )""")
             werte.append(heute_text)
         else:
-            bedingungen.append("""(
-                z.zustand IS NULL
-                OR z.zustand = 'neu'
+            # Ist der Tagesvorrat an WÖRTERN aufgebraucht, darf Neues nur
+            # noch von den heute angefangenen Wörtern kommen. Stünde das
+            # erst im Sieb hinter der Abfrage, holte das Fenster
+            # (anzahl * 4 Zeilen) ausschließlich Verbotenes: die
+            # Sortierung stellt ja gerade die noch unberührten Wörter
+            # nach vorn. Übrig bliebe nichts, und die Sitzung endete nach
+            # genau `neu_je_sitzung` Fragen.
+            if rest_neu <= 0 and heute_begonnen:
+                neu_zweig = (f"""((z.zustand IS NULL OR z.zustand = 'neu')
+                                  AND l.id IN
+                                  ({','.join('?' * len(heute_begonnen))}))""")
+                neu_werte = list(heute_begonnen)
+            elif rest_neu <= 0:
+                neu_zweig, neu_werte = "0", []     # heute nichts Neues mehr
+            else:
+                neu_zweig, neu_werte = "(z.zustand IS NULL OR z.zustand = 'neu')", []
+            bedingungen.append(f"""(
+                {neu_zweig}
                 OR (z.zustand = 'verlernt')
                 OR (z.zustand IN ('lernen','reif') AND z.faellig <= ?)
             )""")
+            werte += neu_werte
             werte.append(heute_text)
         # verlernt zuerst, dann nach Fälligkeit, Neues zuletzt — und
         # innerhalb des Neuen von jedem Wort erst die erste Aufgabe.
@@ -634,18 +673,9 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     # Tag lang nichts als dessen Präsens. Ein Verbstamm ist ein Wort,
     # auch wenn viel daran hängt.
     if nur is None:
-        morgen = (heute() + dt.timedelta(days=1)).isoformat()
-        # Tagesgrenzen statt date() auf der Spalte: so greift der Index
-        # idx_wiederholung_zeit. Mit date() wird bei jedem Aufgabenabruf das
-        # ganze Protokoll des Benutzers gelesen, und das wird nie geleert.
-        heute_begonnen = {z["lexem_id"] for z in dbm.zeilen(db, """
-            SELECT DISTINCT a.lexem_id FROM wiederholung w
-              JOIN aufgabe a ON a.id = w.aufgabe_id
-             WHERE w.benutzer_id = ?
-               AND w.zeitpunkt >= ? AND w.zeitpunkt < ?
-               AND w.stabilitaet_vor IS NULL""",
-            (benutzer_id, heute_text, morgen))}
-        rest_neu = max(0, e["neu_je_sitzung"] - len(heute_begonnen))
+        # Deckelt, wie viele VERSCHIEDENE neue Wörter ein Abruf anfängt.
+        # Die Abfrage oben hat schon ausgeschlossen, was gar nicht mehr
+        # darf; hier wird nur noch gezählt.
         gefiltert, dazu = [], set()
         for r in reihe:
             if r["zustand"] in (None, "neu"):

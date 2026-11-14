@@ -85,8 +85,15 @@ def test_im_vokativ_steht_keiner(klient):
     import sys
     sys.path.insert(0, "backend")
     import sprachen
-    assert sprachen.artikel_fuer("el", {"genus": "n"},
-                                 {"kasus": "vok", "numerus": "sg"}) is None
+    # Ausdrücklich »keiner«, nicht »unbekannt«. Vorher gab beides None
+    # zurück, und die Prüfung konnte die zwei Fälle nicht unterscheiden:
+    # in den Bedeutungsaufgaben, die nie etwas zum Artikel sagen, galt
+    # darum jeder mitgeschriebene Artikel als überflüssig — auch der
+    # richtige. Siehe tests/test_artikel_mitschreiben.py.
+    import pruefung
+    assert sprachen.artikel_fuer(
+        "el", {"genus": "n"},
+        {"kasus": "vok", "numerus": "sg"}) == pruefung.KEIN_ARTIKEL
 
 
 def test_gemeinsames_geschlecht_zeigt_einen(klient):

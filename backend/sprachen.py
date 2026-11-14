@@ -844,7 +844,10 @@ def artikel_fuer(code: str, lexemmerkmale: dict, formmerkmale: dict) -> str | No
     kasus = formmerkmale.get("kasus")
     numerus = formmerkmale.get("numerus", "sg")
     if kasus == "vok":
-        return None            # im Vokativ steht keiner
+        # Ausdrücklich keiner — nicht »unbekannt«. Nur hier darf ein
+        # mitgeschriebener Artikel als überflüssig gelten.
+        import pruefung
+        return pruefung.KEIN_ARTIKEL
     for schluessel in (f"{genus}|{kasus}|{numerus}", f"{genus}|{numerus}"):
         if schluessel in tabelle:
             return tabelle[schluessel]

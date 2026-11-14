@@ -37,6 +37,13 @@ _APOSTROPHE = str.maketrans({"’": "'", "‘": "'", "ʼ": "'", "´": "'"})
 _MEHRFACH_LEERRAUM = re.compile(r"\s+")
 _KLAMMERTEIL = re.compile(r"\s*\(([^()]*)\)\s*")
 
+# Ausdrücklich »hier steht keiner« — zu unterscheiden von None, das nur
+# heißt, dass die Aufgabe dazu nichts sagt. Die Unterscheidung ist der
+# ganze Punkt: ohne sie galt in den Bedeutungsaufgaben, die nie etwas
+# dazu sagen, jeder mitgeschriebene Artikel als überflüssig — auch der
+# richtige.
+KEIN_ARTIKEL = "\x00kein"
+
 
 @dataclass
 class Urteil:
@@ -262,7 +269,11 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
 
     erwartet          alle zulässigen Antworten; eine zu treffen genügt
     verwechslungen    (Text, Beschriftung) anderer Formen desselben Wortes
-    artikel_verlangt  der korrekte Artikel, wenn einer dazugehört
+    artikel_verlangt  der korrekte Artikel, wenn einer dazugehört;
+                      KEIN_ARTIKEL, wo ausdrücklich keiner hingehört;
+                      None heißt »dazu ist nichts bekannt« — dann wird
+                      ein mitgeschriebener Artikel stillschweigend
+                      hingenommen und nicht gewertet
     fehler_benennen   die Art des Fehlers mitnennen (Reihenfolge, Doppelung,
                       verwechselte Buchstaben)
 
@@ -347,7 +358,8 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
                 hinweise.append(f"Fast — auf die Zeichen achten: {anzeige}")
 
         if artikel_pruefen:
-            soll = artikel_verlangt or z_artikel
+            soll = (z_artikel if artikel_verlangt in (None, KEIN_ARTIKEL)
+                    else artikel_verlangt)
             if soll:
                 if e_artikel is None:
                     if artikelregel == "verlangt":
@@ -364,12 +376,18 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
                     abw.append("artikel_falsch")
                     hinweise.append(
                         f"Falscher Artikel: {_anzeige(soll)}, nicht {_anzeige(e_artikel)}")
-            elif e_artikel is not None and artikel_verlangt is None:
-                # Nur wo wirklich keiner hingehört. Steht die erwartete
-                # Form ohne Artikel da, heißt das noch lange nicht, dass
-                # keiner davorgehört — die Formentabelle führt sie eben
-                # ohne. Darum zählt das nur, wenn die Aufgabe ausdrücklich
-                # sagt, dass hier keiner steht.
+            elif e_artikel is not None and artikel_verlangt == KEIN_ARTIKEL:
+                # Nur wo wirklich keiner hingehört — im Vokativ etwa.
+                #
+                # Hier stand `artikel_verlangt is None`, und das war das
+                # Gegenteil des darüberstehenden Kommentars: None heißt
+                # nicht »hier gehört keiner hin«, sondern »dazu wurde
+                # nichts gesagt«. Die beiden Bedeutungsaufgaben sagen nie
+                # etwas — also galt dort jeder mitgeschriebene Artikel als
+                # überflüssig, der richtige wie der falsche. »das Haus«
+                # für σπίτι wurde zu »fast«, mit dem Hinweis, hier gehöre
+                # keiner hin. Das ist doppelt verkehrt: mitzuschreiben ist
+                # die bessere Gewohnheit, und richtig war es auch.
                 abw.append("artikel_ueberfluessig")
                 hinweise.append("Hier gehört kein Artikel davor.")
 

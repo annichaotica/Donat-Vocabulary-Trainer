@@ -39,6 +39,7 @@ import merkmale as mk
 import qualitaet
 import sammelimport
 import sprachen
+import uebung_lernen
 import uebungen
 import wache
 import zugang
@@ -54,7 +55,8 @@ from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      SammlungEinstellungen, SpracheAnlegen,
                      SprachprofilSetzen, TextPruefenEingabe,
                      UebersetzungEingabe, UebungAendern, UebungAntwort,
-                     UebungEingabe, UebungenImportEingabe)
+                     UebungBewertenEingabe, UebungEingabe,
+                     UebungPruefenEingabe, UebungenImportEingabe)
 
 OBERFLAECHE = pathlib.Path(__file__).resolve().parent.parent / "frontend"
 
@@ -704,6 +706,64 @@ def textaufgabe_pruefen(textaufgabe_id: int, eingabe: UebungAntwort,
         return uebungen.bewerten(db, textaufgabe_id, eingabe.antwort)
     except uebungen.UebungFehler as fehler:
         raise HTTPException(404, str(fehler))
+
+
+# ================================================== Übungen abfragen
+
+def _uebung_fehler(aufruf, *args, **kw):
+    try:
+        return aufruf(*args, **kw)
+    except uebung_lernen.UebungFehler as fehler:
+        raise HTTPException(400, str(fehler))
+
+
+@app.get("/api/uebungen/lernen/stand")
+def uebungen_stand(benutzer_id: int, sammlung_id: int | None = None,
+                   db: sqlite3.Connection = DB):
+    _holen(db, "benutzer", benutzer_id)
+    return uebung_lernen.stand(db, benutzer_id, sammlung_id)
+
+
+@app.get("/api/uebungen/lernen/naechste")
+def uebungen_naechste(benutzer_id: int, sammlung_id: int | None = None,
+                      lektion_nr: int | None = None,
+                      bis_lektion: int | None = None,
+                      typ: str | None = None, richtung: str | None = None,
+                      nur: str | None = None,
+                      anzahl: int = Query(default=1, le=20),
+                      db: sqlite3.Connection = DB):
+    """Die nächsten Übungsaufgaben — nur aus freigegebenen Übungen."""
+    _holen(db, "benutzer", benutzer_id)
+    return _uebung_fehler(uebung_lernen.naechste, db, benutzer_id, sammlung_id,
+                          lektion_nr, bis_lektion, typ, richtung, nur, anzahl)
+
+
+@app.post("/api/uebungen/lernen/pruefen")
+def uebungen_pruefen(eingabe: UebungPruefenEingabe,
+                     db: sqlite3.Connection = DB):
+    """Vergleicht Wort für Wort. Schreibt noch nichts fort."""
+    _holen(db, "benutzer", eingabe.benutzer_id)
+    return _uebung_fehler(uebung_lernen.pruefen, db, eingabe.benutzer_id,
+                          eingabe.textaufgabe_id, eingabe.antwort)
+
+
+@app.post("/api/uebungen/lernen/aufdecken")
+def uebungen_aufdecken(eingabe: UebungPruefenEingabe,
+                       db: sqlite3.Connection = DB):
+    _holen(db, "benutzer", eingabe.benutzer_id)
+    return _uebung_fehler(uebung_lernen.aufdecken, db, eingabe.benutzer_id,
+                          eingabe.textaufgabe_id)
+
+
+@app.post("/api/uebungen/lernen/bewerten")
+def uebungen_bewerten(eingabe: UebungBewertenEingabe,
+                      db: sqlite3.Connection = DB):
+    _holen(db, "benutzer", eingabe.benutzer_id)
+    return _uebung_fehler(
+        uebung_lernen.bewerten, db, eingabe.benutzer_id,
+        eingabe.textaufgabe_id, eingabe.urteil, eingabe.bewertung,
+        eingabe.antwort, eingabe.dauer_ms, eingabe.aufgedeckt,
+        eingabe.versuche, eingabe.rueckmeldung)
 
 
 # ============================================================ Wortschatz

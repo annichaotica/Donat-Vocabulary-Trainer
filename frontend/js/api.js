@@ -87,6 +87,17 @@ export const api = {
     ruf(`/lexeme/${lexemId}/bedeutungen`, { methode: 'POST', daten }),
   bedeutungLoeschen: (id) => ruf(`/bedeutungen/${id}`, { methode: 'DELETE' }),
 
+  uebungStand: (benutzerId, sammlungId) =>
+    ruf('/uebungen/lernen/stand',
+        { frage: { benutzer_id: benutzerId, sammlung_id: sammlungId } }),
+  uebungNaechste: (frage) => ruf('/uebungen/lernen/naechste', { frage }),
+  uebungPruefen: (daten) =>
+    ruf('/uebungen/lernen/pruefen', { methode: 'POST', daten }),
+  uebungAufdecken: (daten) =>
+    ruf('/uebungen/lernen/aufdecken', { methode: 'POST', daten }),
+  uebungBewerten: (daten) =>
+    ruf('/uebungen/lernen/bewerten', { methode: 'POST', daten }),
+
   freigabeLektionen: (sammlungId) => ruf(`/sammlungen/${sammlungId}/freigabe/lektionen`),
   freigabe: (sammlungId, frage) => ruf(`/sammlungen/${sammlungId}/freigabe`, { frage }),
   freigabeSetzen: (sammlungId, daten) =>

@@ -361,6 +361,27 @@ CREATE TABLE IF NOT EXISTS textaufgabe (
 );
 CREATE INDEX IF NOT EXISTS idx_textaufgabe_text ON textaufgabe(text_id);
 
+-- Lernstand je Textaufgabe. Dieselbe Rechnung wie bei den Vokabeln (FSRS),
+-- aber eine eigene Tabelle: lernzustand hängt mit einem Fremdschlüssel an
+-- `aufgabe`, und eine Textaufgabe ist keine. Die Spalten sind absichtlich
+-- deckungsgleich — so lässt sich fsrs.py unverändert benutzen, und was
+-- für die Vokabeln gilt, gilt auch hier.
+CREATE TABLE IF NOT EXISTS textlernzustand (
+    textaufgabe_id       INTEGER NOT NULL REFERENCES textaufgabe(id) ON DELETE CASCADE,
+    benutzer_id          INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    zustand              TEXT NOT NULL DEFAULT 'neu'
+                         CHECK (zustand IN ('neu','lernen','reif','verlernt','ausgesetzt')),
+    stabilitaet          REAL,
+    schwierigkeit        REAL,
+    letzte_wiederholung  TEXT,
+    faellig              TEXT,
+    anzahl               INTEGER NOT NULL DEFAULT 0,
+    anzahl_fehler        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (textaufgabe_id, benutzer_id)
+);
+CREATE INDEX IF NOT EXISTS idx_textlernzustand_faellig
+    ON textlernzustand(benutzer_id, faellig);
+
 -- Bearbeitungen von Textaufgaben. Eigenes Protokoll, weil hier die Antwort
 -- lang ist und die Rückmeldung der KI mitgeschrieben wird.
 CREATE TABLE IF NOT EXISTS textbearbeitung (

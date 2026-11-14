@@ -18,7 +18,7 @@ from typing import Any, Iterable
 
 import sprachen
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 _WURZEL = pathlib.Path(__file__).resolve().parent.parent
 PFAD = pathlib.Path(os.environ.get("VOKABEL_DB", _WURZEL / "daten" / "vokabeltrainer.db"))
@@ -95,6 +95,21 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
     "textabschnitt": {
         "varianten": "TEXT NOT NULL DEFAULT '[]'",
         "referenz_varianten": "TEXT NOT NULL DEFAULT '[]'",
+    },
+    # Dieselben Felder wie bei `wiederholung`: der Lernstand einer Übung
+    # soll genauso nachvollziehbar sein wie der einer Vokabel.
+    "textbearbeitung": {
+        "urteil": "TEXT",
+        "denkzeit_ms": "INTEGER",
+        "versuche": "INTEGER NOT NULL DEFAULT 1",
+        "bewertung_quelle": "TEXT NOT NULL DEFAULT 'automatisch'",
+        "aufgedeckt": "INTEGER NOT NULL DEFAULT 0",
+        "stabilitaet_vor": "REAL",
+        "stabilitaet_nach": "REAL",
+        "schwierigkeit_vor": "REAL",
+        "schwierigkeit_nach": "REAL",
+        "intervall_tage": "REAL",
+        "verstrichen_tage": "REAL",
     },
     "benutzer": {
         # Ohne UNIQUE: ALTER TABLE kann in SQLite keine eindeutige Spalte

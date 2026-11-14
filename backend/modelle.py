@@ -168,6 +168,31 @@ class UebungenImportEingabe(BaseModel):
     nur_pruefen: bool = False
 
 
+class UebungPruefenEingabe(BaseModel):
+    benutzer_id: int
+    textaufgabe_id: int
+    antwort: str = ""
+
+
+class UebungBewertenEingabe(BaseModel):
+    """Ohne `bewertung` wird sie aus dem Urteil abgeleitet.
+
+    Bei langen Texten schickt die Oberfläche das selbst eingeschätzte
+    Urteil — dort stimmt eine freie Übersetzung selten wörtlich, und ein
+    Trainer, der sie deshalb als falsch wertet, erzieht zum Auswendiglernen
+    der Musterlösung.
+    """
+    benutzer_id: int
+    textaufgabe_id: int
+    urteil: Literal["richtig", "fast", "falsch", "aufgedeckt"] | None = None
+    bewertung: int | None = Field(default=None, ge=1, le=4)
+    antwort: str | None = None
+    dauer_ms: int | None = Field(default=None, ge=0)
+    versuche: int = Field(default=1, ge=1, le=10)
+    aufgedeckt: bool = False
+    rueckmeldung: str | None = None
+
+
 class TextPruefenEingabe(BaseModel):
     """Deckung eines Textes gegen den Bestand."""
     text: str = Field(min_length=1, max_length=20000)

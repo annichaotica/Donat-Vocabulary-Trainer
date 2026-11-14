@@ -65,7 +65,12 @@ async function teilSammlung(behaelter) {
     });
     kasten.append(h('label', { class: 'schalter' }, haken,
       h('span', { class: 'schalter-text' },
-        h('b', { text: t.name }), h('span', { text: t.beschreibung }))));
+        h('b', { text: t.name }), h('span', { text: t.beschreibung }),
+        // Ein Beispiel sagt mehr als die Beschreibung. Wer "Form
+        // bestimmen" liest, weiß noch nicht, was ihn erwartet.
+        t.beispiel
+          ? h('span', { class: 'beispielzeile', text: t.beispiel })
+          : null)));
   }
 
   // Formgruppen nach Wortart
@@ -73,10 +78,17 @@ async function teilSammlung(behaelter) {
   for (const [wortart, liste] of Object.entries(gruppen.wortarten)) {
     if (!liste.length) continue;
     const reihe = h('div', { class: 'gruppenwahl' });
+    // Was diese Gruppe ist, in einer Zeile — als Mouseover UND unten zum
+    // Aufklappen, denn auf dem Telefon gibt es kein Mouseover.
+    const erklaert = (g) => [g.name,
+                             g.erklaerung ? `— ${g.erklaerung}` : null,
+                             g.beispiel ? `(${g.beispiel})` : null,
+                             `· ${g.zellen} ${g.zellen === 1 ? 'Form' : 'Formen'}`]
+      .filter(Boolean).join(' ');
     for (const g of liste) {
       const knopf = h('button', {
         class: gewaehlteGruppen.has(g.kennung) ? 'aktiv' : null,
-        title: `${g.zellen} ${g.zellen === 1 ? 'Form' : 'Formen'}`,
+        title: erklaert(g),
         onclick: () => {
           if (gewaehlteGruppen.has(g.kennung)) gewaehlteGruppen.delete(g.kennung);
           else gewaehlteGruppen.add(g.kennung);
@@ -87,7 +99,22 @@ async function teilSammlung(behaelter) {
     }
     kasten.append(h('div', { style: 'margin-bottom:.8rem' },
       h('p', { class: 'leise', style: 'margin:.4rem 0 .3rem',
-               text: wortartName(wortart) }), reihe));
+               text: wortartName(wortart) }), reihe,
+      h('details', { class: 'gruppenhilfe' },
+        h('summary', { text: 'Was ist das jeweils?' }),
+        h('dl', {}, liste.map((g) => [
+          h('dt', {}, g.kurz,
+            h('span', { class: 'leise',
+                        text: ` · ${g.zellen} ${g.zellen === 1 ? 'Form' : 'Formen'}` })),
+          h('dd', {},
+            h('span', { text: g.name }),
+            g.erklaerung
+              ? h('span', { class: 'leise', text: ` — ${g.erklaerung}` })
+              : null,
+            g.beispiel
+              ? h('span', { class: 'beispielzeile', text: g.beispiel })
+              : null),
+        ])))));
   }
 
   const ungeprueft = h('input', {

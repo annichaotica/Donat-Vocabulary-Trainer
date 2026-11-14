@@ -216,6 +216,101 @@ PERSONEN = {
 
 STILE = ("fach", "einfach", "beides")
 
+# Ein Beispiel sagt mehr als jede Umschreibung. "wen oder was?" ist schon
+# besser als "Akkusativ", aber erst "ich sehe DEN Hund" macht es in einer
+# Sekunde klar.
+#
+# Immer auf Deutsch und immer mit demselben Wort, damit man die Fälle
+# nebeneinander vergleichen kann.
+BEISPIELE: dict[str, dict[str, str]] = {
+    "kasus": {
+        "nom": "der Hund schläft", "gen": "das Fell des Hundes",
+        "dat": "ich gebe dem Hund etwas", "akk": "ich sehe den Hund",
+        "vok": "Hund, komm her!", "abl": "mit dem Hund",
+    },
+    "stufe": {"grund": "schön", "komparativ": "schöner",
+              "superlativ": "am schönsten"},
+    "nonfinit": {
+        "infinitiv": "gehen", "partizip_praesens": "gehend",
+        "partizip_perfekt": "gegangen", "gerundium": "beim Gehen",
+        "supinum": "um zu gehen",
+    },
+    "modus": {
+        "indikativ": "ich gehe", "konjunktiv": "dass ich gehe",
+        "imperativ": "geh!", "konditional": "ich würde gehen",
+        "optativ": "ginge ich doch",
+    },
+    "genus_verbi": {"aktiv": "ich sehe", "passiv": "ich werde gesehen",
+                    "medium": "ich wasche mich"},
+    "tempus": {
+        "praesens": "ich gehe", "imperfekt": "ich ging immer wieder",
+        "aorist": "ich ging (einmal)", "praeteritum": "ich ging",
+        "perfekt": "ich bin gegangen", "plusquamperfekt": "ich war gegangen",
+        "futur": "ich werde gehen", "futur_ii": "ich werde gegangen sein",
+    },
+    "numerus": {"sg": "der Hund", "pl": "die Hunde"},
+    "genus": {"m": "der Hund", "f": "die Katze", "n": "das Pferd"},
+}
+
+# Person und Zahl am Beispiel durchkonjugiert — genau die Reihe, die man
+# beim Lernen aufsagt.
+PERSONENBEISPIEL = {
+    ("1", "sg"): "ich gehe", ("2", "sg"): "du gehst",
+    ("3", "sg"): "er/sie/es geht", ("1", "pl"): "wir gehen",
+    ("2", "pl"): "ihr geht", ("3", "pl"): "sie gehen",
+}
+
+# In dieser Reihenfolge wird nach einem Beispiel gesucht. Erklärt wird
+# EINE Sache, nicht alle: "ich sehe den Hund, der Hund" wäre keine Hilfe.
+BEISPIELFOLGE = ("kasus", "nonfinit", "stufe", "person", "modus",
+                 "genus_verbi", "tempus", "genus")
+
+# Der Normalfall sagt nichts. Dass eine Form im Indikativ steht und aktiv
+# ist, unterscheidet sie von nichts — das tun die ZEIT und alles, was vom
+# Normalfall abweicht. Darum erklären diese Werte nur, wenn sonst nichts
+# da ist.
+UNMARKIERT = {"modus": "indikativ", "genus_verbi": "aktiv", "stufe": "grund",
+              "numerus": "sg"}
+
+
+def beispiel(merkmale: dict) -> str | None:
+    """Ein deutscher Beispielausdruck für das, was hier verlangt ist."""
+    # Beim Imperativ ist der Modus der Punkt und nicht die Person: "geh!"
+    # erklärt die Form, "du gehst" wäre schlicht etwas anderes.
+    if merkmale.get("modus") == "imperativ":
+        return "geh!" if merkmale.get("numerus") != "pl" else "geht!"
+    # Steht das Geschlecht im Nominativ dabei, IST es der Punkt — bei
+    # einem Adjektiv unterscheidet es die drei Formen voneinander, der
+    # Fall tut es nicht.
+    if merkmale.get("genus") and merkmale.get("kasus") in (None, "nom"):
+        b = BEISPIELE["genus"].get(merkmale["genus"])
+        if b:
+            return b
+    # Zwei Durchgänge: erst das Markierte, dann der Rest. Sonst erklärte
+    # jede griechische Zeit mit "ich gehe", weil der Indikativ vorne steht.
+    folge = [d for d in BEISPIELFOLGE
+             if d in merkmale and UNMARKIERT.get(d) != merkmale[d]]
+    folge += [d for d in BEISPIELFOLGE if d in merkmale and d not in folge]
+    for dimension in folge:
+        if dimension == "person":
+            b = PERSONENBEISPIEL.get((str(merkmale.get("person")),
+                                      str(merkmale.get("numerus", "sg"))))
+            if b:
+                return b
+            continue
+        b = BEISPIELE.get(dimension, {}).get(merkmale[dimension])
+        if b:
+            # Beim Fall sagt die Zahl mit, ob einer oder mehrere gemeint
+            # sind — "ich sehe den Hund" gegen "ich sehe die Hunde".
+            if dimension == "kasus" and merkmale.get("numerus") == "pl":
+                b = (b.replace("der Hund schläft", "die Hunde schlafen")
+                      .replace("den Hund", "die Hunde")
+                      .replace("des Hundes", "der Hunde")
+                      .replace("dem Hund", "den Hunden")
+                      .replace("Hund, komm her!", "Hunde, kommt her!"))
+            return b
+    return None
+
 
 def _einfach(merkmale: dict) -> str:
     """Dasselbe Bündel in Alltagssprache."""

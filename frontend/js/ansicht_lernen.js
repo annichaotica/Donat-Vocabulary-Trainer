@@ -42,6 +42,7 @@ export class Sitzung {
     this.abgebrochen = false;
     this.aufgedeckt = false;
     this.eingabeWert = '';
+    this.reihenWerte = {};
     this.merkmalsWahl = {};
     this.lg = {};
     this.tastatur = (e) => this.aufTaste(e);
@@ -67,6 +68,7 @@ export class Sitzung {
   async naechste() {
     this.ergebnis = null;
     this.eingabeWert = '';
+    this.reihenWerte = {};
     this.merkmalsWahl = {};
     this.denkzeit = null;
     this.versuche = 1;
@@ -227,6 +229,13 @@ export class Sitzung {
     if (a.frage_zusatz) {
       kasten.append(h('p', { class: 'frage-zusatz', text: a.frage_zusatz }));
     }
+    // Ein Beispiel auf Deutsch. "wen oder was?" ist schon besser als
+    // "Akkusativ", aber erst "ich sehe DEN Hund" macht es in einer
+    // Sekunde klar — und zwar auch dem, der nie Latein hatte.
+    if (a.frage_hilfe) {
+      kasten.append(h('p', { class: 'frage-beispiel' },
+        h('span', { class: 'leise', text: 'wie bei: ' }), a.frage_hilfe));
+    }
     if (a.typ === 'bedeutung_fremd_deutsch' && a.anzahl_bedeutungen > 1) {
       kasten.append(h('p', { class: 'frage-hinweis',
         text: `${a.anzahl_bedeutungen} Bedeutungen hinterlegt — eine genügt.` }));
@@ -251,6 +260,7 @@ export class Sitzung {
     const fertig = this.phase === 'rueckmeldung';
     if (a.eingabeart === 'auswahl') return this.teilAuswahl(fertig);
     if (a.eingabeart === 'merkmale') return this.teilMerkmale(fertig);
+    if (a.eingabeart === 'reihe') return this.teilReihe(fertig);
 
     const feld = h('input', {
       type: 'text', lang: a.antwort_sprache || a.sprache,
@@ -291,6 +301,76 @@ export class Sitzung {
       if (leiste) kasten.append(leiste);
     }
     return kasten;
+  }
+
+  /** Die ganze Tabelle auf einmal — ich gehe, du gehst, er/sie/es geht.
+   *
+   *  Ein Feld je Zeile, mit Beschriftung UND Beispiel daneben. Enter
+   *  springt ins nächste Feld statt abzuschicken; abgeschickt wird erst
+   *  im letzten oder über den Knopf. Sonst wäre die Reihe nach dem ersten
+   *  Wort vorbei. */
+  teilReihe(fertig) {
+    const a = this.aufgabe;
+    const zellen = a.zellen || [];
+    if (!this.reihenWerte) this.reihenWerte = {};
+    const ergebnisse = {};
+    for (const z of (this.ergebnis?.aufloesung?.zellen || [])) {
+      ergebnisse[z.zelle] = z;
+    }
+    const kasten = h('div', { class: 'reihe' });
+    const felder = [];
+    for (const [i, z] of zellen.entries()) {
+      const r = ergebnisse[z.zelle];
+      const feld = h('input', {
+        type: 'text', lang: a.antwort_sprache || a.sprache,
+        autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false',
+        autocomplete: 'off',
+        value: this.reihenWerte[z.zelle] || '',
+        disabled: fertig,
+        class: r ? r.urteil : null,
+        oninput: (e) => {
+          if (this.denkzeit === null && e.target.value) {
+            this.denkzeit = Math.round(performance.now() - this.denkzeitStart);
+          }
+          this.reihenWerte[z.zelle] = e.target.value;
+        },
+        onkeydown: (e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          const naechstes = felder[i + 1];
+          if (naechstes && !naechstes.disabled) naechstes.focus();
+          else this.absenden();
+        },
+      });
+      felder.push(feld);
+      kasten.append(h('div', { class: 'reihenzeile' + (r ? ' ' + r.urteil : '') },
+        h('div', { class: 'reihenname' },
+          h('span', { text: z.beschriftung }),
+          z.beispiel
+            ? h('span', { class: 'leise', text: z.beispiel })
+            : null),
+        feld,
+        r && r.urteil !== 'richtig'
+          ? h('div', { class: 'reihenloesung', lang: a.antwort_sprache },
+              (r.erwartet || []).join(' / '))
+          : h('div', {})));
+    }
+    this.feld = felder[0] || null;
+    const unten = h('div', {});
+    if (!fertig) {
+      unten.append(h('div', { class: 'frage-werkzeuge',
+                              style: 'justify-content:flex-start' },
+        h('button', { class: 'wichtig', onclick: () => this.absenden() },
+          'Prüfen')));
+      if (this._antwortsprache) {
+        const leiste = zeichenleiste(this._antwortsprache,
+          () => document.activeElement && felder.includes(document.activeElement)
+            ? document.activeElement : felder[0],
+          () => { /* der Wert wird im oninput mitgeschrieben */ });
+        if (leiste) unten.append(leiste);
+      }
+    }
+    return h('div', {}, kasten, unten);
   }
 
   teilAuswahl(fertig) {
@@ -354,7 +434,11 @@ export class Sitzung {
         h('strong', { text: 'Was passiert ist: ' }), u.fehlertext));
     }
 
-    if (u.urteil !== 'richtig' && this.phase === 'rueckmeldung') {
+    // Bei der ganzen Reihe steht die Lösung schon neben jedem Feld. Ein
+    // herausgegriffenes "Richtig ist: γράφω" wäre hier irreführend — es
+    // ist ja nur eine von sechs.
+    if (u.urteil !== 'richtig' && this.phase === 'rueckmeldung'
+        && this.aufgabe.eingabeart !== 'reihe') {
       const loesung = this.loesungstext();
       if (loesung) {
         kasten.append(h('p', { class: 'leise', style: 'margin-top:.6rem', text: 'Richtig ist:' }),
@@ -364,7 +448,9 @@ export class Sitzung {
     const zerlegt = zerlegungZeigen(this.ergebnis.zerlegung);
     if (zerlegt) kasten.append(zerlegt);
 
-    anfuegen(kasten, this.teilAlternativen());
+    if (this.aufgabe.eingabeart !== 'reihe') {
+      anfuegen(kasten, this.teilAlternativen());
+    }
     if (u.urteil === 'fast') {
       kasten.append(h('p', { class: 'leise', style: 'margin-top:.6rem',
         text: 'Noch einmal tippen — richtig geschrieben zählt es als gewusst.' }));
@@ -572,6 +658,9 @@ export class Sitzung {
   }
 
   antwortWert() {
+    if (this.aufgabe.eingabeart === 'reihe') {
+      return { ...(this.reihenWerte || {}) };
+    }
     if (this.aufgabe.eingabeart === 'merkmale') {
       const sauber = {};
       for (const [d, w] of Object.entries(this.merkmalsWahl)) if (w) sauber[d] = w;
@@ -583,8 +672,12 @@ export class Sitzung {
   async absenden() {
     if (this.phase === 'rueckmeldung' || this.laeuft) return;
     const antwort = this.antwortWert();
+    // Bei der Reihe zählt, ob IRGENDWO etwas steht — leere Felder sind
+    // erlaubt und zählen als nicht gewusst, aber eine völlig leere
+    // Tabelle ist keine Antwort.
     const leerEingabe = typeof antwort === 'string'
-      ? !antwort.trim() : !Object.keys(antwort).length;
+      ? !antwort.trim()
+      : !Object.values(antwort).some((w) => String(w ?? '').trim());
     if (leerEingabe) { meldung('Noch keine Antwort eingegeben.'); return; }
 
     let ergebnis;

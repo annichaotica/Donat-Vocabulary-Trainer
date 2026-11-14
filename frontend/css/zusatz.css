@@ -370,3 +370,62 @@ input[type="file"] { max-width: 100%; }
   padding-left: .7rem;
   border-left: 2px solid var(--rand);
 }
+
+
+/* ------------------------------------------------------- Ganze Reihe
+   Eine Tabelle zum Ausfüllen: Beschriftung links, Feld in der Mitte,
+   nach der Prüfung die Lösung rechts. Auf dem Telefon untereinander —
+   drei Spalten bei 390 px wären drei unlesbare Spalten. */
+
+.reihe { display: flex; flex-direction: column; gap: .45rem; margin-top: .6rem; }
+.reihenzeile {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11rem) 1fr minmax(0, 9rem);
+  gap: .6rem;
+  align-items: center;
+}
+.reihenname { display: flex; flex-direction: column; line-height: 1.25; }
+.reihenname span:first-child { font-size: .92em; }
+.reihenname .leise { font-size: .8em; }
+.reihenzeile input { width: 100%; }
+.reihenzeile input.richtig { border-color: var(--richtig); background: var(--richtig-grund); }
+.reihenzeile input.fast    { border-color: var(--fast);    background: var(--fast-grund); }
+.reihenzeile input.falsch  { border-color: var(--falsch);  background: var(--falsch-grund); }
+.reihenzeile input:disabled { opacity: 1; -webkit-text-fill-color: var(--text); }
+.reihenloesung { font-weight: 600; color: var(--falsch); overflow-wrap: anywhere; }
+.reihenzeile.fast .reihenloesung { color: var(--fast); }
+
+@media (max-width: 34rem) {
+  .reihenzeile {
+    grid-template-columns: 1fr;
+    gap: .15rem;
+    padding-bottom: .4rem;
+    border-bottom: 1px solid var(--rand);
+  }
+  .reihenname { flex-direction: row; gap: .5rem; align-items: baseline; }
+}
+
+/* Das Beispiel unter der Formangabe. Leise, aber lesbar — es ist eine
+   Hilfe, keine zweite Frage. */
+.frage-beispiel {
+  margin: .25rem 0 0;
+  font-size: .9em;
+  font-style: italic;
+  color: var(--leise);
+}
+
+
+/* Beispiele in der Auswahl, was abgefragt werden soll. Leise und kursiv —
+   sie erklären, sie sind nicht die Beschriftung. */
+.beispielzeile {
+  display: block;
+  font-style: italic;
+  color: var(--leise);
+  font-size: .9em;
+  margin-top: .1rem;
+}
+.gruppenhilfe { margin-top: .4rem; font-size: .92em; }
+.gruppenhilfe summary { color: var(--leise); cursor: pointer; }
+.gruppenhilfe dl { margin: .5rem 0 0; }
+.gruppenhilfe dt { font-weight: 600; margin-top: .5rem; }
+.gruppenhilfe dd { margin: 0 0 0 .8rem; }

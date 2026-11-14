@@ -26,26 +26,39 @@ TYPEN: dict[str, dict] = {
         "name": "Bedeutung erkennen",
         "eingabeart": "text",
         "beschreibung": "Fremdsprachiges Wort, gesucht ist die Bedeutung.",
+        "beispiel": "το σπίτι → das Haus",
     },
     "bedeutung_deutsch_fremd": {
         "name": "Wort bilden",
         "eingabeart": "text",
         "beschreibung": "Deutsche Bedeutung, gesucht ist das fremdsprachige Wort.",
+        "beispiel": "das Haus → το σπίτι",
     },
     "form_bilden": {
         "name": "Form bilden",
         "eingabeart": "text",
         "beschreibung": "Grundform und Formangabe gegeben, gesucht ist die Form.",
+        "beispiel": "γράφω, »du« → γράφεις",
     },
     "form_bestimmen": {
         "name": "Form bestimmen",
         "eingabeart": "merkmale",
-        "beschreibung": "Form gegeben, gesucht ist, um welche Form es sich handelt.",
+        "beschreibung": "Form gegeben, gesucht ist, um welche Form es sich "
+                        "handelt.",
+        "beispiel": "γράφεις → wer? du",
     },
     "genus": {
         "name": "Artikel",
         "eingabeart": "auswahl",
         "beschreibung": "Gesucht ist der Artikel beziehungsweise das Geschlecht.",
+        "beispiel": "το σπίτι → το",
+    },
+    "formenreihe": {
+        "name": "Ganze Reihe",
+        "eingabeart": "reihe",
+        "beschreibung": "Eine ganze Tabelle auf einmal: alle Personen einer "
+                        "Zeit, alle Fälle eines Hauptworts.",
+        "beispiel": "ich gehe, du gehst, er/sie/es geht …",
     },
 }
 
@@ -146,6 +159,43 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
             if typ in e["typen"]:
                 gewuenscht[_schluessel(typ, lexem_id, "merkmale", kennzeichen)] = \
                     (typ, "form", f["id"])
+
+    # Ganze Reihe: eine Aufgabe je FORMGRUPPE, nicht je Form. Das ist die
+    # Art, wie man Konjugationen wirklich lernt — ich gehe, du gehst, er
+    # geht —, und sie prüft etwas anderes als sechs Einzelabfragen: ob die
+    # Reihe als Ganzes sitzt.
+    if "formenreihe" in e["typen"]:
+        for gruppe in sprachen.formgruppen(code, wortart):
+            if len(gruppe["zellen"]) < 2:
+                continue            # eine Zelle ist keine Reihe
+            if gruppe["kennung"] not in e["formgruppen"]:
+                continue
+            belegt = [f for f in formen
+                      if not f["ist_grundform"]
+                      and (f["geprueft"] or e["ungeprueft_abfragen"])
+                      and dbm.j_lesen(f["merkmale"])
+                      and _gruppe_der_form(code, wortart,
+                                           dbm.j_lesen(f["merkmale"]))
+                          is not None
+                      and _gruppe_der_form(code, wortart,
+                                           dbm.j_lesen(f["merkmale"])
+                                           )["kennung"] == gruppe["kennung"]]
+            # Eine halbe Tabelle abzufragen wäre ärgerlich: man tippt in
+            # Felder, zu denen es keine Antwort gibt. Erst ab vollständig
+            # (abzüglich erklärter Lücken) lohnt die Reihe.
+            luecken = dbm.j_lesen(lexem["luecken"], [])
+            noetig = [z for z in gruppe["zellen"]
+                      if not mk.ist_erklaerte_luecke(luecken, z)]
+            vorhandene = {mk.schluessel(mk.normieren(dbm.j_lesen(f["merkmale"]),
+                                                     wortart))
+                          for f in belegt}
+            if not noetig or any(
+                    mk.schluessel(mk.normieren(z, wortart)) not in vorhandene
+                    for z in noetig):
+                continue
+            gewuenscht[_schluessel("formenreihe", lexem_id, "gruppe",
+                                   gruppe["kennung"])] = \
+                ("formenreihe", "gruppe", None)
 
     # Artikel: nur wo die Sprache überhaupt Artikel nach Geschlecht hat.
     artikel = sprachen.profil(code).get("artikel", {}).get("genus_artikel", {})
@@ -344,6 +394,48 @@ def geschwisterformen(db: sqlite3.Connection, form_id: int) -> list[str]:
                    for d, w in gruppe["merkmale"].items())]
 
 
+def _reihe_zellen(db: sqlite3.Connection, a: dict, lexem: dict, code: str,
+                  stil: str = "fach") -> tuple[dict | None, list[dict]]:
+    """Gruppe und Zellen einer Reihenaufgabe, mit den gültigen Antworten.
+
+    Die Gruppenkennung steht im Schlüssel — eine Reihe hängt an keiner
+    einzelnen Form, sondern an der Tabelle.
+    """
+    kennung = a["schluessel"].rsplit(":", 1)[-1]
+    gruppe = next((g for g in sprachen.formgruppen(code, lexem["wortart"])
+                   if g["kennung"] == kennung), None)
+    if gruppe is None:
+        return None, []
+    formen = dbm.zeilen(db, "SELECT * FROM form WHERE lexem_id = ?",
+                        (lexem["id"],))
+    nach_zelle: dict[str, list[str]] = {}
+    for f in formen:
+        fm = dbm.j_lesen(f["merkmale"])
+        if not fm:
+            continue
+        nach_zelle.setdefault(
+            mk.schluessel(mk.normieren(fm, lexem["wortart"])), []).append(f["text"])
+    luecken = dbm.j_lesen(lexem["luecken"], [])
+    zellen = []
+    for zelle in gruppe["zellen"]:
+        if mk.ist_erklaerte_luecke(luecken, zelle):
+            continue
+        schl = mk.schluessel(mk.normieren(zelle, lexem["wortart"]))
+        eigen = {d: w for d, w in zelle.items() if d not in gruppe["merkmale"]}
+        zellen.append({
+            "zelle": schl,
+            "merkmale": zelle,
+            # Nur, was diese Zeile von ihren Geschwistern unterscheidet —
+            # der Gruppenname steht als Überschrift darüber.
+            "beschriftung": (mk.beschriften(eigen, stil=stil) if eigen
+                             else sprachen.beschriften_form(
+                                 code, lexem["wortart"], zelle, stil=stil)),
+            "beispiel": mk.beispiel(zelle),
+            "erwartet": nach_zelle.get(schl, []),
+        })
+    return gruppe, zellen
+
+
 def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
     """Baut die Aufgabe für die Oberfläche.
 
@@ -401,7 +493,24 @@ def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
                 "frage_sprache": code,
                 "frage_zusatz": sprachen.beschriften_form(
                     code, lexem["wortart"], fm, stil=stil),
+                # Ein Beispiel auf Deutsch. "wen oder was?" ist schon
+                # besser als "Akkusativ", aber erst "ich sehe DEN Hund"
+                # macht es in einer Sekunde klar.
+                "frage_hilfe": mk.beispiel(fm),
                 "antwort_sprache": code,
+                "vorlesen": lexem["lemma"]}
+
+    if typ == "formenreihe":
+        gruppe, zellen = _reihe_zellen(db, a, lexem, code, stil)
+        return {**kopf,
+                "frage_text": lexem["lemma"],
+                "frage_sprache": code,
+                "frage_zusatz": gruppe["name"] if gruppe else "",
+                "antwort_sprache": code,
+                # Ohne die erwarteten Antworten — die Lösung gehört nicht
+                # in die Frage.
+                "zellen": [{k: v for k, v in z.items() if k != "erwartet"}
+                           for z in zellen],
                 "vorlesen": lexem["lemma"]}
 
     if typ == "form_bestimmen":
@@ -522,6 +631,46 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
         return urteil, {"erwartet": gueltig,
                         "beschriftung": sprachen.beschriften_form(
                             code, lexem["wortart"], fm)}
+
+    if typ == "formenreihe":
+        gruppe, zellen = _reihe_zellen(db, a, lexem, code)
+        eingaben = eingabe if isinstance(eingabe, dict) else {}
+        ergebnisse = []
+        for z in zellen:
+            text = str(eingaben.get(z["zelle"], "") or "")
+            # Die Geschwisterformen DERSELBEN Reihe sind hier keine
+            # Verwechslung, sondern die Nachbarfelder — sie als solche zu
+            # melden wäre irreführend.
+            einzel = text_pruefen(text, z["erwartet"], p_code,
+                                  fehler_benennen=fehler_benennen)
+            ergebnisse.append({
+                "zelle": z["zelle"], "beschriftung": z["beschriftung"],
+                "urteil": einzel.urteil, "erwartet": z["erwartet"],
+                "eingabe": text, "hinweis": einzel.hinweis,
+                "fehlertext": einzel.fehlertext,
+            })
+        richtig = sum(1 for r in ergebnisse if r["urteil"] == "richtig")
+        fast = sum(1 for r in ergebnisse if r["urteil"] == "fast")
+        gesamt = len(ergebnisse)
+        # Eine Reihe sitzt als GANZES oder nicht. Wer fünf von sechs Formen
+        # kann, kann die Tabelle noch nicht — aber es ist auch kein glatter
+        # Fehlschlag, darum "fast", wenn nur Kleinigkeiten fehlen.
+        if gesamt and richtig == gesamt:
+            urteil = Urteil("richtig")
+        elif gesamt and richtig + fast == gesamt:
+            urteil = Urteil("fast", hinweis="Bis auf Kleinigkeiten richtig.")
+        else:
+            teile = [f"{richtig} von {gesamt} Formen sitzen"]
+            if fast:
+                teile.append(f"{fast} fast")
+            offen = gesamt - richtig - fast
+            if offen:
+                teile.append(f"{offen} noch nicht")
+            urteil = Urteil("falsch", hinweis=", ".join(teile) + ".")
+        return urteil, {"zellen": ergebnisse,
+                        "gruppe": gruppe["name"] if gruppe else "",
+                        "richtig": richtig, "gesamt": gesamt,
+                        "erwartet": [t for z in zellen for t in z["erwartet"]]}
 
     if typ == "form_bestimmen":
         f = dbm.zeile(db, "SELECT * FROM form WHERE id = ?", (a["ziel_id"],))

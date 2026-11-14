@@ -310,8 +310,18 @@ def formgruppen_liste(code: str):
     return {
         "sprache": p["name"],
         "wortarten": {
+            # erklaerung und beispiel kommen mit: in der Auswahl, WAS
+            # abgefragt werden soll, muss man verstehen können, was man da
+            # anhakt. "Υποτακτική" sagt dem Lernenden nichts, "Möglichkeit
+            # oder Wunsch — dass ich gehe" schon.
             wortart: [{"kennung": g["kennung"], "name": g["name"],
-                       "kurz": g["kurz"], "zellen": len(g["zellen"])}
+                       "kurz": g["kurz"], "zellen": len(g["zellen"]),
+                       "erklaerung": mk.beschriften(g["merkmale"],
+                                                    stil="einfach"),
+                       # Nur aus den Merkmalen der GRUPPE, nicht aus ihrer
+                       # ersten Zelle: sonst erklärte jede griechische Zeit
+                       # mit "ich gehe", weil die 1. Person vorne steht.
+                       "beispiel": mk.beispiel(g["merkmale"])}
                       for g in gruppen]
             for wortart, gruppen in p.get("formgruppen", {}).items()
         },

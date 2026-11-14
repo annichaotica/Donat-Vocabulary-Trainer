@@ -42,8 +42,12 @@ DIENSTE = [
      "titel": "Vokabeltrainer", "schutz": "personen"},
     {"name": "rezepte", "ziel": "http://127.0.0.1:9925",
      "titel": "Mealie (Rezepte)", "schutz": "personen"},
+    # Immich bewusst OHNE Access: die Handy-App kann keine Anmeldeseite
+    # bedienen, und der automatische Abgleich ist der halbe Nutzen. Es
+    # schützt also allein Immichs eigene Anmeldung — ein Schloss statt
+    # zwei. Das ist eine bewusste Abwägung, keine Nachlässigkeit.
     {"name": "fotos", "ziel": "http://127.0.0.1:2283",
-     "titel": "Immich (Fotos)", "schutz": "personen"},
+     "titel": "Immich (Fotos)", "schutz": "ohne"},
     # Die MCP-Schnittstelle wird von der Claude-App gerufen, nicht von einem
     # Menschen — sie kann keine Anmeldeseite bedienen. Darum ein Diensttoken,
     # das Cloudflare schon am Rand prüft, dazu das eigene Geheimnis im Trainer.
@@ -153,6 +157,19 @@ def main() -> int:
     for d in DIENSTE:
         name = f"{d['name']}.{ZONE_NAME}"
         app = next((a for a in vorhandene_apps if a.get("domain") == name), None)
+
+        if d["schutz"] == "ohne":
+            # Kein Access davor. Eine etwaige frühere Anwendung wird entfernt,
+            # sonst stünde sie weiter im Weg.
+            if app:
+                ruf(f"/accounts/{KONTO}/access/apps/{app['id']}", "DELETE",
+                    token=token)
+                sage(f"Access »{d['titel']}« entfernt (bewusst ohne Schutz)")
+            else:
+                sage(f"»{d['titel']}«: kein Access — es schützt die eigene "
+                     f"Anmeldung des Dienstes")
+            continue
+
         rumpf = {"name": d["titel"], "domain": name, "type": "self_hosted",
                  "session_duration": "24h",
                  "app_launcher_visible": d["schutz"] == "personen",
@@ -190,11 +207,22 @@ def main() -> int:
                                   "POST",
                                   {"name": "claude-konnektor",
                                    "duration": "8760h"}, token=token)
+                # SOFORT ausgeben, nicht erst am Ende: das Geheimnis gibt es
+                # nur dieses eine Mal, und ein Abbruch danach machte es
+                # unwiederbringlich.
+                sage("")
+                sage("  ── Diensttoken für den Claude-Konnektor ──")
+                sage(f"  CF-Access-Client-Id:     {diensttoken['client_id']}")
+                sage(f"  CF-Access-Client-Secret: {diensttoken['client_secret']}")
+                sage("  (nur jetzt sichtbar)")
+                sage("")
             ruf(f"/accounts/{KONTO}/access/apps/{app['id']}/policies", "POST",
                 {"name": "Nur der Konnektor", "decision": "non_identity",
                  "precedence": 1,
+                 # Die Regel verlangt die id des Diensttokens, NICHT die
+                 # client_id — die beiden sehen ähnlich aus und sind es nicht.
                  "include": [{"service_token": {
-                     "token_id": diensttoken["client_id"]}}]},
+                     "token_id": diensttoken["id"]}}]},
                 token=token)
             sage("  Regel: nur das Diensttoken »claude-konnektor«")
 
@@ -214,6 +242,16 @@ def main() -> int:
         else:
             ruf(f"/zones/{zone}/dns_records", "POST", rumpf, token=token)
             sage(f"DNS {name} angelegt")
+
+    ohne_schutz = [d["titel"] for d in DIENSTE if d["schutz"] == "ohne"]
+    if ohne_schutz:
+        sage("")
+        sage("ACHTUNG: ohne Access, nur mit eigener Anmeldung erreichbar:")
+        for t in ohne_schutz:
+            sage(f"  {t}")
+        sage("  Dort gilt: starkes Passwort, und die Anmeldeseite sollte eine")
+        sage("  Ratenbegrenzung bekommen (Cloudflare: Sicherheit -> WAF ->")
+        sage("  Ratenbegrenzungsregeln).")
 
     sage("\n" + "=" * 60)
     sage("TUNNELGEHEIMNIS — gehört nach /srv/cloudflared/.env:")

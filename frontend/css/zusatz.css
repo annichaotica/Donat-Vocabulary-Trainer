@@ -78,3 +78,22 @@
     margin-bottom: .4rem;
   }
 }
+
+/* Fußzeile mit dem Quelltextverweis.
+ * Die AGPL verlangt, dass eine über das Netz benutzte Fassung ihren Nutzern
+ * den Quelltext anbietet — ein Vermerk nur im Repo genügt dafür nicht. */
+.fusszeile {
+  display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center;
+  padding: 1.5rem 1rem;
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  font-size: .82em; color: var(--leise);
+}
+.fusszeile a { color: var(--leise); }
+.fusszeile abbr { text-decoration: none; border-bottom: 1px dotted currentColor; }
+@media (hover: hover) and (pointer: fine) {
+  .fusszeile a:hover { color: var(--akzent); }
+}
+/* Auf schmalen Geräten steht unten die Reiterleiste — Platz lassen. */
+@media (max-width: 44rem) {
+  .fusszeile { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+}

@@ -1,5 +1,7 @@
 # Vokabeltrainer
 
+[![Lizenz: AGPL v3](https://img.shields.io/badge/Lizenz-AGPL%20v3-blue.svg)](LICENSE)
+
 Browserbasiert, eigene Datenbank, läuft im Heimnetz. Gebaut, weil die
 üblichen Trainer eine Vokabel als *Paar aus zwei Zeichenketten* begreifen und
 daran alles scheitert, was man eigentlich pauken muss — Formen, Zeiten,
@@ -184,3 +186,25 @@ Aufgabentyp, Lückensätze, Statistik.
 **Später (Tabellen stehen schon):** Textverständnis — Texte mit Abschnitten
 und Referenzübersetzungen, Übersetzen in beide Richtungen,
 Verständnisfragen, Bewertung über den MCP-Server.
+
+
+## Lizenz und Mitarbeit
+
+Copyright © 2026 Annuschka Brenner.
+
+Freie Software unter der [GNU Affero General Public License, Fassung 3 oder
+später](LICENSE). Du darfst sie benutzen, verändern und weitergeben.
+
+Die AGPL hat gegenüber den üblichen freien Lizenzen eine Besonderheit, und
+sie ist hier ausdrücklich gewollt: **wer eine veränderte Fassung über das
+Netz anbietet, muss seinen Quelltext veröffentlichen.** Wer den Trainer zu
+Hause im eigenen Netz betreibt — also der Normalfall —, ist davon nicht
+betroffen. Verbesserungen an einem Lernwerkzeug sollen aber nicht in einem
+geschlossenen Dienst verschwinden.
+
+Darum bietet die laufende Fassung ihren Quelltext selbst an: in der Fußzeile
+der Oberfläche und unter `GET /api/zustand`.
+
+**Mitarbeit am Repo ist auf Anfrage** — siehe [CONTRIBUTING.md](CONTRIBUTING.md).
+Fehlerberichte sind jederzeit willkommen, auch ohne Rückfrage. Für eigene
+Anpassungen braucht es niemanden zu fragen: abspalten und loslegen.

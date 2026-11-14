@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# Vokabeltrainer — Copyright (C) 2026 Annuschka Brenner
+#
+# Freie Software unter der GNU Affero General Public License, Fassung 3
+# oder später. Herausgegeben in der Hoffnung, dass sie nützt, aber OHNE
+# JEDE GEWÄHRLEISTUNG. Siehe die Datei LICENSE.
 """Brücke von stdio zum MCP-Dienst des Vokabeltrainers.
 
 Seit dem Umbau auf HTTPS gibt es nur noch EINE Umsetzung der Werkzeuge:

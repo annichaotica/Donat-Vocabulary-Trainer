@@ -1,3 +1,8 @@
+# Vokabeltrainer — Copyright (C) 2026 Annuschka Brenner
+#
+# Freie Software unter der GNU Affero General Public License, Fassung 3
+# oder später. Herausgegeben in der Hoffnung, dass sie nützt, aber OHNE
+# JEDE GEWÄHRLEISTUNG. Siehe die Datei LICENSE.
 """FSRS-5 — der Lernalgorithmus, nachvollziehbar.
 
 FSRS ist der Nachfolger von SM-2 und steckt heute in Anki. Der Unterschied zu

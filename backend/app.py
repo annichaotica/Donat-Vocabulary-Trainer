@@ -1,3 +1,8 @@
+# Vokabeltrainer — Copyright (C) 2026 Annuschka Brenner
+#
+# Freie Software unter der GNU Affero General Public License, Fassung 3
+# oder später. Herausgegeben in der Hoffnung, dass sie nützt, aber OHNE
+# JEDE GEWÄHRLEISTUNG. Siehe die Datei LICENSE.
 """Vokabeltrainer — HTTP-Schnittstelle und Auslieferung der Oberfläche.
 
 Start zur Entwicklung:
@@ -1140,9 +1145,21 @@ def wer_bin_ich(request: Request, db: sqlite3.Connection = DB):
 
 # ============================================================ Oberfläche
 
+QUELLTEXT = "https://github.com/annichaotica/vokabeltrainer"
+
+
 @app.get("/api/zustand")
 def zustand():
-    return {"name": "Vokabeltrainer", "version": app.version, "datenbank": str(dbm.PFAD)}
+    return {
+        "name": "Vokabeltrainer",
+        "version": app.version,
+        "datenbank": str(dbm.PFAD),
+        # AGPL §13: eine über das Netz erreichbare Fassung muss ihren
+        # Nutzern den Quelltext anbieten. Darum steht er hier und in der
+        # Fußzeile der Oberfläche, nicht nur in einer Datei im Repo.
+        "lizenz": "AGPL-3.0-or-later",
+        "quelltext": QUELLTEXT,
+    }
 
 
 if OBERFLAECHE.is_dir():

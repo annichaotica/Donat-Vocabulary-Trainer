@@ -200,6 +200,20 @@ class BedeutungEingabe(BaseModel):
     reihenfolge: int = 0
     notiz: str | None = None
 
+    @field_validator("uebersetzungen", mode="before")
+    @classmethod
+    def _kurzform(cls, wert):
+        """["schreiben", "reden"] statt [{"text": "schreiben"}, …].
+
+        Der Sammelimport nahm die Kurzform von Anfang an, und so steht sie
+        auch in jeder Werkzeugbeschreibung und auf dem Festlegungsblatt.
+        Dass sie beim einzelnen Aufruf fehlschlug, war ein Bruch in der
+        Schnittstelle, kein Vorsatz.
+        """
+        if not isinstance(wert, list):
+            return wert
+        return [{"text": u} if isinstance(u, str) else u for u in wert]
+
 
 class BeispielEingabe(BaseModel):
     satz: str = Field(min_length=1)
@@ -251,6 +265,23 @@ class LexemAendern(BaseModel):
     merkmale: dict[str, Any] | None = None
     lektion_id: int | None = None
     notiz: str | None = None
+    reihenfolge: int | None = None
+    kennung: str | None = None
+    # Angegeben, ersetzt es ALLE Bedeutungen. Eine Teiländerung einzelner
+    # Übersetzungen ließe sich nicht ausdrücken — welche gemeint wäre,
+    # stünde nirgends.
+    bedeutungen: list[BedeutungEingabe] | None = None
+
+
+class FormAendern(BaseModel):
+    """Teiländerung einer Form. Was nicht genannt ist, bleibt."""
+    text: str | None = Field(default=None, min_length=1, max_length=200)
+    merkmale: dict[str, Any] | None = None
+    ist_grundform: bool | None = None
+    ist_variante: bool | None = None
+    aussprache: str | None = None
+    notiz: str | None = None
+    geprueft: bool | None = None
 
 
 class PruefenEingabe(BaseModel):

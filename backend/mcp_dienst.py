@@ -176,6 +176,152 @@ def vokabeln_importieren(db: sqlite3.Connection, person: dict, sammlung_id: int,
         raise WerkzeugFehler(str(f)) from f
 
 
+# ------------------------------------------------------------- Pflege
+
+def sammlung_anlegen(db: sqlite3.Connection, person: dict, name: str,
+                     sprache: str, grundsprache: str = "de",
+                     beschreibung: str | None = None):
+    """Eine neue Sammlung — sie gehört der sprechenden Person."""
+    from modelle import SammlungAnlegen
+    ergebnis = _fehler_wandeln(
+        _app().sammlung_anlegen,
+        SammlungAnlegen(besitzer_id=person["id"], name=name, sprache=sprache,
+                        grundsprache=grundsprache, beschreibung=beschreibung),
+        None, db)
+    return {"sammlung_id": ergebnis["id"], "name": ergebnis["name"],
+            "sprache": ergebnis["sprache"],
+            "grundsprache": ergebnis["grundsprache"],
+            "hinweis": "Die Sammlung gehört dir. Als Nächstes "
+                       "formgruppen_zeigen für diese Sprache."}
+
+
+def vokabeln_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                       lektion_nr: int | None = None,
+                       wortart: str | None = None,
+                       suche: str | None = None,
+                       nur_ungepruefte: bool = False,
+                       seite: int = 1, anzahl: int = 50):
+    """Was steht schon im Bestand? Vor dem Berichtigen und vor dem Anlegen."""
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id)
+    anzahl = max(1, min(int(anzahl), 200))
+    ab = max(0, (max(1, int(seite)) - 1) * anzahl)
+    ergebnis = _fehler_wandeln(_app().lexeme_liste, sammlung_id, suche, None,
+                               lektion_nr, wortart, nur_ungepruefte, ab,
+                               anzahl, db)
+    return {
+        "gesamt": ergebnis["gesamt"], "seite": max(1, int(seite)),
+        "anzahl": ergebnis["anzahl"],
+        "vokabeln": [{"lexem_id": z["id"], "lemma": z["lemma"],
+                      "wortart": z["wortart"], "merkmale": z["merkmale"],
+                      "bedeutung": z["erste_bedeutung"],
+                      "formen": z["formen_anzahl"],
+                      "ungeprueft": z["ungeprueft_anzahl"],
+                      "aufgaben": z["aufgaben_anzahl"],
+                      "kennung": z["kennung"],
+                      "reihenfolge": z["reihenfolge"]}
+                     for z in ergebnis["lexeme"]],
+    }
+
+
+def vokabel_aendern(db: sqlite3.Connection, person: dict, lexem_id: int,
+                    lektion_nr: int | None = None, **aenderung):
+    """Ein Wort berichtigen. Nur das Genannte ändert sich."""
+    import sammelimport
+    from modelle import LexemAendern
+    zugang.lexem_pruefen(db, person["id"], lexem_id, schreiben=True)
+    lexem = dbm.zeile(db, "SELECT * FROM lexem WHERE id = ?", (lexem_id,))
+    if lektion_nr is not None:
+        aenderung["lektion_id"] = sammelimport.lektion_sichern(
+            db, lexem["sammlung_id"], lektion_nr)
+    if not aenderung:
+        raise WerkzeugFehler("Nichts zu ändern angegeben")
+    try:
+        eingabe = LexemAendern(**aenderung)
+    except Exception as f:
+        raise WerkzeugFehler(f"Unbrauchbare Angaben: {f}") from f
+    ergebnis = _fehler_wandeln(_app().lexem_aendern, lexem_id, eingabe, db)
+    return {"lexem_id": ergebnis["id"], "lemma": ergebnis["lemma"],
+            "wortart": ergebnis["wortart"], "merkmale": ergebnis["merkmale"],
+            "bedeutungen": [[u["text"] for u in b["uebersetzungen"]]
+                            for b in ergebnis["bedeutungen"]],
+            "formen": len(ergebnis["formen"])}
+
+
+def form_aendern(db: sqlite3.Connection, person: dict, form_id: int,
+                 **aenderung):
+    """Eine Form berichtigen. Geänderter Inhalt fällt auf ungeprüft zurück."""
+    from modelle import FormAendern
+    zugang.form_pruefen(db, person["id"], form_id, schreiben=True)
+    if not aenderung:
+        raise WerkzeugFehler("Nichts zu ändern angegeben")
+    # Die Freigabe ist dem Agenten nicht zugänglich: sie gehört dem
+    # Menschen, und eine geänderte Form ist nicht mehr die freigegebene.
+    aenderung.pop("geprueft", None)
+    try:
+        eingabe = FormAendern(**aenderung)
+    except Exception as f:
+        raise WerkzeugFehler(f"Unbrauchbare Angaben: {f}") from f
+    ergebnis = _fehler_wandeln(_app().form_teil_aendern, form_id, eingabe, db)
+    return {"form_id": ergebnis["id"], "text": ergebnis["text"],
+            "merkmale": dbm.j_lesen(ergebnis["merkmale"]),
+            "geprueft": bool(ergebnis["geprueft"]),
+            "hinweis": None if ergebnis["geprueft"] else
+                       "Die Form ist jetzt ungeprüft und wird erst nach "
+                       "Freigabe durch einen Menschen abgefragt."}
+
+
+def form_loeschen(db: sqlite3.Connection, person: dict, form_id: int,
+                  text: str):
+    """Eine Form entfernen. `text` muss die vorhandene Form nennen.
+
+    Die Bestätigung ist kein Formalismus: an einer Form hängt ein
+    Lernstand, und eine verwechselte Kennung löschte stillschweigend die
+    falsche.
+    """
+    zugang.form_pruefen(db, person["id"], form_id, schreiben=True)
+    f = dbm.zeile(db, "SELECT * FROM form WHERE id = ?", (form_id,))
+    if f is None:
+        raise WerkzeugFehler(f"Form {form_id} gibt es nicht")
+    if (text or "").strip() != f["text"]:
+        raise WerkzeugFehler(
+            f"Form {form_id} lautet {f['text']!r}, nicht {text!r}. "
+            f"Zum Löschen muss der vorhandene Text genannt werden.")
+    _fehler_wandeln(_app().form_loeschen, form_id, db)
+    return {"geloescht": f["text"], "lexem_id": f["lexem_id"]}
+
+
+def vokabel_loeschen(db: sqlite3.Connection, person: dict, lexem_id: int,
+                     lemma: str):
+    """Ein ganzes Wort entfernen. `lemma` muss das vorhandene nennen.
+
+    Mit dem Wort gehen seine Formen, Bedeutungen und der Lernstand dazu.
+    Darum die Bestätigung — und darum sagt die Antwort, was dabei
+    verlorenging.
+    """
+    zugang.lexem_pruefen(db, person["id"], lexem_id, schreiben=True)
+    lexem = dbm.zeile(db, "SELECT * FROM lexem WHERE id = ?", (lexem_id,))
+    if lexem is None:
+        raise WerkzeugFehler(f"Wort {lexem_id} gibt es nicht")
+    if (lemma or "").strip() != lexem["lemma"]:
+        raise WerkzeugFehler(
+            f"Wort {lexem_id} lautet {lexem['lemma']!r}, nicht {lemma!r}. "
+            f"Zum Löschen muss das vorhandene Lemma genannt werden.")
+    bestand = {
+        "formen": dbm.wert(db, "SELECT COUNT(*) FROM form WHERE lexem_id = ?",
+                           (lexem_id,)),
+        "aufgaben": dbm.wert(db, "SELECT COUNT(*) FROM aufgabe WHERE lexem_id = ?",
+                             (lexem_id,)),
+        "wiederholungen": dbm.wert(db, """SELECT COUNT(*) FROM wiederholung w
+                                            JOIN aufgabe a ON a.id = w.aufgabe_id
+                                           WHERE a.lexem_id = ?""", (lexem_id,)),
+    }
+    _fehler_wandeln(_app().lexem_loeschen, lexem_id, db)
+    return {"geloescht": lexem["lemma"], **bestand,
+            "hinweis": (f"Mit dem Wort sind {bestand['wiederholungen']} "
+                        f"Wiederholungen verlorengegangen."
+                        if bestand["wiederholungen"] else None)}
+
+
 # ------------------------------------------------------- Sätze und Texte
 
 def uebung_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
@@ -280,7 +426,10 @@ def vokabel_lesen(db: sqlite3.Connection, person: dict, lexem_id: int):
         "lexem_id": lexem["id"], "lemma": lexem["lemma"],
         "wortart": lexem["wortart"], "merkmale": lexem["merkmale"],
         "sprache": lexem["sprache"],
-        "formen": [{"id": f["id"], "text": f["text"], "merkmale": f["merkmale"],
+        # form_id, nicht id: genau diese Zahl verlangen form_aendern und
+        # form_loeschen, und sie soll nicht erst übersetzt werden müssen.
+        "formen": [{"form_id": f["id"], "text": f["text"],
+                    "merkmale": f["merkmale"],
                     "beschriftung": f["beschriftung"],
                     "geprueft": bool(f["geprueft"]), "quelle": f["quelle"],
                     "gruppe": f["gruppe"]} for f in lexem["formen"]],
@@ -489,6 +638,117 @@ WERKZEUGE: list[dict] = [
                 "true: nichts schreiben, nur berichten. Zuerst immer so.")},
             "required": ["sammlung_id", "eintraege"]},
         "funktion": vokabeln_importieren,
+    },
+    {
+        "name": "sammlung_anlegen",
+        "description": "Eine neue Sammlung anlegen. Sie gehört dir; niemand "
+                       "sonst sieht sie, bis du sie freigibst. Danach "
+                       "formgruppen_zeigen für die Sprache aufrufen.",
+        "inputSchema": {"type": "object", "properties": {
+            "name": _s("string", "wie die Sammlung heißen soll"),
+            "sprache": _s("string",
+                "Code der Lernsprache: de, en, fr, es, el, gmh. Eine andere "
+                "braucht erst sprache_einrichten."),
+            "grundsprache": _s("string", "Sprache der Übersetzungen, meist de"),
+            "beschreibung": _s("string", "wahlweise"),
+        }, "required": ["name", "sprache"]},
+        "funktion": sammlung_anlegen,
+    },
+    {
+        "name": "vokabeln_auflisten",
+        "description":
+            "Was steht schon im Bestand? Vor dem Anlegen und vor dem "
+            "Berichtigen aufzurufen — sonst entstehen Doppelte.\n\n"
+            "Je Wort kommen lexem_id, Lemma, Wortart, die erste Bedeutung "
+            "und die Zahl der Formen, der ungeprüften und der Aufgaben "
+            "zurück. Mit nur_ungepruefte lässt sich sehen, wo noch eine "
+            "Freigabe fehlt.",
+        "inputSchema": {"type": "object", "properties": {
+            "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+            "lektion_nr": _s("integer", "nur diese Lektion"),
+            "wortart": _s("string", "nur diese Wortart"),
+            "suche": _s("string", "Teil des Lemmas oder einer Übersetzung"),
+            "nur_ungepruefte": _s("boolean",
+                "nur Wörter mit noch nicht freigegebenen Formen"),
+            "seite": _s("integer", "ab 1"),
+            "anzahl": _s("integer", "je Seite, höchstens 200"),
+        }, "required": ["sammlung_id"]},
+        "funktion": vokabeln_auflisten,
+    },
+    {
+        "name": "vokabel_aendern",
+        "description":
+            "Ein Wort berichtigen. Nur die genannten Felder ändern sich.\n\n"
+            "`bedeutungen` ERSETZT alle Bedeutungen — welche einzelne "
+            "Übersetzung sonst gemeint wäre, ließe sich nicht ausdrücken. "
+            "Für die Formen gibt es form_aendern und formen_ergaenzen.",
+        "inputSchema": {"type": "object", "properties": {
+            "lexem_id": _s("integer", "aus vokabeln_auflisten"),
+            "lemma": _s("string", "die Zitierform"),
+            "wortart": _s("string", ""),
+            "merkmale": _s("object",
+                "Merkmale des WORTES (genus, klasse, diathese), nicht einer "
+                "Form. Ersetzt die bisherigen."),
+            "bedeutungen": _s("array",
+                'ERSETZT alle: [{"uebersetzungen":["schreiben"],'
+                '"kontext":"…"}]', items={"type": "object"}),
+            "lektion_nr": _s("integer", "Nummer im Lehrwerk"),
+            "reihenfolge": _s("integer", "Lernreihenfolge in der Lektion"),
+            "kennung": _s("string", "eigener Schlüssel"),
+            "notiz": _s("string", "freier Vermerk"),
+        }, "required": ["lexem_id"]},
+        "funktion": vokabel_aendern,
+    },
+    {
+        "name": "form_aendern",
+        "description":
+            "Eine einzelne Form berichtigen. Nur das Genannte ändert sich.\n\n"
+            "Ändert sich Text oder Merkmalsbündel, fällt die Form auf "
+            "**ungeprüft** zurück und wird bis zur Freigabe nicht abgefragt "
+            "— was geändert wurde, ist nicht mehr das, was ein Mensch "
+            "freigegeben hat. Die Freigabe selbst kann dieses Werkzeug "
+            "nicht setzen.\n\n" + MERKMALSHINWEIS,
+        "inputSchema": {"type": "object", "properties": {
+            "form_id": _s("integer", "aus vokabel_lesen"),
+            "text": _s("string", "die berichtigte Form"),
+            "merkmale": _s("object", "ersetzt das Bündel vollständig"),
+            "ist_grundform": _s("boolean", "die Zitierform; nur eine je Wort"),
+            "ist_variante": _s("boolean",
+                "eine weitere gültige Form derselben Zelle (μιλώ neben "
+                "μιλάω). Varianten zählen als richtig, werden aber nicht "
+                "eigens abgefragt."),
+            "aussprache": _s("string", "wahlweise"),
+            "notiz": _s("string", "wahlweise"),
+        }, "required": ["form_id"]},
+        "funktion": form_aendern,
+    },
+    {
+        "name": "form_loeschen",
+        "description":
+            "Eine Form entfernen. `text` muss die vorhandene Form nennen — "
+            "an einer Form hängt ein Lernstand, und eine verwechselte "
+            "Kennung löschte sonst stillschweigend die falsche.\n\n"
+            "Eine falsch beschriftete Form lässt sich meist mit form_aendern "
+            "richtigstellen; das ist der schonendere Weg.",
+        "inputSchema": {"type": "object", "properties": {
+            "form_id": _s("integer", "aus vokabel_lesen"),
+            "text": _s("string", "die vorhandene Form, zur Bestätigung"),
+        }, "required": ["form_id", "text"]},
+        "funktion": form_loeschen,
+    },
+    {
+        "name": "vokabel_loeschen",
+        "description":
+            "Ein ganzes Wort entfernen, mit allen Formen, Bedeutungen und "
+            "dem Lernstand dazu. `lemma` muss das vorhandene nennen.\n\n"
+            "Die Antwort sagt, wie viele Wiederholungen dabei verlorengehen. "
+            "Steht dort eine Zahl über null, ist das Wort schon gelernt "
+            "worden — dann vorher mit der Benutzerin abstimmen.",
+        "inputSchema": {"type": "object", "properties": {
+            "lexem_id": _s("integer", "aus vokabeln_auflisten"),
+            "lemma": _s("string", "das vorhandene Lemma, zur Bestätigung"),
+        }, "required": ["lexem_id", "lemma"]},
+        "funktion": vokabel_loeschen,
     },
     {
         "name": "uebung_anlegen",

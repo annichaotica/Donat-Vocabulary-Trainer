@@ -47,7 +47,7 @@ from modelle import (BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      ImportEingabe, LernzielAendern, LernzielAnlegen,
                      SammelimportEingabe,
                      McpTokenAnlegen,
-                     LexemAendern, LexemEingabe,
+                     FormAendern, LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
                      SammlungEinstellungen, SpracheAnlegen,
                      SprachprofilSetzen, TextPruefenEingabe,
@@ -696,7 +696,9 @@ def _lexem_ausbauen(db: sqlite3.Connection, lexem: dict,
 @app.get("/api/sammlungen/{sammlung_id}/lexeme")
 def lexeme_liste(sammlung_id: int, suche: str | None = None,
                  lektion_id: int | None = None,
+                 lektion_nr: int | None = None,
                  wortart: str | None = None,
+                 nur_ungepruefte: bool = False,
                  ab: int = 0, anzahl: int = Query(default=50, le=500),
                  db: sqlite3.Connection = DB):
     _holen(db, "sammlung", sammlung_id)
@@ -709,9 +711,18 @@ def lexeme_liste(sammlung_id: int, suche: str | None = None,
     if lektion_id is not None:
         bedingungen.append("l.lektion_id = ?")
         werte.append(lektion_id)
+    if lektion_nr is not None:
+        # Über die Nummer, nicht die Kennung: so denkt ein Lehrwerk, und
+        # nur so lässt sich eine Lektion von außen benennen.
+        bedingungen.append("""l.lektion_id IN (SELECT id FROM lektion
+                                WHERE sammlung_id = ? AND nr = ?)""")
+        werte += [sammlung_id, lektion_nr]
     if wortart:
         bedingungen.append("l.wortart = ?")
         werte.append(wortart)
+    if nur_ungepruefte:
+        bedingungen.append("""EXISTS (SELECT 1 FROM form f
+                               WHERE f.lexem_id = l.id AND f.geprueft = 0)""")
     wo = " AND ".join(bedingungen)
     gesamt = dbm.wert(db, f"SELECT COUNT(*) FROM lexem l WHERE {wo}", werte)
     zeilen = dbm.zeilen(db, f"""
@@ -852,7 +863,24 @@ def lexem_aendern(lexem_id: int, eingabe: LexemAendern, db: sqlite3.Connection =
         felder.append("lektion_id = ?"); werte.append(eingabe.lektion_id)
     if eingabe.notiz is not None:
         felder.append("notiz = ?"); werte.append(eingabe.notiz)
-    if felder:
+    if eingabe.reihenfolge is not None:
+        felder.append("reihenfolge = ?"); werte.append(eingabe.reihenfolge)
+    if eingabe.kennung is not None:
+        felder.append("kennung = ?"); werte.append(eingabe.kennung)
+    if eingabe.bedeutungen is not None:
+        if not eingabe.bedeutungen:
+            raise HTTPException(
+                400, "Ohne Bedeutung entsteht keine Bedeutungsaufgabe. "
+                     "Um alle zu entfernen, das Wort löschen.")
+        lexem = _holen(db, "lexem", lexem_id)
+        s_ = _holen(db, "sammlung", lexem["sammlung_id"])
+        # Ersetzen, nicht ergänzen: welche einzelne Übersetzung gemeint
+        # wäre, ließe sich nicht ausdrücken.
+        db.execute("DELETE FROM bedeutung WHERE lexem_id = ?", (lexem_id,))
+        for b in eingabe.bedeutungen:
+            _bedeutung_einfuegen(db, lexem_id, b, s_["grundsprache"])
+        felder = felder or []
+    if felder or eingabe.bedeutungen is not None:
         felder.append("geaendert = datetime('now')")
         db.execute(f"UPDATE lexem SET {', '.join(felder)} WHERE id = ?",
                    (*werte, lexem_id))
@@ -883,6 +911,49 @@ def form_aendern(form_id: int, eingabe: FormEingabe, db: sqlite3.Connection = DB
                (eingabe.text, dbm.j_schreiben(eingabe.merkmale),
                 int(eingabe.ist_grundform), eingabe.aussprache, eingabe.quelle,
                 int(eingabe.geprueft), eingabe.notiz, form_id))
+    aufgaben.erzeugen(db, f["lexem_id"])
+    return _holen(db, "form", form_id)
+
+
+@app.patch("/api/formen/{form_id}/teil")
+def form_teil_aendern(form_id: int, eingabe: FormAendern,
+                      db: sqlite3.Connection = DB):
+    """Teiländerung. Was nicht genannt ist, bleibt stehen.
+
+    Ändert sich Text oder Merkmalsbündel, fällt die Form auf **ungeprüft**
+    zurück — sofern nicht ausdrücklich etwas anderes verlangt wird. Was
+    geändert wurde, ist nicht mehr das, was jemand freigegeben hat.
+    """
+    f = _holen(db, "form", form_id)
+    gesetzt = eingabe.model_dump(exclude_unset=True)
+    if not gesetzt:
+        raise HTTPException(400, "Nichts zu ändern angegeben")
+    felder, werte = [], []
+    inhaltlich = False
+    if eingabe.text is not None:
+        inhaltlich = inhaltlich or eingabe.text != f["text"]
+        felder.append("text = ?"); werte.append(eingabe.text)
+    if eingabe.merkmale is not None:
+        try:
+            geprueftes = mk.pruefen(eingabe.merkmale)
+        except mk.MerkmalFehler as fehler:
+            raise HTTPException(400, str(fehler))
+        inhaltlich = inhaltlich or geprueftes != dbm.j_lesen(f["merkmale"])
+        felder.append("merkmale = ?"); werte.append(dbm.j_schreiben(geprueftes))
+    for name, wert in (("ist_grundform", eingabe.ist_grundform),
+                       ("ist_variante", eingabe.ist_variante)):
+        if wert is not None:
+            felder.append(f"{name} = ?"); werte.append(int(wert))
+    for name, wert in (("aussprache", eingabe.aussprache),
+                       ("notiz", eingabe.notiz)):
+        if wert is not None:
+            felder.append(f"{name} = ?"); werte.append(wert)
+    if eingabe.geprueft is not None:
+        felder.append("geprueft = ?"); werte.append(int(eingabe.geprueft))
+    elif inhaltlich and f["geprueft"]:
+        felder.append("geprueft = 0")
+    db.execute(f"UPDATE form SET {', '.join(felder)} WHERE id = ?",
+               (*werte, form_id))
     aufgaben.erzeugen(db, f["lexem_id"])
     return _holen(db, "form", form_id)
 

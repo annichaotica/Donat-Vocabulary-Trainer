@@ -462,10 +462,35 @@ unbekannten Wörtern ist keine Übung, sondern eine Enttäuschung.
 Wie Formen bleiben Übungen **ungeprüft**, bis ein Mensch sie freigibt.
 
 
-## Was später der MCP-Server übernimmt
+## Berichtigen und Löschen
 
-Alles davon. Der Server bekommt Werkzeuge wie `vokabel_anlegen`,
-`formen_ergaenzen` und `paradigma_pruefen`; dann entfällt das Erzeugen von
-JSON-Dateien und das Hinübertragen von Hand. Die Regeln auf diesem Blatt
-bleiben dieselben — der MCP-Server ist nur ein anderer Weg zur gleichen
-Schnittstelle, und er wird dieselben Merkmale prüfen.
+Ein Probelauf findet Fehler; danach müssen sie sich auch beheben lassen,
+ohne dass ein Mensch alles von Hand nachzieht. Dafür gibt es
+`vokabeln_auflisten`, `vokabel_aendern`, `form_aendern`, `form_loeschen`
+und `vokabel_loeschen`.
+
+Drei Regeln dabei:
+
+- **Geänderter Inhalt fällt auf ungeprüft zurück.** Ändert sich der Text
+  oder das Merkmalsbündel einer Form, gilt die Freigabe nicht mehr — was
+  geändert wurde, ist nicht mehr das, was ein Mensch bestätigt hat. Die
+  Freigabe selbst kann kein Werkzeug setzen.
+- **Löschen verlangt eine Bestätigung.** `form_loeschen` braucht den
+  vorhandenen Text, `vokabel_loeschen` das vorhandene Lemma. An jeder Form
+  hängt ein Lernstand; eine verwechselte Kennung träfe sonst lautlos das
+  Falsche. Die Antwort sagt, wie viele Wiederholungen verlorengehen —
+  steht dort eine Zahl über null, vorher abstimmen.
+- **Berichtigen ist besser als Löschen.** Eine falsch beschriftete Form
+  lässt sich mit `form_aendern` richtigstellen; die Aufgaben hängen am
+  Merkmalsbündel, nicht an der Zeile, und der Lernstand bleibt.
+
+`bedeutungen` bei `vokabel_aendern` **ersetzt** alle Bedeutungen. Welche
+einzelne Übersetzung sonst gemeint wäre, ließe sich nicht ausdrücken.
+
+
+## Der MCP-Server
+
+Der Server deckt inzwischen alles von diesem Blatt ab. Die Regeln bleiben
+dieselben — er ist nur ein anderer Weg zur gleichen Schnittstelle und
+prüft dieselben Merkmale. Der erste Aufruf in jeder Sitzung ist
+`sammlungen_auflisten`, der zweite `formgruppen_zeigen` für die Sprache.

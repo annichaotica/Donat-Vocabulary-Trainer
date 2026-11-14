@@ -222,7 +222,9 @@ def test_angelegte_formen_bleiben_ungeprueft(mcp):
     form = gelesen["formen"][0]
     assert form["geprueft"] is False and form["quelle"] == "ki"
 
-    werkzeug(mcp, "formen_bestaetigen", form_ids=[form["id"]])
+    # form_id, nicht id: genau diese Zahl verlangen form_aendern,
+    # form_loeschen und formen_bestaetigen.
+    werkzeug(mcp, "formen_bestaetigen", form_ids=[form["form_id"]])
     danach = werkzeug(mcp, "vokabel_lesen", lexem_id=ergebnis["lexem_id"])
     assert danach["formen"][0]["geprueft"] is True
 

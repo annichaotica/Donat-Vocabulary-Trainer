@@ -206,17 +206,27 @@ function zahl(wert, beschriftung) {
 
 function teilAbschnitt(a, deckung, textId, behaelter) {
   const original = h('div', { class: 'textabschnitt-original' });
+  let mitBedeutung = 0;
   for (const stueck of woerterDesAbschnitts(a.original, deckung)) {
     if (stueck.lexem_id === undefined) {
       original.append(document.createTextNode(stueck.text));
       continue;
     }
-    original.append(h('button', {
+    const knopf = h('button', {
       type: 'button',
       class: 'wortknopf ' + FARBE[stueck.art]
            + (stueck.gewuenscht ? ' wort-gewuenscht' : ''),
       onclick: (e) => wortZeigen(e.target, stueck, textId, a, behaelter),
-    }, stueck.text));
+    }, stueck.text);
+    // Jedes Wort steht in einer Säule: Bedeutung oben, Wort unten.
+    // Auch das unbekannte, und zwar MIT leerer Oberzeile — die Lücke
+    // ist die Auskunft. »Manche könnte ich dann vielleicht auch
+    // erkennen aus dem Zusammenhang«: dafür muss man sehen, wo sie
+    // steht und was links und rechts davon bekannt ist.
+    if (stueck.bedeutung) mitBedeutung += 1;
+    original.append(h('span', { class: 'wortsaeule' },
+      h('span', { class: 'glosse', lang: 'de', text: stueck.bedeutung || '' }),
+      knopf));
   }
 
   const feld = h('textarea', {
@@ -243,7 +253,7 @@ function teilAbschnitt(a, deckung, textId, behaelter) {
     // Trainer nicht; er hat keine Übersetzungsmaschine und soll keine
     // erfinden. Was er hat, sind deine Einträge, und die reichen, um
     // beim Entziffern nicht an jedem zweiten Wort hängenzubleiben.
-    wortFuerWort(a, deckung),
+    wortFuerWort(original, mitBedeutung),
     feld,
     a.referenz
       ? h('details', { style: 'margin-top:.4rem' },
@@ -292,28 +302,32 @@ function woerterDesAbschnitts(original, deckung) {
  * der angeschlossenen KI holen?« — Für eine richtige Übersetzung ja.
  * Für das Entziffern nicht: die Bedeutungen stehen ja in deinem
  * Wortschatz. Das ist ausdrücklich KEINE Übersetzung, und die
- * Überschrift sagt es, damit niemand sie dafür hält.
+ * Beschriftung sagt es, damit niemand sie dafür hält.
+ *
+ * ÜBER den Wörtern, nicht als Liste darunter. Die Liste war nach
+ * Sprachen geordnet richtig und beim Lesen falsch: »για für · μήνες
+ * der Monat · των der« ist eine Vokabelliste, und wer sie liest,
+ * sucht danach im Satz die Stelle wieder, an der er war. Zwischen den
+ * Zeilen steht die Bedeutung dort, wo das Wort steht — und die
+ * unbekannten Wörter behalten ihren Platz in der Reihe, statt aus ihr
+ * herauszufallen. Genau die sind ja die Frage.
+ *
+ * Es ist dieselbe Darstellung, die ein Interlinearglossar seit
+ * Jahrhunderten benutzt, und zwar aus demselben Grund.
  */
-function wortFuerWort(abschnitt, deckung) {
-  const nach = new Map();
-  for (const w of deckung.woerter) if (!nach.has(w.wort)) nach.set(w.wort, w);
-  const stuecke = woerterDesAbschnitts(abschnitt.original, deckung)
-    .filter((x) => x.lexem_id !== undefined && x.bedeutung);
-  if (!stuecke.length) return null;
-
-  const liste = h('div', { class: 'wortfuerwort' });
-  const gesehen = new Set();
-  for (const x of stuecke) {
-    if (gesehen.has(x.vergleichsform)) continue;
-    gesehen.add(x.vergleichsform);
-    liste.append(h('span', { class: 'wfw-paar' },
-      h('b', { text: x.wort }), ' ', h('span', { text: x.bedeutung })));
-  }
-  return h('details', { class: 'wfw' },
-    h('summary', { class: 'leise',
-                   text: `Wort für Wort (${gesehen.size} aus deinem `
-                       + 'Wortschatz)' }),
-    liste);
+function wortFuerWort(original, mitBedeutung) {
+  if (!mitBedeutung) return null;
+  const schalter = h('button', { type: 'button', class: 'schlicht' },
+    `Wort für Wort einblenden (${mitBedeutung} aus deinem Wortschatz)`);
+  let an = false;
+  schalter.addEventListener('click', () => {
+    an = !an;
+    original.classList.toggle('mit-glosse', an);
+    schalter.textContent = an
+      ? 'Wort für Wort ausblenden'
+      : `Wort für Wort einblenden (${mitBedeutung} aus deinem Wortschatz)`;
+  });
+  return h('div', { class: 'wfw' }, schalter);
 }
 
 

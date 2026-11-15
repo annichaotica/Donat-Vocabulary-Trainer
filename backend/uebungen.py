@@ -647,7 +647,10 @@ def bewerten(db: sqlite3.Connection, textaufgabe_id: int,
                                   profil)
     return {"textaufgabe_id": textaufgabe_id,
             "bewertung_art": a["bewertung_art"],
-            "zaehlt": a["bewertung_art"] == "genau",
+            # Wortgleich heißt: nichts mehr einzuschätzen. Dieselbe
+            # Regel wie in `uebung_lernen.pruefen` — zwei Maßstäbe für
+            # dieselbe Antwort wären schlimmer als ein unbequemer.
+            "zaehlt": a["bewertung_art"] == "genau" or urteil.wortgleich,
             "sprache": code, **urteil.als_dict()}
 
 

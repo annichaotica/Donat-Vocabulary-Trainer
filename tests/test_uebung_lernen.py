@@ -214,6 +214,59 @@ def test_bei_langem_text_entscheidet_der_mensch(klient):
     assert bewertet["bewertung_quelle"] == "selbsteinschaetzung"
 
 
+def test_wortgleich_zaehlt_auch_beim_text(klient):
+    """»Wie kommt das? Es ist doch sogar wortgleich.«
+
+    Neben »Richtig — 9 von 9 Wörtern« stand »zählt nicht«, und sie
+    musste darunter noch einmal von Hand bestätigen, dass es richtig
+    war. Die Begründung für die Selbsteinschätzung — eine freie
+    Übersetzung trifft die Referenz selten wörtlich — gilt hier nicht,
+    denn sie hat sie wörtlich getroffen. Dann gibt es nichts mehr
+    einzuschätzen.
+    """
+    b, s = _aufbau(klient)
+    anlegen(klient, s["id"], {
+        "typ": "text", "titel": "Στο θέατρο",
+        "zielsprache": "Χθες πήγα στο θέατρο. Η παράσταση ήταν ωραία.",
+        "grundsprache": "Gestern ging ich ins Theater. Die Vorstellung war schön.",
+        "richtungen": ["el-de"]})
+    aufgabe = naechste(klient, b["id"], sammlung_id=s["id"])[0]
+    wort_fuer_wort = "Gestern ging ich ins Theater."
+
+    ergebnis = pruefen(klient, b["id"], aufgabe["textaufgabe_id"], wort_fuer_wort)
+    assert ergebnis["urteil"]["wortgleich"] is True
+    assert ergebnis["zaehlt"] is True
+    assert ergebnis["selbsteinschaetzung"] is False
+
+    # Und im Protokoll steht dann auch nicht, sie habe sich selbst
+    # eingeschätzt — gefragt wurde sie ja gar nicht.
+    bewertet = bewerten(klient, b["id"], aufgabe["textaufgabe_id"],
+                        urteil="richtig", antwort=wort_fuer_wort)
+    assert bewertet["bewertung_quelle"] == "automatisch"
+
+
+def test_nur_die_gleichheit_oeffnet_die_tuer(klient):
+    """Eine Tür in eine Richtung. Wer NICHT wörtlich trifft, kann
+    trotzdem völlig richtig übersetzt haben — deswegen gibt es die
+    Selbsteinschätzung überhaupt. Auch »fast« bleibt bei ihr: dort
+    weicht etwas ab, und ob das ein Fehler ist, weiß nur sie."""
+    b, s = _aufbau(klient)
+    anlegen(klient, s["id"], {
+        "typ": "text", "titel": "Στο θέατρο",
+        "zielsprache": "Χθες πήγα στο θέατρο. Η παράσταση ήταν ωραία.",
+        "grundsprache": "Gestern ging ich ins Theater. Die Vorstellung war schön.",
+        "richtungen": ["el-de"]})
+    aufgabe = naechste(klient, b["id"], sammlung_id=s["id"])[0]
+
+    for antwort in ("Gestern war ich im Theater.",      # richtig, aber anders
+                    "Gestern ging ich ins Theatr.",     # Tippfehler -> fast
+                    "Heute koche ich Suppe."):          # falsch
+        ergebnis = pruefen(klient, b["id"], aufgabe["textaufgabe_id"], antwort)
+        assert ergebnis["urteil"]["wortgleich"] is False, antwort
+        assert ergebnis["zaehlt"] is False, antwort
+        assert ergebnis["selbsteinschaetzung"] is True, antwort
+
+
 def test_aufdecken_zeigt_die_loesung(klient):
     b, s = _aufbau(klient)
     anlegen(klient, s["id"])

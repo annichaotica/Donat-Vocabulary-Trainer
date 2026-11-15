@@ -144,7 +144,16 @@ def test_geprueft_wird_in_der_sprache_der_antwort(klient):
 
 def test_bei_laengerem_bleibt_die_einschaetzung_beim_menschen(klient):
     """Bei einem Textblock passt ein genauer Vergleich selten. Er findet
-    trotzdem statt — aber er zählt nicht."""
+    trotzdem statt — aber er zählt nicht.
+
+    Dieser Test stand hier mit einer WORTGLEICHEN Antwort als Beispiel
+    und behauptete »zählt nicht« — also genau das, was sie später als
+    Fehler gemeldet hat: »Wie kommt das? Es ist doch sogar wortgleich.«
+    Er hat den Fehler nicht gefunden, er hat ihn festgeschrieben. Das
+    Beispiel ist jetzt eine Antwort, die tatsächlich abweicht; dass
+    Wortgleiches zählt, prüft
+    test_wortgleich_zaehlt_auch_beim_text.
+    """
     _b, s = _aufbau(klient)
     u = anlegen(klient, s["id"], {
         "typ": "text", "titel": "Στο θέατρο",
@@ -154,8 +163,8 @@ def test_bei_laengerem_bleibt_die_einschaetzung_beim_menschen(klient):
     assert len(u["abschnitte"]) == 2
     aufgabe = [a for a in u["aufgaben"] if a["aktiv"]][0]
     assert aufgabe["bewertung_art"] == "selbst"
-    ergebnis = pruefen(klient, aufgabe["id"], "Gestern ging ich ins Theater.")
-    assert ergebnis["urteil"] == "richtig"
+    ergebnis = pruefen(klient, aufgabe["id"], "Gestern war ich im Theater.")
+    assert ergebnis["wortgleich"] is False
     assert ergebnis["zaehlt"] is False
 
 

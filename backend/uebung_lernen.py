@@ -319,12 +319,23 @@ def pruefen(db: sqlite3.Connection, benutzer_id: int, textaufgabe_id: int,
     _frage_sprache, antwort_sprache = _sprachen(db, a)
     urteil = satzpruefung.pruefen(antwort, dbm.j_lesen(a["erwartet"]) or [],
                                   sprachen.profil(antwort_sprache))
+    # Beim langen Text ist der Vergleich Hilfestellung, kein Urteil —
+    # eine freie Übersetzung trifft die Referenz selten wörtlich. Ist
+    # sie aber WORTGLEICH, ist diese Begründung weg: dann gibt es nichts
+    # mehr einzuschätzen, und »zählt nicht« neben neun von neun Wörtern
+    # ist schlicht falsch. Genau das stand da.
+    #
+    # Nur die Gleichheit öffnet diese Tür, nie das Gegenteil: eine
+    # Antwort, die NICHT wörtlich trifft, kann vollkommen richtig sein
+    # — deshalb gibt es die Selbsteinschätzung überhaupt. »fast«
+    # bleibt bei ihr, denn dort weicht etwas ab, und ob das ein Fehler
+    # ist, weiß nur sie.
+    zaehlt = a["bewertung_art"] == "genau" or urteil.wortgleich
     return {
         "textaufgabe_id": textaufgabe_id,
         "bewertung_art": a["bewertung_art"],
-        # Beim langen Text ist der Vergleich Hilfestellung, kein Urteil.
-        "zaehlt": a["bewertung_art"] == "genau",
-        "selbsteinschaetzung": a["bewertung_art"] != "genau",
+        "zaehlt": zaehlt,
+        "selbsteinschaetzung": not zaehlt,
         "sprache": antwort_sprache,
         "urteil": urteil.als_dict(),
         "loesung": _loesung(a),
@@ -373,8 +384,18 @@ def bewerten(db: sqlite3.Connection, benutzer_id: int, textaufgabe_id: int,
             urteil, denkzeit_ms=None, versuche=versuche, aufgedeckt=aufgedeckt,
             zeitmessung=False)
         bewertung = einschaetzung["bewertung"]
-        quelle = ("automatisch" if a["bewertung_art"] == "genau"
-                  else "selbsteinschaetzung")
+        # Woher die Note kam, wird mitgeschrieben — und muss stimmen.
+        # Bei einer wortgleichen Antwort hat die Oberfläche gar nicht
+        # erst gefragt, also war es keine Selbsteinschätzung. Hier
+        # nachgerechnet und nicht vom Browser geglaubt: was im
+        # Protokoll steht, soll aus der Antwort folgen.
+        automatisch = a["bewertung_art"] == "genau"
+        if not automatisch and antwort:
+            _f, antwort_sprache = _sprachen(db, a)
+            automatisch = satzpruefung.pruefen(
+                antwort, dbm.j_lesen(a["erwartet"]) or [],
+                sprachen.profil(antwort_sprache)).wortgleich
+        quelle = "automatisch" if automatisch else "selbsteinschaetzung"
     if bewertung not in fsrs.BEWERTUNGEN:
         raise UebungFehler("Bewertung muss 1 bis 4 sein")
 

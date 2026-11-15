@@ -16,6 +16,64 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### »Zählt nicht« neben neun von neun Wörtern
+
+Zu merken war: eine Übersetzung, die mit der hinterlegten Fassung
+Wort für Wort übereinstimmte, bekam »Richtig — 9 von 9 Wörtern« und
+daneben die Marke **zählt nicht**; darunter musste man noch einmal
+von Hand bestätigen, dass es richtig war. »Wie kommt das? Es ist doch
+sogar wortgleich?«
+
+Bei einem längeren Text schätzt die Lernende selbst ein, und das aus
+gutem Grund: eine freie Übersetzung trifft die Referenz selten
+wörtlich, ein Zeichenkettenvergleich wäre dort ein schlechter
+Richter. Nur gilt die Begründung nicht mehr, wenn sie wörtlich
+getroffen hat. Dann ist nichts mehr einzuschätzen.
+
+Wortgleiches zählt jetzt also auch beim Text, ohne Nachfrage. Die Tür
+geht nur in diese eine Richtung auf: eine Antwort, die **nicht**
+wörtlich trifft, kann vollkommen richtig sein — dafür gibt es die
+Selbsteinschätzung überhaupt —, und auch »fast« bleibt bei ihr. Im
+Protokoll steht in diesem Fall »automatisch« statt
+»Selbsteinschätzung«, denn gefragt wurde ja nicht; nachgerechnet wird
+das am Server und nicht vom Browser geglaubt.
+
+Ein Test hat genau das Gegenteil behauptet — mit einer wortgleichen
+Antwort als Beispiel. Er hat den Fehler nicht gefunden, er hat ihn
+festgeschrieben.
+
+### Wort für Wort steht jetzt zwischen den Zeilen
+
+Die Lesehilfe war eine Liste unter dem Absatz: »για für · μήνες der
+Monat · των der«. Das ist eine Vokabelliste, und wer sie liest, sucht
+danach im Satz die Stelle wieder, an der er war. Die unbekannten
+Wörter kamen darin gar nicht vor — dabei sind genau die die Frage.
+
+Jetzt steht die Bedeutung **über** dem Wort, an seinem Platz im Satz,
+und jedes Wort bekommt seine Zeile darüber — auch das unbekannte,
+dessen leere Oberzeile die eigentliche Auskunft ist. »Manche könnte
+ich dann vielleicht auch erkennen aus dem Zusammenhang«: dafür muss
+man sehen, wo die Lücke sitzt und was links und rechts davon bekannt
+ist. Es ist dieselbe Darstellung, die ein Interlinearglossar seit
+Jahrhunderten benutzt, und zwar aus demselben Grund.
+
+Ausgeschaltet sieht der Absatz aus wie vorher; die Glosse kostet dann
+keine Zeilenhöhe.
+
+### Griechische Eigennamen gehören doch in den Wortschatz
+
+Die Anweisung an den Chat sagte, Eigennamen seien auszulassen. Das
+war für »AfD« richtig und für »Μπουτάκογλου« falsch: ein
+griechischer Name ist für jemanden, der die Schrift erst lernt,
+genauso unlesbar wie jedes andere Wort. »Die weiß ich ja auch
+nicht.«
+
+Jetzt gilt: Namen in der Schrift der Lernsprache werden angelegt, mit
+der Umschrift und der Einordnung als Bedeutung (»Θεσσαλονίκη —
+Thessaloniki, Stadt in Nordgriechenland«). Ausgelassen wird nur, was
+ohnehin lateinisch dasteht.
+
+
 ### Einen ganzen Artikel auf einmal anfordern
 
 Zu merken war: beim Einfügen eines Zeitungsartikels standen unter der

@@ -44,6 +44,11 @@ class Satzurteil:
     stellen: list[dict] = field(default_factory=list)
     woerter_gesamt: int = 0
     woerter_richtig: int = 0
+    # Wort für Wort deckungsgleich mit einer hinterlegten Fassung —
+    # nicht »gut genug«, sondern dasselbe. Daran hängt, ob die
+    # Selbsteinschätzung überhaupt noch eine Frage ist; siehe
+    # `uebung_lernen.pruefen`.
+    wortgleich: bool = False
 
     @property
     def zaehlt_als_richtig(self) -> bool:
@@ -53,7 +58,8 @@ class Satzurteil:
         d = {"urteil": self.urteil, "treffer": self.treffer,
              "hinweis": self.hinweis, "abweichungen": self.abweichungen,
              "stellen": self.stellen, "woerter_gesamt": self.woerter_gesamt,
-             "woerter_richtig": self.woerter_richtig}
+             "woerter_richtig": self.woerter_richtig,
+             "wortgleich": self.wortgleich}
         return d
 
 
@@ -169,7 +175,8 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict) -> Satzurteil:
         if z_woerter == e_woerter:
             return Satzurteil("richtig", treffer=treffer,
                               woerter_gesamt=len(z_woerter),
-                              woerter_richtig=len(z_woerter))
+                              woerter_richtig=len(z_woerter),
+                              wortgleich=True)
 
         if z_ohne == e_ohne:
             # Jedes Wort sitzt, nur die Akzente nicht. Im Griechischen ist

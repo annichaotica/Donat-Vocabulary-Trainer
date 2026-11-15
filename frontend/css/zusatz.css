@@ -634,17 +634,38 @@ input[type="file"] { max-width: 100%; }
 }
 
 
-/* Wort für Wort: Paare, die beim Umbruch zusammenbleiben müssen —
-   ein Wort in der einen und seine Bedeutung in der nächsten Zeile
-   wäre schlimmer als keine Hilfe. */
+/* Wort für Wort — als Interlinearglosse, die Bedeutung ÜBER dem Wort.
+   Jedes Wort ist eine Säule, auch das unbekannte: dessen leere
+   Oberzeile ist die eigentliche Auskunft.
+
+   Ausgeschaltet darf die Säule nichts kosten. Darum ist sie
+   `inline-block` mit `vertical-align: baseline` — so sitzt das Wort
+   auf derselben Linie wie der Text drumherum, und ein Absatz ohne
+   Glosse sieht genauso aus wie vorher. */
 .wfw { margin: .2rem 0 .6rem; }
-.wortfuerwort {
-  display: flex; flex-wrap: wrap; gap: .15rem .9rem;
-  margin-top: .4rem; font-size: .92em; line-height: 1.6;
+.wortsaeule {
+  display: inline-block;
+  vertical-align: baseline;
+  text-align: center;
 }
-.wfw-paar { white-space: nowrap; }
-.wfw-paar b { font-weight: 600; }
-.wfw-paar > span { color: var(--leise, #667); }
+.glosse { display: none; }
+.mit-glosse .glosse {
+  display: block;
+  font-size: .62em;
+  line-height: 1.2;
+  color: var(--leise, #667);
+  /* Die Glosse darf den Satz nicht auseinanderziehen: sie ist Beiwerk,
+     das Wort ist die Hauptsache. Ein eigenes `white-space: nowrap`,
+     damit eine zweiteilige Bedeutung (»in das/dem«) nicht umbricht
+     und die Säule verdoppelt. */
+  white-space: nowrap;
+  padding: 0 .25em;
+}
+/* Mit Glosse braucht jede Zeile Luft für zwei Stockwerke, und die
+   Säulen brauchen Abstand — sonst klebt die Bedeutung des einen Wortes
+   am nächsten und man weiß nicht mehr, wozu sie gehört. */
+.mit-glosse { line-height: 1.35; }
+.mit-glosse .wortsaeule { margin: .45rem .18rem 0; }
 
 
 /* Akzentauswahl beim Gedrückthalten — wie am Betriebssystem.

@@ -125,7 +125,7 @@ function zielkarte(behaelter, z) {
  * auch — ein leeres Feld heißt »ohne Termin«, und das Ziel steht dann
  * nicht mehr unter Zeitdruck.
  */
-function bearbeiten(behaelter, z) {
+async function bearbeiten(behaelter, z) {
   const name = h('input', { type: 'text', value: z.name || '' });
   const termin = h('input', { type: 'date', value: z.termin || '' });
   const ziel = h('select', {},
@@ -133,6 +133,70 @@ function bearbeiten(behaelter, z) {
     h('option', { value: 'einmal_richtig', text: 'einmal gekonnt' }));
   ziel.value = z.ziel || 'reif';
   const aktiv = h('input', { type: 'checkbox', checked: z.aktiv !== 0 });
+
+  /* Der Umfang war bisher nur beim Anlegen einzustellen.
+   *
+   * »Bei den Lernzielen sollte man auch einstellen können, welche Tempi
+   * und welche Abfragen dort erfolgen.« — Das Formular zum Anlegen
+   * konnte das längst, das zum Bearbeiten nicht; wer sich beim Anlegen
+   * vertat oder weiterkam, musste das Ziel wegwerfen und neu anlegen,
+   * und damit den Lernstandsbezug des Blocks verlieren.
+   *
+   * Die Felder hängen an der Sammlung des Ziels: ohne sie gibt es keine
+   * Lektionen und keine Formgruppen zu zeigen. Umgekehrt bleibt ein
+   * Ziel über alle Sammlungen ohne diese Felder — dort wäre jede
+   * Lektionsliste eine Lüge.
+   */
+  const umfang = z.umfang || {};
+  const sammlungId = (umfang.sammlungen || [])[0] || null;
+  const felder = {};
+  const umfangFelder = h('div', {});
+  if (sammlungId) {
+    try {
+      const [lektionen, einstellungen] = await Promise.all([
+        api.lektionen(sammlungId), api.sammlungEinstellungen(sammlungId),
+      ]);
+      const [gruppen, typen] = await Promise.all([
+        api.formgruppen(einstellungen.sprache), stammdaten.aufgabentypen(),
+      ]);
+      felder.lektionen = mehrfachwahl(
+        'Lektionen', lektionen.map((l) => [String(l.id), l.name]),
+        'Nichts gewählt heißt: alle.', umfang.lektionen || []);
+      felder.formgruppen = mehrfachwahl(
+        'Zeiten und Tabellen',
+        Object.values(gruppen.wortarten).flat().map((g) => [g.kennung, g.name]),
+        'Nichts gewählt heißt: alle, die in der Sammlung eingeschaltet sind.',
+        umfang.formgruppen || []);
+      felder.typen = mehrfachwahl(
+        'Abfragearten',
+        Object.entries(typen.typen).map(([k, t]) => [k, t.name]),
+        'Nichts gewählt heißt: alle.', umfang.typen || []);
+      for (const f of Object.values(felder)) {
+        if (f.element) umfangFelder.append(f.element);
+      }
+    } catch (fehler) {
+      umfangFelder.append(h('p', { class: 'leise',
+        text: `Der Umfang ließ sich nicht laden: ${fehler.message}` }));
+    }
+  }
+
+  /** Der Umfang, wie er gespeichert werden soll.
+   *
+   * Die Sammlung wird mitgeschrieben, auch wenn sie hier nicht
+   * änderbar ist — `umfang` wird als Ganzes ersetzt, ein Auslassen
+   * würde sie löschen. */
+  function umfangLesen() {
+    const neu = {};
+    if (umfang.sammlungen) neu.sammlungen = umfang.sammlungen;
+    if (umfang.lexeme) neu.lexeme = umfang.lexeme;
+    if (umfang.wortarten) neu.wortarten = umfang.wortarten;
+    for (const [schluessel, feld] of Object.entries(felder)) {
+      const wahl = feld.gewaehlt();
+      if (!wahl.length) continue;
+      neu[schluessel] = schluessel === 'lektionen' ? wahl.map(Number) : wahl;
+    }
+    return neu;
+  }
 
   const kasten = h('div', { class: 'karte' },
     h('h2', { text: 'Lernziel bearbeiten' }),
@@ -146,6 +210,7 @@ function bearbeiten(behaelter, z) {
     h('label', { class: 'feldname', text: 'Geschafft ist es, wenn …' }), ziel,
     h('label', { class: 'schalter', style: 'margin-top:.6rem' }, aktiv,
       h('span', { class: 'schalter-text' }, h('b', { text: 'Aktiv' }))),
+    umfangFelder,
     h('div', { class: 'frage-werkzeuge', style: 'margin-top:.8rem' },
       h('button', {
         class: 'wichtig',
@@ -158,6 +223,7 @@ function bearbeiten(behaelter, z) {
               termin: termin.value || '',
               ziel: ziel.value,
               aktiv: aktiv.checked,
+              umfang: umfangLesen(),
             });
             meldung('Gespeichert.');
             zeichnen(behaelter);
@@ -331,12 +397,17 @@ function beschriftet(text, feld) {
 
 /** Mehrfachauswahl als Knopfreihe — auf dem Handy brauchbarer als ein
  *  Mehrfach-Auswahlfeld, das man dort kaum bedienen kann. */
-function mehrfachwahl(titel, eintraege, hinweis) {
-  const gewaehlt = new Set();
+function mehrfachwahl(titel, eintraege, hinweis, vorgewaehlt = []) {
+  // `vorgewaehlt` gibt es, seit sich ein Lernziel bearbeiten lässt: beim
+  // Anlegen ist nichts gewählt, beim Bearbeiten muss dastehen, was gilt.
+  // Ohne das sähe ein Ziel mit Umfang beim Öffnen aus wie eines ohne —
+  // und Speichern hätte ihn stillschweigend gelöscht.
+  const gewaehlt = new Set(vorgewaehlt.map(String));
   const reihe = h('div', { class: 'gruppenwahl' });
   for (const [wert, beschriftung] of eintraege) {
     const knopf = h('button', {
       type: 'button',
+      class: gewaehlt.has(String(wert)) ? 'aktiv' : '',
       onclick: () => {
         if (gewaehlt.has(wert)) gewaehlt.delete(wert); else gewaehlt.add(wert);
         knopf.className = gewaehlt.has(wert) ? 'aktiv' : '';

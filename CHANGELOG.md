@@ -16,6 +16,16 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Lernziel bearbeiten: jetzt auch Lektionen, Zeiten und Abfragearten
+
+Zu merken war: »bei den Lernzielen sollte man auch einstellen können,
+welche Tempi und welche Abfragen dort erfolgen«.
+
+Das Formular zum ANLEGEN konnte das längst, das zum Bearbeiten nicht.
+Wer sich vertat oder weiterkam, musste das Ziel wegwerfen und neu
+anlegen. Jetzt stehen die drei Mehrfachwahlen auch dort, mit dem
+vorgewählt, was gerade gilt.
+
 ### Die Leiste bei der Freigabe wurde von den Formzeilen durchkreuzt
 
 Zu merken war: unten über den Knöpfen »Weitere laden« und »Lektion

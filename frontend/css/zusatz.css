@@ -771,3 +771,23 @@ input[type="file"] { max-width: 100%; }
   margin: .2rem 0 .6rem;
 }
 .sortierzeile select { width: auto; }
+
+
+/* Die gewählte Sammlung in der Kopfzeile: Kante unten, Punkt vor dem
+   Namen. Beides zusammen, weil die Kante allein auf einem schmalen
+   Gerät unter der Leiste verschwinden kann und der Punkt allein zu
+   leise ist. */
+.kopf.hat-sammlung {
+  border-bottom: 3px solid var(--sammlungsfarbe);
+}
+.kopf.hat-sammlung #kopf-zusatz::before {
+  content: "";
+  display: inline-block;
+  width: .55rem; height: .55rem;
+  margin-right: .35rem;
+  border-radius: 50%;
+  background: var(--sammlungsfarbe);
+  /* Mittig zur Schrift, nicht auf der Grundlinie. */
+  vertical-align: baseline;
+  position: relative; top: -.03em;
+}

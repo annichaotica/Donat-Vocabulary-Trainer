@@ -485,8 +485,15 @@ def vokabel_lesen(db: sqlite3.Connection, person: dict, lexem_id: int):
                     "geprueft": bool(f["geprueft"]), "quelle": f["quelle"],
                     "gruppe": f["gruppe"]} for f in lexem["formen"]],
         "bedeutungen": [{"id": b["id"], "kontext": b["kontext"],
+                         "erklaerung": b["notiz"],
                          "uebersetzungen": [u["text"] for u in b["uebersetzungen"]]}
                         for b in lexem["bedeutungen"]],
+        # Mit, damit beispiele_setzen nicht blind ersetzt: es tauscht
+        # die Liste als Ganzes aus, und wer sie nicht kennt, wirft weg,
+        # was schon dasteht.
+        "beispiele": [{"satz": b["satz"], "uebersetzung": b["uebersetzung"],
+                       "bedeutung_id": b["bedeutung_id"]}
+                      for b in lexem["beispiele"]],
         "aufgaben_aktiv": len([x for x in lexem["aufgaben"] if x["aktiv"]]),
     }
 
@@ -535,6 +542,31 @@ def formen_ergaenzen(db: sqlite3.Connection, person: dict, lexem_id: int,
 # beurteilen kann —, aber es ist eine Entscheidung und keine Sperre, und
 # der Kommentar hat jahrelang das Gegenteil behauptet. Wer das ändern
 # will: den Parameter streichen, dann stimmt die alte Zusage wieder.
+
+
+def beispiele_setzen(db: sqlite3.Connection, person: dict, lexem_id: int,
+                     beispiele: list):
+    """Beispielsätze zu einem Wort — wie im Wörterbuch."""
+    zugang.lexem_pruefen(db, person["id"], lexem_id, schreiben=True)
+    from modelle import BeispieleSetzen
+    eingabe = BeispieleSetzen(beispiele=beispiele or [])
+    d = _fehler_wandeln(_app().beispiele_setzen, lexem_id, eingabe, None, db)
+    return {**d, "hinweis": "Beispielsätze werden nicht abgefragt und "
+                            "brauchen keine Freigabe — sie stehen beim Wort "
+                            "und helfen beim Verstehen."}
+
+
+def erklaerung_setzen(db: sqlite3.Connection, person: dict, bedeutung_id: int,
+                      erklaerung: str):
+    """Der Erklärsatz zu einer Bedeutung."""
+    lexem_id = dbm.wert(db, "SELECT lexem_id FROM bedeutung WHERE id = ?",
+                        (bedeutung_id,))
+    if lexem_id is None:
+        raise KeyError(f"Bedeutung {bedeutung_id} gibt es nicht")
+    zugang.lexem_pruefen(db, person["id"], lexem_id, schreiben=True)
+    from modelle import ErklaerungSetzen
+    return _fehler_wandeln(_app().erklaerung_setzen, bedeutung_id,
+                           ErklaerungSetzen(erklaerung=erklaerung), None, db)
 
 
 def eintrag_pruefen(db: sqlite3.Connection, person: dict, lexem_id: int):
@@ -1408,6 +1440,52 @@ WERKZEUGE: list[dict] = [
             "required": ["text_id", "fassungen"],
         },
         "funktion": text_uebersetzen,
+    },
+    {
+        "name": "beispiele_setzen",
+        "description": "Beispielsätze zu einem Wort, wie in einem "
+                       "Wörterbuch: ein Satz, der zeigt, wie das Wort "
+                       "benutzt wird, mit Übersetzung. Gehört ein Satz zu "
+                       "einer bestimmten Bedeutung, `bedeutung_id` "
+                       "mitgeben — bei »to go« gehört der Satz mit dem Auto "
+                       "zu »fahren«, nicht zu »gehen«; die Kennungen kommen "
+                       "aus vokabel_lesen.\n\n"
+                       "Die Liste wird als GANZES ersetzt: vorher "
+                       "vokabel_lesen, sonst wirfst du weg, was schon "
+                       "dasteht. Kurze, alltägliche Sätze, die nur Wörter "
+                       "aus dem schon gelernten Umfeld benutzen — ein "
+                       "Beispielsatz, den man selbst nicht lesen kann, "
+                       "erklärt nichts.\n\n"
+                       "Beispielsätze werden nicht abgefragt und brauchen "
+                       "keine Freigabe.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lexem_id": _s("integer", "aus vokabeln_auflisten"),
+                "beispiele": _s("array",
+                                '[{"satz": …, "uebersetzung": …, '
+                                '"bedeutung_id": …}]',
+                                items={"type": "object"})},
+            "required": ["lexem_id", "beispiele"],
+        },
+        "funktion": beispiele_setzen,
+    },
+    {
+        "name": "erklaerung_setzen",
+        "description": "Ein Erklärsatz zu EINER Bedeutung — was sie "
+                       "bedeutet, in eigenen Worten, wie die Zeile im "
+                       "Duden. Nicht zu verwechseln mit `kontext`: der "
+                       "unterscheidet zwei Bedeutungen voneinander (»mit "
+                       "Fahrzeug«), die Erklärung sagt, was die Bedeutung "
+                       "IST. Leerer Text löscht sie.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "bedeutung_id": _s("integer", "aus vokabel_lesen"),
+                "erklaerung": _s("string", "ein bis zwei Sätze")},
+            "required": ["bedeutung_id", "erklaerung"],
+        },
+        "funktion": erklaerung_setzen,
     },
 ]
 

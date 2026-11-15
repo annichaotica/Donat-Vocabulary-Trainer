@@ -16,6 +16,25 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Farbe, Sortieren, Einklappen — und Beispielsätze wie im Wörterbuch
+
+Jede Sammlung hat jetzt eine Farbe. Sie steht als Kante an der Karte
+und in der Kopfzeile, samt Punkt vor dem Namen: man sieht im
+Augenwinkel, in welcher Sprache man gerade steckt. Wer keine wählt,
+bekommt eine zugeteilt — ändern geht in den Einstellungen.
+
+Auf der Übersicht lassen sich die Sammlungen sortieren (Name,
+Fälliges, zuletzt gelernt) und einzeln einklappen. Beides bleibt im
+Browser: eine Ansichtssache gehört zum Gerät, nicht zum Bestand.
+
+Neu sind **Beispielsätze und Erklärungen** — wie im Wörterbuch. Zu
+jeder Bedeutung kann ein Erklärsatz stehen, zu jedem Wort
+Beispielsätze mit Übersetzung, und ein Satz lässt sich der Bedeutung
+zuordnen, zu der er gehört: bei »to go« der Satz mit dem Auto zu
+»fahren«, nicht zu »gehen«. Dein Chatprogramm kann beides schreiben.
+Die Sätze werden nicht abgefragt und brauchen keine Freigabe — ein
+Beispielsatz steht daneben und wird nicht gepaukt.
+
 ### Neu: der Lehrgang, mit Bildern und zum Mitmachen
 
 Die vier Rundgänge waren zu kurz und zu oberflächlich — aber nicht,

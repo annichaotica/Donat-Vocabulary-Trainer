@@ -596,3 +596,24 @@ class ReferenzSetzen(BaseModel):
     Arbeit nicht überschreiben.
     """
     fassungen: dict[int, str]
+
+
+class Beispielsatz(BaseModel):
+    """Ein Satz, der zeigt, wie das Wort benutzt wird."""
+    satz: str = Field(min_length=1, max_length=400)
+    uebersetzung: str | None = Field(default=None, max_length=400)
+    # Wozu er gehört. Bei »to go« heißt das: der Satz mit dem Auto
+    # gehört zu »fahren«, nicht zu »gehen«. Ohne die Zuordnung stünden
+    # beide beieinander und erklärten nichts.
+    bedeutung_id: int | None = None
+    quelle: str = "ki"
+
+
+class BeispieleSetzen(BaseModel):
+    """Die Beispielsätze eines Wortes, als Ganzes."""
+    beispiele: list[Beispielsatz] = []
+
+
+class ErklaerungSetzen(BaseModel):
+    """Der Erklärsatz zu einer Bedeutung. Leer löscht ihn."""
+    erklaerung: str = Field(default="", max_length=600)

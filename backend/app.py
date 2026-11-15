@@ -52,7 +52,8 @@ from modelle import (RegelEingabe, RegelAendern,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
-                     BuchstandSetzen, FassungSichern, ReferenzSetzen,
+                     BeispieleSetzen, BuchstandSetzen, ErklaerungSetzen,
+                     FassungSichern, ReferenzSetzen,
                      ImportEingabe, LehrgangSetzen, LernwahlSetzen,
                      LesetextAnlegen, WortMerken,
                      LernzielAendern, LernzielAnlegen,
@@ -1596,6 +1597,55 @@ def lexem_aendern(lexem_id: int, eingabe: LexemAendern, db: sqlite3.Connection =
                    (*werte, lexem_id))
         aufgaben.erzeugen(db, lexem_id)
     return _lexem_ausbauen(db, _holen(db, "lexem", lexem_id), mit_aufgaben=True)
+
+
+@app.put("/api/lexeme/{lexem_id}/beispiele")
+def beispiele_setzen(lexem_id: int, eingabe: BeispieleSetzen,
+                     request: Request = None, db: sqlite3.Connection = DB):
+    """Beispielsätze zu einem Wort — wie im Wörterbuch.
+
+    Als GANZES ersetzt, nicht einzeln angehängt. Ein Werkzeug, das nur
+    anfügt, sammelt bei jedem Lauf der KI dieselben Sätze noch einmal;
+    wer ersetzt, muss vorher lesen und sieht dabei, was schon da ist.
+
+    Die Sätze sind Lesestoff, keine Aufgaben: sie erzeugen nichts und
+    werden nicht abgefragt. Darum brauchen sie auch keine Freigabe —
+    ein falscher Beispielsatz steht daneben und wird nicht gepaukt.
+    """
+    _wache_rumpf(db, request, lexem_id=lexem_id)
+    _holen(db, "lexem", lexem_id)
+    eigene = {z["id"] for z in dbm.zeilen(db, """
+        SELECT id FROM bedeutung WHERE lexem_id = ?""", (lexem_id,))}
+    db.execute("DELETE FROM beispiel WHERE lexem_id = ?", (lexem_id,))
+    for b in eingabe.beispiele:
+        if b.bedeutung_id is not None and b.bedeutung_id not in eigene:
+            raise HTTPException(
+                400, f"Bedeutung {b.bedeutung_id} gehört nicht zu diesem Wort.")
+        db.execute("""INSERT INTO beispiel (lexem_id, bedeutung_id, satz,
+                                            uebersetzung, quelle)
+                      VALUES (?, ?, ?, ?, ?)""",
+                   (lexem_id, b.bedeutung_id, b.satz, b.uebersetzung,
+                    b.quelle))
+    return {"lexem_id": lexem_id, "beispiele": len(eingabe.beispiele)}
+
+
+@app.put("/api/bedeutungen/{bedeutung_id}/erklaerung")
+def erklaerung_setzen(bedeutung_id: int, eingabe: ErklaerungSetzen,
+                      request: Request = None, db: sqlite3.Connection = DB):
+    """Der Erklärsatz zu einer Bedeutung — die Duden-Zeile.
+
+    Nicht zu verwechseln mit `kontext`: der unterscheidet zwei
+    Bedeutungen voneinander (»mit Fahrzeug«), die Erklärung sagt, was
+    die Bedeutung ist. Beides nebeneinander, weil beides gebraucht
+    wird.
+    """
+    _wache_rumpf(db, request, bedeutung_id=bedeutung_id)
+    if dbm.zeile(db, "SELECT 1 FROM bedeutung WHERE id = ?",
+                 (bedeutung_id,)) is None:
+        raise HTTPException(404, f"Bedeutung {bedeutung_id} gibt es nicht")
+    db.execute("UPDATE bedeutung SET notiz = ? WHERE id = ?",
+               (eingabe.erklaerung or None, bedeutung_id))
+    return {"bedeutung_id": bedeutung_id, "erklaerung": eingabe.erklaerung}
 
 
 @app.delete("/api/lexeme/{lexem_id}", status_code=204)

@@ -71,14 +71,26 @@ async function kopfzeile() {
   knopf.title = `${person.name} — Profil wechseln`;
 
   let zusatz = '';
+  let farbe = '';
   if (zustand.sammlungId) {
     try {
       const alle = await api.sammlungen(zustand.benutzerId);
       const s = alle.find((x) => x.id === zustand.sammlungId);
-      if (s) zusatz = s.name; else merken({ sammlungId: null });
+      if (s) { zusatz = s.name; farbe = s.farbe_wirksam || ''; }
+      else merken({ sammlungId: null });
     } catch { /* nichts */ }
   }
   document.getElementById('kopf-zusatz').textContent = zusatz;
+  // Die gewählte Sammlung nicht nur benennen, sondern zeigen: die
+  // Kopfzeile bekommt ihre Farbe als Kante, und vor dem Namen steht
+  // ein Punkt. Ein Name allein liest man nicht mehr, wenn er immer
+  // dasteht — eine Farbe sieht man auch im Augenwinkel.
+  // Nicht `kopf` nennen: so heißt in dieser Funktion schon etwas
+  // anderes, und ein `const` desselben Namens legt die Zeile darüber
+  // lahm, noch bevor es zugewiesen wird.
+  const kopfleiste = document.getElementById('kopf');
+  kopfleiste.style.setProperty('--sammlungsfarbe', farbe || 'transparent');
+  kopfleiste.classList.toggle('hat-sammlung', Boolean(farbe));
 
   // Auf dem schmalen Gerät deckt die untere Leiste den Programmnamen ab —
   // dort ist der Name der Ansicht nützlicher.

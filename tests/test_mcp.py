@@ -499,6 +499,7 @@ def test_kein_werkzeugtext_nennt_ein_werkzeug_das_es_nicht_gibt():
     erlaubt = {"lektion_nr", "sammlung_id", "lexem_id", "form_id", "text_id",
                "benutzer_id", "abschnitt_id", "wunsch_id", "aufgabe_id",
                "als_geprueft", "nur_pruefen", "ist_grundform", "genus_verbi",
+               "bedeutung_id",
                "ist_variante", "bewertung_art", "grund_sprache",
                "ungeprueft_abfragen", "ab_lektion", "bis_lektion",
                "textaufgabe_id", "formgruppe_lektion", "zielsprache_text",

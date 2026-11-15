@@ -106,11 +106,22 @@ export const api = {
   lexemLoeschen: (id) => ruf(`/lexeme/${id}`, { methode: 'DELETE' }),
   formAnlegen: (lexemId, daten) => ruf(`/lexeme/${lexemId}/formen`, { methode: 'POST', daten }),
   formAendern: (id, daten) => ruf(`/formen/${id}`, { methode: 'PATCH', daten }),
+  // Teiländerung: was nicht genannt ist, bleibt stehen. Ändert sich
+  // Text oder Merkmalsbündel, fällt die Form von selbst auf »ungeprüft«
+  // zurück — was geändert wurde, ist nicht mehr das, was jemand
+  // freigegeben hat.
+  formTeilAendern: (id, daten) => ruf(`/formen/${id}/teil`, { methode: 'PATCH', daten }),
   formBestaetigen: (id) => ruf(`/formen/${id}/bestaetigen`, { methode: 'POST' }),
   formLoeschen: (id) => ruf(`/formen/${id}`, { methode: 'DELETE' }),
   bedeutungAnlegen: (lexemId, daten) =>
     ruf(`/lexeme/${lexemId}/bedeutungen`, { methode: 'POST', daten }),
   bedeutungLoeschen: (id) => ruf(`/bedeutungen/${id}`, { methode: 'DELETE' }),
+  erklaerungSetzen: (id, erklaerung) =>
+    ruf(`/bedeutungen/${id}/erklaerung`, { methode: 'PUT', daten: { erklaerung } }),
+  uebersetzungAnlegen: (bedeutungId, daten) =>
+    ruf(`/bedeutungen/${bedeutungId}/uebersetzungen`, { methode: 'POST', daten }),
+  uebersetzungLoeschen: (id) =>
+    ruf(`/uebersetzungen/${id}`, { methode: 'DELETE' }),
 
   // Merkmalsbündel-Dateien (das Format, das die KI liefert)
   vokabelnImportieren: (sammlungId, daten) =>

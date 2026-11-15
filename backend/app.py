@@ -359,6 +359,9 @@ def formgruppen_liste(code: str):
         "standard": sprachen.formgruppen_standard(code),
         "stammformen": p.get("stammformen", []),
         "lexemmerkmale": p.get("lexemmerkmale", {}),
+        # Wie die Abfrage danach fragt. Dient zugleich als Beschriftung
+        # beim Berichtigen: »Ablautreihe« statt »klasse«.
+        "lexemmerkmale_fragen": p.get("lexemmerkmale_fragen", {}),
     }
 
 

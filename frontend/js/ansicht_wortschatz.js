@@ -127,16 +127,22 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
            location.hash = '#/wortschatz'; }
   };
 
-  el.append(h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap' },
+  el.append(h('div', { class: 'wortkopf',
+                       style: 'display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap' },
     h('div', {},
       h('h1', { style: 'margin:0', lang: lexem.sprache, text: lexem.lemma }),
       h('p', { class: 'leise', style: 'margin:.2rem 0 0',
                text: [lexem.wortart_name, sprache.name,
                       ...Object.entries(lexem.merkmale || {}).map(([d, w]) => `${d}: ${w}`)]
                      .filter(Boolean).join(' · ') })),
-    sprache.stimme
-      ? h('button', { onclick: () => sprechen(lexem.lemma, sprache.stimme) }, '🔊 Hören')
-      : null));
+    h('div', { style: 'display:flex;gap:.4rem' },
+      h('button', {
+        onclick: () => kopfBearbeiten(behaelter, lexem),
+      }, 'Bearbeiten'),
+      sprache.stimme
+        ? h('button', { onclick: () => sprechen(lexem.lemma, sprache.stimme) },
+            '🔊 Hören')
+        : null)));
 
   // Wo man in der Durchsicht steht, und wie man weiterkommt.
   if (stelle >= 0 && reihe.length > 1) {
@@ -168,14 +174,27 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
           h('p', { class: 'leise', style: 'margin:.2rem 0 0',
                    text: `${b.uebersetzungen.length} gültige Übersetzung`
                        + (b.uebersetzungen.length === 1 ? '' : 'en') })),
-        h('button', {
-          class: 'schlicht gefahr',
-          onclick: () => tun(async () => {
-              if (!confirm('Diese Bedeutung löschen?')) return;
-              await api.bedeutungLoeschen(b.id);
-              zeichnenEinzeln(behaelter, lexemId);
-          }),
-        }, 'Löschen'))));
+        h('div', { style: 'white-space:nowrap' },
+          h('button', {
+            class: 'schlicht',
+            onclick: (e) => {
+              const karte = e.target.closest('.karte');
+              if (karte.nextElementSibling?.classList.contains('bedeutungbearbeiten')) {
+                return;
+              }
+              const kasten = bedeutungBearbeiten(behaelter, lexem, b);
+              kasten.classList.add('bedeutungbearbeiten');
+              karte.insertAdjacentElement('afterend', kasten);
+            },
+          }, 'Ändern'),
+          h('button', {
+            class: 'schlicht gefahr',
+            onclick: () => tun(async () => {
+                if (!confirm('Diese Bedeutung löschen?')) return;
+                await api.bedeutungLoeschen(b.id);
+                zeichnenEinzeln(behaelter, lexemId);
+            }),
+          }, 'Löschen')))));
   }
   el.append(teilNeueBedeutung(behaelter, lexem));
 
@@ -199,6 +218,12 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
           h('span', { class: 'marke' + (f.geprueft ? '' : ' warnung'),
                       text: f.geprueft ? f.quelle : f.quelle + ', ungeprüft' })),
         h('td', { style: 'white-space:nowrap' },
+          h('button', {
+            class: 'schlicht',
+            title: 'Schreibung oder Bestimmung berichtigen',
+            onclick: (e) => formBearbeiten(behaelter, lexem, f,
+                                           e.target.closest('tr')),
+          }, 'Ändern'),
           f.geprueft ? null : h('button', {
             class: 'schlicht',
             title: 'Als geprüft markieren — erst dann wird sie abgefragt',
@@ -420,6 +445,226 @@ async function zellenHolen(sprache, wortart, kennung) {
   zellenHalde[schluessel] = zellen;
   return zellen.map((z) => ({ ...z }));
 }
+
+/* ------------------------------------------------------- Berichtigen
+ *
+ * »Wir müssen die Datensätze natürlich auch mal überarbeiten können.
+ * Dafür fehlt ein Knopf!«
+ *
+ * Es gab Löschen und Bestätigen, aber kein Ändern. Ein Tippfehler in
+ * einer Form war damit nur zu beheben, indem man sie löscht und neu
+ * anlegt — und dabei ist der Lernstand weg, denn er hängt an der Form.
+ * Bei einem Bestand, den zum großen Teil eine KI gefüllt hat, ist das
+ * die falsche Richtung: berichtigen wird häufiger gebraucht als
+ * wegwerfen.
+ *
+ * Die Schnittstelle konnte das längst. Es fehlte nur der Knopf.
+ */
+
+/** Alle Zellen einer Wortart, quer durch die Formgruppen.
+ *
+ * Für die Berichtigung einer BESTIMMUNG: »zwei Genitiv Singular« ist
+ * nicht unbedingt ein Tippfehler, sondern meist eine falsch
+ * eingeordnete Form, und die gehört umgehängt statt gelöscht.
+ */
+async function zellenDerWortart(sprache, wortart) {
+  const gruppen = await stammdaten.formgruppen(sprache);
+  const liste = [];
+  for (const g of (gruppen.wortarten[wortart] || [])) {
+    for (const z of await zellenHolen(sprache, wortart, g.kennung)) {
+      liste.push({ ...z, gruppe: g.name });
+    }
+  }
+  return liste;
+}
+
+
+/** Eine Formzeile zum Bearbeiten aufklappen — an Ort und Stelle.
+ *
+ * Nicht als eigene Seite und nicht als Fenster darüber: man berichtigt
+ * eine Form, weil man die daneben gerade gesehen hat. Nimmt man ihr den
+ * Zusammenhang weg, muss man ihn sich merken.
+ */
+async function formBearbeiten(behaelter, lexem, f, zeile) {
+  if (!zeile || zeile.dataset.offen) return;
+  zeile.dataset.offen = '1';
+  const feld = h('input', { type: 'text', lang: lexem.sprache, value: f.text,
+                            style: 'width:100%' });
+  const wahl = h('select', { style: 'width:100%' },
+    h('option', { value: '', text: f.beschriftung + ' (unverändert)' }));
+  const bearbeiten = h('tr', { class: 'formbearbeiten' },
+    h('td', { colspan: '4' },
+      h('div', { class: 'feldzeile' },
+        h('label', { class: 'leise', text: 'Schreibung' }), feld),
+      h('div', { class: 'feldzeile' },
+        h('label', { class: 'leise', text: 'Was ist das?' }), wahl),
+      h('p', { class: 'leise', style: 'margin:.4rem 0 .6rem' },
+        'Beides setzt die Form auf ',
+        h('b', { text: 'ungeprüft' }),
+        ' zurück — was geändert wurde, ist nicht mehr das, was jemand '
+        + 'freigegeben hat. Eine berichtigte ',
+        h('b', { text: 'Schreibung' }),
+        ' behält den Lernstand. Eine andere ',
+        h('b', { text: 'Bestimmung' }),
+        ' nicht: der Lernstand hängt an der Zelle, nicht an der Form. '
+        + 'Die Zelle, in die du sie hängst, fängt von vorn an — und die '
+        + 'alte bleibt stehen, falls du es zurücknimmst.'),
+      h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+        h('button', { class: 'wichtig', onclick: () => sichern() }, 'Speichern'),
+        h('button', { class: 'schlicht', onclick: () => schliessen() },
+          'Abbrechen'))));
+  zeile.insertAdjacentElement('afterend', bearbeiten);
+  feld.focus();
+  feld.select();
+
+  const schliessen = () => { delete zeile.dataset.offen; bearbeiten.remove(); };
+
+  // Die Bestimmungen kommen nach: sie brauchen mehrere Abrufe, und das
+  // Textfeld soll nicht darauf warten — der Tippfehler ist der häufigere
+  // Fall und steht sofort bereit.
+  for (const z of await zellenDerWortart(lexem.sprache, lexem.wortart)) {
+    // Gruppenname nur davor, wenn er etwas HINZUFÜGT. Bei einer
+    // einzelligen Gruppe heißt die Zelle wie die Gruppe, und
+    // »Nominativ Singular · Nominativ Singular« ist keine Auskunft,
+    // sondern ein Echo.
+    const name = z.beschriftung.includes(z.gruppe) || z.gruppe === z.beschriftung
+      ? z.beschriftung : `${z.gruppe} · ${z.beschriftung}`;
+    wahl.append(h('option', { value: JSON.stringify(z.merkmale), text: name }));
+  }
+
+  const sichern = () => tun(async () => {
+    const daten = {};
+    const text = feld.value.trim();
+    if (!text) { meldung('Ohne Schreibung geht es nicht.'); return; }
+    if (text !== f.text) daten.text = text;
+    if (wahl.value) daten.merkmale = JSON.parse(wahl.value);
+    if (!Object.keys(daten).length) { schliessen(); return; }
+    await api.formTeilAendern(f.id, daten);
+    zeichnenEinzeln(behaelter, lexem.id);
+  });
+}
+
+
+/** Lemma und Lexemmerkmale berichtigen.
+ *
+ * Die Ablautreihe steht hier und nicht an einer Form — sie beschreibt
+ * das Wort. Falsch eingetragen macht sie die ganze Klassenabfrage
+ * falsch, und zwar unbemerkt: die Frage sieht richtig aus.
+ */
+async function kopfBearbeiten(behaelter, lexem) {
+  const gruppen = await stammdaten.formgruppen(lexem.sprache);
+  const moeglich = (gruppen.lexemmerkmale || {})[lexem.wortart] || {};
+  const fragen = (gruppen.lexemmerkmale_fragen || {})[lexem.wortart] || {};
+  // »genus« und »klasse« sind die Namen im Datenbestand, nicht die der
+  // Sache. Die Sprache sagt in ihrer Frage, wie sie heißt — »Welche
+  // Ablautreihe?« wird hier zu »Ablautreihe«.
+  const benennen = (name) => {
+    const frage = fragen[name];
+    if (frage) return frage.replace(/^Welche[rs]?\s+/, '').replace(/\?$/, '');
+    return { genus: 'Geschlecht', klasse: 'Klasse' }[name]
+           || name[0].toUpperCase() + name.slice(1);
+  };
+  const lemma = h('input', { type: 'text', lang: lexem.sprache,
+                             value: lexem.lemma, style: 'width:100%' });
+  const kasten = h('div', { class: 'karte' },
+    h('div', { class: 'feldzeile' },
+      h('label', { class: 'leise', text: 'Lemma' }), lemma));
+
+  const felder = {};
+  for (const [name, werte] of Object.entries(moeglich)) {
+    const wahl = h('select', { style: 'width:100%' },
+      h('option', { value: '', text: '— nichts eingetragen —' }),
+      werte.map((w) => h('option', { value: w, text: w })));
+    wahl.value = (lexem.merkmale || {})[name] || '';
+    felder[name] = wahl;
+    kasten.append(h('div', { class: 'feldzeile' },
+      h('label', { class: 'leise', text: benennen(name) }), wahl));
+  }
+  if (!Object.keys(moeglich).length) {
+    kasten.append(h('p', { class: 'leise',
+      text: `Für ${lexem.wortart_name} sind in dieser Sprache keine `
+          + 'Lexemmerkmale vorgesehen.' }));
+  }
+
+  kasten.append(h('div', { class: 'frage-werkzeuge',
+                           style: 'justify-content:flex-start' },
+    h('button', {
+      class: 'wichtig',
+      onclick: () => tun(async () => {
+        const merkmale = {};
+        for (const [name, wahl] of Object.entries(felder)) {
+          if (wahl.value) merkmale[name] = wahl.value;
+        }
+        await api.lexemAendern(lexem.id,
+                               { lemma: lemma.value.trim() || lexem.lemma,
+                                 merkmale });
+        zeichnenEinzeln(behaelter, lexem.id);
+      }),
+    }, 'Speichern'),
+    h('button', { class: 'schlicht', onclick: () => kasten.remove() },
+      'Abbrechen')));
+
+  const kopf = behaelter.querySelector('.wortkopf');
+  if (!kopf || kopf.nextElementSibling?.classList.contains('kopfbearbeiten')) return;
+  kasten.classList.add('kopfbearbeiten');
+  kopf.insertAdjacentElement('afterend', kasten);
+  lemma.focus();
+}
+
+
+/** Übersetzungen und Erklärsatz einer Bedeutung. */
+function bedeutungBearbeiten(behaelter, lexem, b) {
+  const kasten = h('div', { class: 'karte' });
+  const liste = h('div', {});
+  for (const u of b.uebersetzungen) {
+    liste.append(h('div', { class: 'feldzeile' },
+      h('span', {}, u.text,
+        u.ist_haupt ? h('span', { class: 'marke', text: 'Haupt' }) : null),
+      h('button', {
+        class: 'schlicht gefahr',
+        // Die letzte Übersetzung darf nicht weg: ohne sie gibt es keine
+        // Abfrage mehr, und die Bedeutung stünde leer da.
+        disabled: b.uebersetzungen.length < 2,
+        title: b.uebersetzungen.length < 2
+          ? 'Die letzte Übersetzung kann nicht weg — dann lieber die ganze '
+            + 'Bedeutung löschen.' : '',
+        onclick: () => tun(async () => {
+          await api.uebersetzungLoeschen(u.id);
+          zeichnenEinzeln(behaelter, lexem.id);
+        }),
+      }, 'Entfernen')));
+  }
+  const neuFeld = h('input', { type: 'text', style: 'width:100%',
+                               placeholder: 'weitere Übersetzung' });
+  const erklaerung = h('textarea', { rows: '2', style: 'width:100%',
+                                     placeholder: 'Erklärsatz wie im Duden' });
+  erklaerung.value = b.erklaerung || b.notiz || '';
+
+  kasten.append(
+    h('p', { class: 'leise', style: 'margin:0 0 .4rem', text: 'Übersetzungen' }),
+    liste,
+    h('div', { class: 'feldzeile' },
+      h('label', { class: 'leise', text: 'Hinzufügen' }), neuFeld),
+    h('div', { class: 'feldzeile' },
+      h('label', { class: 'leise', text: 'Erklärung' }), erklaerung),
+    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+      h('button', {
+        class: 'wichtig',
+        onclick: () => tun(async () => {
+          const text = neuFeld.value.trim();
+          if (text) {
+            await api.uebersetzungAnlegen(b.id, { text, quelle: 'manuell',
+                                                  geprueft: true });
+          }
+          await api.erklaerungSetzen(b.id, erklaerung.value.trim());
+          zeichnenEinzeln(behaelter, lexem.id);
+        }),
+      }, 'Speichern'),
+      h('button', { class: 'schlicht', onclick: () => kasten.remove() },
+        'Abbrechen')));
+  return kasten;
+}
+
 
 /* ---------------------------------------------------------- Neues Wort */
 

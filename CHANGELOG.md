@@ -16,6 +16,41 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Ein Knopf zum Berichtigen
+
+»Wir müssen die Datensätze natürlich auch mal überarbeiten können.
+Dafür fehlt ein Knopf!«
+
+Es gab **Löschen** und **Bestätigen**, aber kein **Ändern**. Ein
+Tippfehler in einer Form war nur zu beheben, indem man sie löscht und
+neu anlegt — und dabei war der Lernstand weg. Bei einem Bestand, den
+zum großen Teil die KI gefüllt hat, ist das die falsche Richtung:
+berichtigen wird häufiger gebraucht als wegwerfen.
+
+Drei Stellen haben jetzt einen:
+
+- **Oben beim Wort** — Lemma und die Merkmale, die am Wort hängen.
+  Beschriftet mit ihrem richtigen Namen: »Ablautreihe«,
+  »Deklinationsklasse«, »Geschlecht« statt `klasse` und `genus`.
+- **Bei jeder Bedeutung** — Übersetzungen ergänzen und entfernen, dazu
+  der Erklärsatz. Die letzte Übersetzung lässt sich nicht entfernen:
+  ohne sie gäbe es keine Abfrage mehr.
+- **Bei jeder Form** — Schreibung und Bestimmung, aufklappend in der
+  Zeile selbst. Eine falsch eingeordnete Form (»zweimal Genitiv
+  Singular«) gehört umgehängt, nicht gelöscht.
+
+Was dabei mit dem Lernstand passiert, steht jetzt auch dort, weil es
+zwei verschiedene Dinge sind: eine berichtigte **Schreibung** behält
+ihn — der Aufgabenschlüssel nennt das Merkmalsbündel, nicht die Form.
+Eine andere **Bestimmung** nicht: der Lernstand gehört der Zelle. Was
+man unter »du schreibst« gelernt hat, hat man nicht unter »er
+schreibt« gelernt, und war die Zuordnung falsch, war auch das Gelernte
+falsch. Die alte Zelle bleibt dabei stehen, falls man es zurücknimmt.
+
+Beides setzt die Form auf **ungeprüft** zurück. Was geändert wurde,
+ist nicht mehr das, was jemand freigegeben hat.
+
+
 ### Zwei neue Abfragen: Stammformen und Klasse bestimmen
 
 »Kann man auch Grammatik für Mittelhochdeutsch abfragen? Keine

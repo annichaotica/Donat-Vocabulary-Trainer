@@ -34,7 +34,7 @@ ALLER = {
 
 
 def _aufbau(klient, sprache="fr", name="Französisch 1"):
-    b = klient.post("/api/benutzer", json={"name": "Annuschka"}).json()
+    b = klient.post("/api/benutzer", json={"name": "Lernender 1"}).json()
     s = klient.post("/api/sammlungen", json={
         "besitzer_id": b["id"], "name": name, "sprache": sprache}).json()
     return b, s

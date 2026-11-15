@@ -85,8 +85,8 @@ CREATE TABLE IF NOT EXISTS freigabe (
 --
 -- Das waren bisher dieselbe Sache, und das war falsch: eine Freigabe
 -- heißt »du darfst hineinsehen und mitpflegen«, nicht »das lernst du«.
--- Wer Lernende 2s Französisch berichtigt, bekam es in der allgemeinen
--- Abfrage zwischen die griechischen Wörter gemischt.
+-- Wer ein fremdes Französisch berichtigt, bekam es in der
+-- allgemeinen Abfrage zwischen die griechischen Wörter gemischt.
 --
 -- Hier stehen nur die ABWEICHUNGEN von der Vorgabe. Die Vorgabe
 -- ergibt sich aus dem Besitz: die eigenen Sammlungen lernt man, die
@@ -549,8 +549,8 @@ CREATE INDEX IF NOT EXISTS idx_lernziel_benutzer ON lernziel(benutzer_id, aktiv)
 -- Die Regeln hängen an der SAMMLUNG, nicht an der Sprache. Grammatik
 -- ist zwar eine Eigenschaft der Sprache, aber die Sammlung ist überall
 -- sonst die Einheit für Besitz, Freigabe und Zugriff; an der Sprache
--- hängend bräuchte es eine eigene Rechteregel, und Lernende 2s französische
--- Erklärungen gingen Max etwas an. Der Preis ist, dass zwei Sammlungen
+-- hängend bräuchte es eine eigene Rechteregel, und die französischen
+-- Erklärungen des einen gingen den anderen etwas an. Der Preis ist, dass zwei Sammlungen
 -- derselben Sprache ihre Regeln doppelt pflegen.
 --
 -- `geprueft` wie überall: was ein Agent einträgt, wird nicht gezeigt,

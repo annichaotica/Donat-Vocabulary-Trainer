@@ -200,7 +200,7 @@ export async function zeichnen(behaelter) {
         h('span', { class: 'marke', text: sprache ? sprache.name : s.sprache })),
       h('p', { class: 'leise', style: 'margin:.2rem 0 0',
                text: `${s.lexeme ?? 0} Wörter${s.eigen ? '' : ' · freigegeben'}` }),
-      // Freigegeben heißt nicht gelernt. Wer Lernende 2s Französisch
+      // Freigegeben heißt nicht gelernt. Wer ein fremdes Französisch
       // mitpflegt, bekam es bisher in der allgemeinen Abfrage zwischen
       // die griechischen Wörter gemischt, ohne eine Stelle, wo sich
       // das abstellen ließ. Der Schalter gehört hierher, zur Karte:

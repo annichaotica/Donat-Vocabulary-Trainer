@@ -9,8 +9,8 @@ sie.
 
 
 def _aufbau(klient):
-    mutter = klient.post("/api/benutzer", json={"name": "Annuschka"}).json()
-    kind = klient.post("/api/benutzer", json={"name": "Lernende 2"}).json()
+    mutter = klient.post("/api/benutzer", json={"name": "Lernender 1"}).json()
+    kind = klient.post("/api/benutzer", json={"name": "Lernender 2"}).json()
     s = klient.post("/api/sammlungen", json={
         "besitzer_id": mutter["id"], "name": "Französisch",
         "sprache": "fr"}).json()
@@ -36,9 +36,9 @@ def test_mitlernen_freigeben(klient):
     mutter, kind, s = _aufbau(klient)
     z = klient.put(f"/api/sammlungen/{s['id']}/zugriff", json={
         "benutzer_id": kind["id"], "recht": "lesen"}).json()
-    assert z["besitzer"]["name"] == "Annuschka"
+    assert z["besitzer"]["name"] == "Lernender 1"
     assert [(m["name"], m["recht"]) for m in z["mitlernende"]] \
-        == [("Lernende 2", "lesen")]
+        == [("Lernender 2", "lesen")]
 
     meine = sammlungen(klient, kind["id"])
     assert [x["name"] for x in meine] == ["Französisch"]
@@ -71,14 +71,14 @@ def test_der_lernstand_ist_je_person_eigen(klient):
 
 
 def test_besitz_uebertragen(klient):
-    """»Das Französisch an Lernende 2 übertragen« — und trotzdem weiter
+    """»Das Französisch an Lernender 2 übertragen« — und trotzdem weiter
     pflegen können."""
     mutter, kind, s = _aufbau(klient)
     z = klient.post(f"/api/sammlungen/{s['id']}/besitz", json={
         "benutzer_id": kind["id"], "bisherige_behaelt_zugriff": True}).json()
-    assert z["besitzer"]["name"] == "Lernende 2"
+    assert z["besitzer"]["name"] == "Lernender 2"
     assert [(m["name"], m["recht"]) for m in z["mitlernende"]] \
-        == [("Annuschka", "schreiben")]
+        == [("Lernender 1", "schreiben")]
     # Beide sehen sie weiterhin, mit vertauschten Rollen.
     assert sammlungen(klient, kind["id"])[0]["eigen"] == 1
     assert sammlungen(klient, mutter["id"])[0]["eigen"] == 0

@@ -171,9 +171,9 @@ def sichtbare_sammlungen(db: sqlite3.Connection, benutzer_id: int) -> list[int]:
 def lernsammlungen(db: sqlite3.Connection, benutzer_id: int) -> list[int]:
     """Woraus wird abgefragt, wenn keine Sammlung gewählt ist?
 
-    »Wenn ich schon die Sammlungen von Max und Katharina sehe, würde ich
-    gerne einstellen können, dass ich diese nicht aktiv lerne.« — Sie
-    hatte recht: die Freigabe auf Lernende 2s Französisch trägt das Recht
+    »Wenn ich schon die Sammlungen der anderen sehe, würde ich gerne
+    einstellen können, dass ich diese nicht aktiv lerne.« — Das traf
+    zu: die Freigabe auf das fremde Französisch trug das Recht
     `schreiben`, also zum Mitpflegen, und trotzdem lagen die 36
     französischen Wörter im allgemeinen Lernen zwischen den
     griechischen.

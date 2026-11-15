@@ -656,8 +656,8 @@ def zugriff_setzen(sammlung_id: int, eingabe: ZugriffSetzen,
     Zugriff heißt NICHT, dass die Sammlung mitgelernt wird — das sagt
     die Lernwahl (`PUT …/lernwahl`), und die steht voreingestellt auf
     »nein« für fremde Sammlungen. Hier stand einmal »lesen
-    (mitlernen)«, und genau daran lag es, dass Lernende 2s Französisch
-    zwischen den griechischen Wörtern auftauchte.
+    (mitlernen)«, und genau daran lag es, dass ein fremdes
+    Französisch zwischen den griechischen Wörtern auftauchte.
     """
     _wache_rumpf(db, request, sammlung_id=sammlung_id)
     s = _holen(db, "sammlung", sammlung_id)

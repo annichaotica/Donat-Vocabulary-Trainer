@@ -125,6 +125,13 @@ input.falsch, select.falsch {
   bottom: 0;
   padding: .7rem 0;
   background: linear-gradient(to top, var(--grund) 60%, transparent);
+  /* Die klebende erste Tabellenspalte (`table.paradigma td.form`) hat
+     z-index 1, damit das Wort beim seitlichen Rollen stehen bleibt.
+     Ohne eigene Angabe lag diese Leiste darunter, und die Formzeilen
+     malten mitten durch die Knöpfe. 10 nach der Staffel im Hauptblatt:
+     60 Sprungmarke, 50 Meldung, 40 Leiste am Telefon, 20 Kopfzeile —
+     die Leiste gehört über die Tabelle und unter die Kopfzeile. */
+  z-index: 10;
 }
 .freigabe-leiste button { flex: 1 1 10rem; }
 

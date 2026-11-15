@@ -16,6 +16,17 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Die Leiste bei der Freigabe wurde von den Formzeilen durchkreuzt
+
+Zu merken war: unten über den Knöpfen »Weitere laden« und »Lektion
+freigeben« lagen Teile der Formtabelle, der linke Knopf war halb
+verdeckt.
+
+Die erste Tabellenspalte klebt beim seitlichen Rollen (damit das Wort
+stehen bleibt) und hat dafür eine Lage über dem Fluss. Die Leiste hatte
+gar keine Angabe und lag damit darunter. Sie liegt jetzt dazwischen:
+über der Tabelle, unter der Kopfzeile.
+
 ### Die Abfrage war kaputt — behoben
 
 Zu merken war: die Frage erschien kurz und wurde dann überblendet,

@@ -60,6 +60,31 @@ TYPEN: dict[str, dict] = {
                         "Zeit, alle Fälle eines Hauptworts.",
         "beispiel": "ich gehe, du gehst, er/sie/es geht …",
     },
+    # Die Stammformen sind KEINE Formgruppe, sondern eine Auswahl aus
+    # mehreren: je eine Form aus Infinitiv, Präteritum und Partizip. Als
+    # Reihe abfragbar waren sie darum bisher nicht — jede dieser Gruppen
+    # hat nur eine Zelle, und "eine Zelle ist keine Reihe". Dabei ist
+    # gerade das die Reihe, die man auswendig lernt: aus ihr leitet sich
+    # das ganze Paradigma ab, und im Mittelhochdeutschen hängt daran die
+    # Ablautreihe.
+    "stammformen": {
+        "name": "Stammformen",
+        "eingabeart": "reihe",
+        "beschreibung": "Die Formen, aus denen sich alle anderen ableiten — "
+                        "auf einmal.",
+        "beispiel": "nëmen – nam – nâmen – genomen",
+    },
+    # Was für ein Wort ist das? Das Geschlecht hat dafür seine eigene
+    # Aufgabe, weil es als Artikel gefragt wird. Alles andere, was eine
+    # Sprache als Lexemmerkmal mit fester Werteliste kennt, ist hiermit
+    # abfragbar: die Ablautreihe, die Deklinationsklasse, das Hilfsverb.
+    "klasse": {
+        "name": "Klasse bestimmen",
+        "eingabeart": "auswahl",
+        "beschreibung": "Gesucht ist, zu welcher Klasse das Wort gehört — "
+                        "Ablautreihe, Deklinationsklasse, Hilfsverb.",
+        "beispiel": "rîten → stark I",
+    },
 }
 
 TYPEN_STANDARD = ["bedeutung_fremd_deutsch", "bedeutung_deutsch_fremd",
@@ -83,6 +108,43 @@ def sammlung_einstellungen(db: sqlite3.Connection, sammlung_id: int) -> dict:
         "grundsprache": s["grundsprache"],
         "sammlung": s,
     }
+
+
+def _klassenmerkmale(code: str, wortart: str) -> dict[str, list[str]]:
+    """Lexemmerkmale mit fester Werteliste, die sich abfragen lassen.
+
+    Ohne das Geschlecht: das hat seine eigene Aufgabe, weil es als
+    ARTIKEL gefragt wird und nicht als Kürzel — »der« statt »m«. Zwei
+    Aufgaben für dieselbe Auskunft wären eine zu viel.
+    """
+    erlaubt = sprachen.profil(code).get("lexemmerkmale", {}).get(wortart, {})
+    return {d: list(w) for d, w in erlaubt.items()
+            if d != "genus" and len(w) >= 2}
+
+
+def _stammformgruppen(code: str, wortart: str) -> list[dict]:
+    """Die Formgruppen, die in dieser Sprache die Stammformen bilden.
+
+    Aus `stammformen` im Sprachprofil, in dessen Reihenfolge — die ist
+    die gelernte (nëmen – nam – nâmen – genomen, nicht alphabetisch).
+    Nur Gruppen DIESER Wortart: die Liste ist flach, aber Stammformen
+    hat nur das Verb.
+    """
+    nach = {g["kennung"]: g for g in sprachen.formgruppen(code, wortart)}
+    return [nach[k] for k in sprachen.profil(code).get("stammformen", [])
+            if k in nach]
+
+
+def _stammform_zellen(code: str, wortart: str) -> list[dict]:
+    """Je Gruppe EINE Zelle — die erste.
+
+    Bei einer einzelligen Gruppe (Infinitiv, Partizip) ist das die
+    einzige. Bei einer Personenreihe ist es die 1. Person Singular, und
+    genau so steht die Stammform auch im Lehrbuch: »ich ging«, nicht die
+    ganze Präteritumstabelle. Wer die will, nimmt die ganze Reihe.
+    """
+    return [{"gruppe": g, "zelle": g["zellen"][0]}
+            for g in _stammformgruppen(code, wortart) if g["zellen"]]
 
 
 def _gruppe_der_form(code: str, wortart: str, merkmale: dict) -> dict | None:
@@ -206,6 +268,60 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
             gewuenscht[_schluessel("formenreihe", lexem_id, "gruppe",
                                    gruppe["kennung"])] = \
                 ("formenreihe", "gruppe", None, gruppe["kennung"])
+
+    # Stammformen: eine Aufgabe je Lexem, nicht je Gruppe — es ist ja
+    # gerade die Reihe QUER durch die Gruppen.
+    if "stammformen" in e["typen"]:
+        zellen = _stammform_zellen(code, wortart)
+        # Nur Gruppen, die diese Sammlung überhaupt abfragt — dieselbe
+        # Regel wie bei der ganzen Reihe.
+        if any(z["gruppe"]["kennung"] not in e["formgruppen"] for z in zellen):
+            zellen = []
+        luecken = dbm.j_lesen(lexem["luecken"], [])
+        noetig = [z["zelle"] for z in zellen
+                  if not mk.ist_erklaerte_luecke(luecken, z["zelle"])]
+        # Dieselbe Regel wie bei der ganzen Reihe: eine halbe Tabelle
+        # abzufragen heißt, in Felder zu tippen, zu denen es keine
+        # Antwort gibt. Und unter zwei Formen ist es keine Reihe.
+        vorhandene = {mk.schluessel(mk.normieren(dbm.j_lesen(f["merkmale"]),
+                                                 wortart))
+                      for f in formen
+                      if (f["geprueft"] or e["ungeprueft_abfragen"])
+                      and dbm.j_lesen(f["merkmale"])}
+        if len(noetig) >= 2 and all(
+                mk.schluessel(mk.normieren(z, wortart)) in vorhandene
+                for z in noetig):
+            # Welche Formgruppe in die Spalte kommt, entscheidet, WANN
+            # die Reihe freigeschaltet ist: die Lektionsschranke prüft
+            # genau diese eine. Leer zu lassen wäre bequem und falsch —
+            # die Reihe enthält das Präteritum, und das käme dann, bevor
+            # das Lehrwerk es eingeführt hat. Genau dieser Fehler ist
+            # beim griechischen Aorist schon einmal passiert.
+            #
+            # Also die LETZTE der beteiligten Gruppen. Die Reihenfolge in
+            # `stammformen` ist die gelernte, und das Partizip steht dort
+            # am Ende, weil es im Lehrbuch zuletzt kommt. Die Reihe
+            # wartet damit auf ihren spätesten Bestandteil. Eine
+            # Annahme ist das trotzdem: sie hängt daran, dass die
+            # Profilreihenfolge der Einführungsreihenfolge entspricht.
+            # Im Zweifel wartet die Reihe zu lange — das ist die
+            # harmlosere Richtung.
+            letzte = zellen[-1]["gruppe"]["kennung"]
+            gewuenscht[_schluessel("stammformen", lexem_id, "lexem", "")] = \
+                ("stammformen", "lexem", None, letzte)
+
+    # Klasse: je Lexemmerkmal mit fester Werteliste eine Aufgabe — aber
+    # nur, wenn an diesem Wort auch wirklich etwas steht. Ein Verb ohne
+    # eingetragene Ablautreihe ergäbe eine Frage ohne Antwort.
+    if "klasse" in e["typen"]:
+        for merkmal, werte in _klassenmerkmale(code, wortart).items():
+            if lex_merkmale.get(merkmal) in werte:
+                # Die Spalte `formgruppe` bleibt leer wie beim Artikel:
+                # sie ist der SQL-Filter der Abfrage, und eine Klasse ist
+                # keine Formgruppe. Welches Merkmal gemeint ist, steht im
+                # Schlüssel.
+                gewuenscht[_schluessel("klasse", lexem_id, "lexem", merkmal)] = \
+                    ("klasse", "lexem", None, None)
 
     # Artikel: nur wo die Sprache überhaupt Artikel nach Geschlecht hat.
     artikel = sprachen.profil(code).get("artikel", {}).get("genus_artikel", {})
@@ -470,6 +586,43 @@ def _reihe_zellen(db: sqlite3.Connection, a: dict, lexem: dict, code: str,
     return gruppe, zellen
 
 
+def _stammform_reihe(db: sqlite3.Connection, lexem: dict,
+                     code: str) -> list[dict]:
+    """Die Zellen der Stammformenreihe, in derselben Gestalt wie bei der
+    ganzen Reihe — damit Oberfläche und Prüfung nichts unterscheiden
+    müssen.
+
+    Beschriftet wird mit dem KURZNAMEN der Gruppe (»Prät. Sg.«), nicht
+    mit den Merkmalen der Zelle. Bei einer Reihe quer durch die Gruppen
+    ist der Gruppenname das Unterscheidende; »1. Person Singular« stünde
+    sonst zweimal da und sagte nichts.
+    """
+    nach_zelle: dict[str, list[str]] = {}
+    for f in dbm.zeilen(db, "SELECT * FROM form WHERE lexem_id = ?",
+                        (lexem["id"],)):
+        fm = dbm.j_lesen(f["merkmale"])
+        if fm:
+            nach_zelle.setdefault(
+                mk.schluessel(mk.normieren(fm, lexem["wortart"])),
+                []).append(f["text"])
+    luecken = dbm.j_lesen(lexem["luecken"], [])
+    zellen = []
+    for eintrag in _stammform_zellen(code, lexem["wortart"]):
+        zelle, gruppe = eintrag["zelle"], eintrag["gruppe"]
+        if mk.ist_erklaerte_luecke(luecken, zelle):
+            continue
+        schl = mk.schluessel(mk.normieren(zelle, lexem["wortart"]))
+        zellen.append({
+            "zelle": schl,
+            "merkmale": zelle,
+            "beschriftung": gruppe.get("kurz") or gruppe["name"],
+            "beispiel": mk.beispiel(zelle),
+            "pronomen": sprachen.personalpronomen(code, zelle),
+            "erwartet": nach_zelle.get(schl, []),
+        })
+    return zellen
+
+
 def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
     """Baut die Aufgabe für die Oberfläche.
 
@@ -561,6 +714,29 @@ def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
                 "antwort_sprache": None,
                 "dimensionen": _dimensionen(code, lexem["wortart"]),
                 "vorlesen": f["text"]}
+
+    if typ == "stammformen":
+        zellen = _stammform_reihe(db, lexem, code)
+        return {**kopf,
+                "frage_text": lexem["lemma"],
+                "frage_sprache": code,
+                "frage_zusatz": "Stammformen",
+                "antwort_sprache": code,
+                "zellen": [{k: v for k, v in z.items() if k != "erwartet"}
+                           for z in zellen],
+                "vorlesen": lexem["lemma"]}
+
+    if typ == "klasse":
+        merkmal = a["schluessel"].rsplit(":", 1)[-1]
+        werte = _klassenmerkmale(code, lexem["wortart"]).get(merkmal, [])
+        return {**kopf,
+                "frage_text": lexem["lemma"],
+                "frage_sprache": code,
+                "frage_zusatz": sprachen.klassenfrage(code, lexem["wortart"],
+                                                      merkmal),
+                "antwort_sprache": None,
+                "auswahl": [{"wert": w, "text": w} for w in werte],
+                "vorlesen": lexem["lemma"]}
 
     if typ == "genus":
         artikel = sprachen.profil(code)["artikel"]["genus_artikel"]
@@ -676,47 +852,30 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
 
     if typ == "formenreihe":
         gruppe, zellen = _reihe_zellen(db, a, lexem, code)
-        eingaben = eingabe if isinstance(eingabe, dict) else {}
-        ergebnisse = []
-        for z in zellen:
-            text = str(eingaben.get(z["zelle"], "") or "")
-            # Die Geschwisterformen DERSELBEN Reihe sind hier keine
-            # Verwechslung, sondern die Nachbarfelder — sie als solche zu
-            # melden wäre irreführend.
-            einzel = text_pruefen(text, z["erwartet"], p_code,
-                                  fehler_benennen=fehler_benennen,
-                                  vorsilben=z.get("pronomen"),
-                                  artikel_verlangt=sprachen.artikel_fuer(
-                                      code, dbm.j_lesen(lexem["merkmale"]),
-                                      z["merkmale"]))
-            ergebnisse.append({
-                "zelle": z["zelle"], "beschriftung": z["beschriftung"],
-                "urteil": einzel.urteil, "erwartet": z["erwartet"],
-                "eingabe": text, "hinweis": einzel.hinweis,
-                "fehlertext": einzel.fehlertext,
-            })
-        richtig = sum(1 for r in ergebnisse if r["urteil"] == "richtig")
-        fast = sum(1 for r in ergebnisse if r["urteil"] == "fast")
-        gesamt = len(ergebnisse)
-        # Eine Reihe sitzt als GANZES oder nicht. Wer fünf von sechs Formen
-        # kann, kann die Tabelle noch nicht — aber es ist auch kein glatter
-        # Fehlschlag, darum "fast", wenn nur Kleinigkeiten fehlen.
-        if gesamt and richtig == gesamt:
-            urteil = Urteil("richtig")
-        elif gesamt and richtig + fast == gesamt:
-            urteil = Urteil("fast", hinweis="Bis auf Kleinigkeiten richtig.")
-        else:
-            teile = [f"{richtig} von {gesamt} Formen sitzen"]
-            if fast:
-                teile.append(f"{fast} fast")
-            offen = gesamt - richtig - fast
-            if offen:
-                teile.append(f"{offen} noch nicht")
-            urteil = Urteil("falsch", hinweis=", ".join(teile) + ".")
-        return urteil, {"zellen": ergebnisse,
-                        "gruppe": gruppe["name"] if gruppe else "",
-                        "richtig": richtig, "gesamt": gesamt,
-                        "erwartet": [t for z in zellen for t in z["erwartet"]]}
+        return _reihe_pruefen(db, lexem, code, zellen, eingabe,
+                              fehler_benennen, p_code,
+                              gruppe["name"] if gruppe else "")
+
+    if typ == "stammformen":
+        return _reihe_pruefen(db, lexem, code, _stammform_reihe(db, lexem, code),
+                              eingabe, fehler_benennen, p_code, "Stammformen")
+
+    if typ == "klasse":
+        merkmal = a["schluessel"].rsplit(":", 1)[-1]
+        soll = dbm.j_lesen(lexem["merkmale"]).get(merkmal)
+        if soll is None:
+            # Das Merkmal wurde nachträglich entfernt. Dann ist die
+            # Aufgabe nicht beantwortbar, und das soll dastehen —
+            # dieselbe Lage wie beim Geschlecht.
+            return Urteil("falsch", None,
+                          "Zu diesem Wort ist keine Klasse hinterlegt. Die "
+                          "Aufgabe wird beim nächsten Durchrechnen "
+                          "abgeschaltet.", ["unbeantwortbar"]), {"erwartet": []}
+        gegeben = str(eingabe).strip()
+        urteil = (Urteil("richtig", soll) if gegeben == soll
+                  else Urteil("falsch", soll, f"Richtig ist {soll}.",
+                              ["klasse"]))
+        return urteil, {"erwartet": [soll], "klasse": soll}
 
     if typ == "form_bestimmen":
         f = dbm.zeile(db, "SELECT * FROM form WHERE id = ?", (a["ziel_id"],))
@@ -756,6 +915,58 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
         return urteil, {"erwartet": [soll_artikel], "genus": soll_genus}
 
     raise ValueError(f"Unbekannter Aufgabentyp {typ!r}")
+
+
+def _reihe_pruefen(db: sqlite3.Connection, lexem: dict, code: str,
+                   zellen: list[dict], eingabe, fehler_benennen: bool,
+                   p_code: str, gruppenname: str) -> tuple[Urteil, dict]:
+    """Eine ganze Reihe auf einmal bewerten.
+
+    Gemeinsam für die Formgruppenreihe und die Stammformen: sie
+    unterscheiden sich darin, WELCHE Zellen in der Reihe stehen, und in
+    nichts sonst. Zwei Maßstäbe für dieselbe Eingabeart wären ein
+    Versprechen, das irgendwann bricht.
+    """
+    eingaben = eingabe if isinstance(eingabe, dict) else {}
+    ergebnisse = []
+    for z in zellen:
+        text = str(eingaben.get(z["zelle"], "") or "")
+        # Die Geschwisterformen DERSELBEN Reihe sind hier keine
+        # Verwechslung, sondern die Nachbarfelder — sie als solche zu
+        # melden wäre irreführend.
+        einzel = text_pruefen(text, z["erwartet"], p_code,
+                              fehler_benennen=fehler_benennen,
+                              vorsilben=z.get("pronomen"),
+                              artikel_verlangt=sprachen.artikel_fuer(
+                                  code, dbm.j_lesen(lexem["merkmale"]),
+                                  z["merkmale"]))
+        ergebnisse.append({
+            "zelle": z["zelle"], "beschriftung": z["beschriftung"],
+            "urteil": einzel.urteil, "erwartet": z["erwartet"],
+            "eingabe": text, "hinweis": einzel.hinweis,
+            "fehlertext": einzel.fehlertext,
+        })
+    richtig = sum(1 for r in ergebnisse if r["urteil"] == "richtig")
+    fast = sum(1 for r in ergebnisse if r["urteil"] == "fast")
+    gesamt = len(ergebnisse)
+    # Eine Reihe sitzt als GANZES oder nicht. Wer fünf von sechs Formen
+    # kann, kann die Tabelle noch nicht — aber es ist auch kein glatter
+    # Fehlschlag, darum "fast", wenn nur Kleinigkeiten fehlen.
+    if gesamt and richtig == gesamt:
+        urteil = Urteil("richtig")
+    elif gesamt and richtig + fast == gesamt:
+        urteil = Urteil("fast", hinweis="Bis auf Kleinigkeiten richtig.")
+    else:
+        teile = [f"{richtig} von {gesamt} Formen sitzen"]
+        if fast:
+            teile.append(f"{fast} fast")
+        offen = gesamt - richtig - fast
+        if offen:
+            teile.append(f"{offen} noch nicht")
+        urteil = Urteil("falsch", hinweis=", ".join(teile) + ".")
+    return urteil, {"zellen": ergebnisse, "gruppe": gruppenname,
+                    "richtig": richtig, "gesamt": gesamt,
+                    "erwartet": [t for z in zellen for t in z["erwartet"]]}
 
 
 def _merkmale_pruefen(db: sqlite3.Connection, lexem: dict, form: dict,

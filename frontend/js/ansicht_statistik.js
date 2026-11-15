@@ -34,6 +34,8 @@ const TYPNAME = {
   form_bilden: 'Form bilden',
   form_bestimmen: 'Form bestimmen',
   formenreihe: 'Ganze Reihe',
+  stammformen: 'Stammformen',
+  klasse: 'Klasse bestimmen',
   genus: 'Artikel',
 };
 

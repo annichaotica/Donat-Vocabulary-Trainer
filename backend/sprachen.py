@@ -529,6 +529,12 @@ MITTELHOCHDEUTSCH = {
                        "klasse": ["stark a", "stark i", "stark u",
                                   "schwach n", "Wurzelnomen"]},
     },
+    # Wonach die Abfrage »Klasse bestimmen« hier fragt. Genau so steht
+    # es in der Klausur.
+    "lexemmerkmale_fragen": {
+        "verb": {"klasse": "Welche Ablautreihe?"},
+        "substantiv": {"klasse": "Welche Deklinationsklasse?"},
+    },
 }
 
 # -------------------------------------------------------------------- Deutsch
@@ -744,6 +750,19 @@ def beschriften_form(code: str, wortart: str, merkmale: dict,
             else f"{fach} ({schlicht})")
 
 
+def klassenfrage(code: str, wortart: str, merkmal: str) -> str:
+    """Wie die Frage nach einem Lexemmerkmal lautet.
+
+    »Welche Klasse?« wäre überall richtig und nirgends gut: bei einem
+    mittelhochdeutschen Verb heißt die Frage »Welche Ablautreihe?«, und
+    wer das Wort nicht liest, sucht in der Auswahl nach etwas anderem.
+    Steht nichts im Profil, bleibt die allgemeine Fassung.
+    """
+    eigen = (profil(code).get("lexemmerkmale_fragen", {})
+             .get(wortart, {}).get(merkmal))
+    return eigen or "Welche Klasse?"
+
+
 def pruefen_lexemmerkmale(code: str, wortart: str, merkmale: dict) -> dict[str, str]:
     """Prüft die Merkmale eines LEXEMS — ein anderer Namensraum als die
     Merkmale einer Form.
@@ -785,7 +804,8 @@ def pruefen_lexemmerkmale(code: str, wortart: str, merkmale: dict) -> dict[str, 
 
 ERLAUBTE_SCHLUESSEL = {"name", "schrift", "stimme", "pruefung", "artikel",
                        "formgruppen", "formgruppen_standard", "stammformen",
-                       "lexemmerkmale", "beschriftungen", "sonderzeichen",
+                       "lexemmerkmale", "lexemmerkmale_fragen",
+                       "beschriftungen", "sonderzeichen",
                        "tastatur_empfohlen", "partikeln"}
 
 

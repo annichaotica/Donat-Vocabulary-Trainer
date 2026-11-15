@@ -16,6 +16,46 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Zwei neue Abfragen: Stammformen und Klasse bestimmen
+
+»Kann man auch Grammatik für Mittelhochdeutsch abfragen? Keine
+Ahnung, wie man so was machen sollte.«
+
+Die mittelhochdeutsche Grammatik stand längst im Sprachprofil — die
+vier Stammformen, die sieben Ablautreihen, die Deklinationsklassen,
+die Artikeltabelle mit `der/diu/daz`. Abfragen ließ sich davon aber
+ausgerechnet das nicht, wonach eine Klausur fragt.
+
+**Stammformen.** `nëmen – nam – nâmen – genomen` ist keine Formgruppe,
+sondern eine Auswahl quer durch vier, und jede davon hat nur eine
+Zelle. Die »Ganze Reihe« verlangt mindestens zwei Zellen je Gruppe —
+also fiel ausgerechnet die Reihe durch, die man auswendig lernt. Es
+gibt sie jetzt als eigene Abfrage: alle vier Formen auf einmal,
+beschriftet mit den Gruppennamen. Sie gilt auch für Englisch,
+Französisch, Spanisch und Deutsch, die ihre Stammformen ebenso im
+Profil stehen haben — die unregelmäßigen Verben also als Tabelle statt
+einzeln.
+
+Die Reihe hängt an der **letzten** beteiligten Formgruppe, nicht an
+keiner. Das klingt nebensächlich und ist es nicht: sie enthält das
+Präteritum, und ohne diese Bindung käme sie, bevor das Lehrwerk das
+Präteritum eingeführt hat — genau der Fehler, den du beim
+griechischen Aorist hattest.
+
+**Klasse bestimmen.** Die Ablautreihe steht als Merkmal am Verb, mit
+fester Werteliste — genau das, was eine Auswahlfrage braucht. Fragen
+ließ sich bisher nur das Geschlecht, und das fest verdrahtet als
+Artikel. Jetzt ist jedes Lexemmerkmal mit fester Werteliste abfragbar;
+das Geschlecht behält seine eigene Abfrage, weil es als »diu« gefragt
+wird und nicht als »f«. Die Frage lautet dabei nicht »Welche Klasse?«,
+sondern was im Profil dazu steht: **»Welche Ablautreihe?«** beim Verb,
+**»Welche Deklinationsklasse?«** beim Substantiv.
+
+Beide sind nicht voreingestellt — du schaltest sie in den
+Sammlungseinstellungen ein, dann werden die Aufgaben für alles
+nachgerechnet, was schon drinsteht.
+
+
 ### »Zählt nicht« neben neun von neun Wörtern
 
 Zu merken war: eine Übersetzung, die mit der hinterlegten Fassung

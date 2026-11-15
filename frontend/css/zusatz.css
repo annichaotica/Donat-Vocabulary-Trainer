@@ -572,3 +572,58 @@ input[type="file"] { max-width: 100%; }
   font-size: .92em;
   line-height: 1.45;
 }
+
+
+/* -------------------------------------------------- Geführte Rundgänge
+   Die Hülle fängt KEINE Klicks ab (pointer-events: none) — nur die
+   Blase selbst. Wer mitten im Rundgang etwas ausprobieren will, soll
+   das können; eine Tour, die die Anwendung sperrt, erzieht dazu, sie
+   wegzuklicken. */
+.fuehrung {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+}
+.fuehrung-blase {
+  position: fixed;
+  pointer-events: auto;
+  width: min(22rem, calc(100vw - 2rem));
+  background: var(--grund-2);
+  border: 1px solid var(--rand);
+  border-radius: var(--rund);
+  box-shadow: var(--schatten);
+  padding: .9rem 1rem;
+}
+.fuehrung-mitte {
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.fuehrung-titel { margin: 0 0 .35rem; font-size: 1.05rem; }
+.fuehrung-text  { margin: 0 0 .8rem; line-height: 1.5; }
+.fuehrung-knoepfe {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+}
+.fuehrung-zaehler { margin-right: auto; font-size: .85em; }
+
+/* Das Ziel wird hervorgehoben, nicht ausgeschnitten: ein Ausschnitt
+   bräuchte eine Maske über der ganzen Seite und ginge beim Rollen
+   ständig daneben. */
+.fuehrung-ziel {
+  position: relative;
+  z-index: 56;
+  outline: 3px solid var(--akzent);
+  outline-offset: 3px;
+  border-radius: var(--rund-klein);
+}
+@media (max-width: 40rem) {
+  /* Auf dem Telefon immer unten — neben einem Knopf ist kein Platz. */
+  .fuehrung-blase {
+    top: auto !important;
+    bottom: calc(var(--leiste, 0px) + .75rem) !important;
+    left: .75rem !important;
+    right: .75rem;
+    width: auto;
+    transform: none;
+  }
+}

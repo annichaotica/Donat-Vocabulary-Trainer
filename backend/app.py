@@ -32,6 +32,7 @@ import freigabe as freigabemodul
 import datenbank as dbm
 import legasthenie
 import lernen as lernmodul
+import beispielkurs
 import lehrgang
 import lesetexte
 import lernziele
@@ -771,6 +772,21 @@ def sammlung_einstellungen_setzen(sammlung_id: int, eingabe: SammlungEinstellung
     bilanz = aufgaben.erzeugen_fuer_sammlung(db, sammlung_id)
     return {"einstellungen": sammlung_einstellungen_lesen(sammlung_id, db),
             "aufgaben": bilanz}
+
+
+@app.post("/api/beispielkurs", status_code=201)
+def beispielkurs_anlegen(benutzer_id: int, request: Request = None,
+                         db: sqlite3.Connection = DB):
+    """Ein kleiner englischer Übungskurs zum Ausprobieren.
+
+    Einmal je Person; beim zweiten Aufruf wird der bestehende
+    zurückgegeben statt eines zweiten angelegt.
+    """
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    try:
+        return beispielkurs.anlegen(db, benutzer_id)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
 
 
 @app.get("/api/sammlungen/{sammlung_id}/wortarten")

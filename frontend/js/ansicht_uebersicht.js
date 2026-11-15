@@ -4,6 +4,7 @@ import { api } from './api.js';
 import { h, leeren, meldung } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
+import * as fuehrung from './fuehrung.js';
 
 export async function zeichnenProfile(behaelter, zurueckNach = null) {
   const leute = await api.benutzer();
@@ -79,6 +80,61 @@ function profilpunkt(p) {
   punkt.style.background = p.farbe || '';
   return punkt;
 }
+
+/** Die Karte für den Anfang: Rundgänge und der Übungskurs.
+ *
+ * Sie verschwindet, sobald alle Rundgänge einmal gesehen sind — ein
+ * Hinweis, der nach dem zwanzigsten Mal noch dasteht, wird zu
+ * Hintergrundrauschen, und dann liest man auch den nächsten nicht mehr.
+ * Über die Anleitung bleiben die Rundgänge erreichbar.
+ */
+function willkommen(behaelter, sammlungen) {
+  if (fuehrung.alleGesehen() && sammlungen.length) return null;
+
+  const karte = h('div', { class: 'karte' });
+  karte.append(h('h2', { style: 'margin-top:0',
+                         text: sammlungen.length
+                           ? 'Noch nicht überall gewesen?'
+                           : 'Willkommen' }));
+  if (!sammlungen.length) {
+    karte.append(h('p', {},
+      'Du hast noch keine Sammlung. Du kannst eine anlegen — oder '
+      + 'erst einmal einen kleinen englischen Übungskurs einrichten, '
+      + 'an dem sich alles ausprobieren lässt: Vokabeln, Formen, '
+      + 'Sätze, ein Lesetext und eine Grammatikregel.'));
+    karte.append(h('button', {
+      class: 'wichtig',
+      onclick: async (e) => {
+        e.target.disabled = true;
+        try {
+          const d = await api.beispielkursAnlegen(zustand.benutzerId);
+          merken({ sammlungId: d.sammlung_id });
+          meldung(d.neu ? `Übungskurs angelegt: ${d.aufgaben} Aufgaben.`
+                        : 'Der Übungskurs war schon da.');
+          zeichnen(behaelter);
+        } catch (f) {
+          meldung(f.message, 'fehler');
+          e.target.disabled = false;
+        }
+      },
+    }, 'Übungskurs einrichten'));
+  }
+
+  karte.append(h('p', { class: 'leise', style: 'margin:.8rem 0 .4rem',
+                        text: 'Kurze Rundgänge — einzeln, jederzeit:' }));
+  const reihe = h('div', { class: 'gruppenwahl' });
+  for (const r of fuehrung.RUNDGAENGE) {
+    reihe.append(h('button', {
+      type: 'button',
+      class: fuehrung.schonGesehen(r.kennung) ? 'schlicht' : '',
+      title: `${r.beschreibung} (${r.dauer})`,
+      onclick: () => fuehrung.starten(r.kennung),
+    }, fuehrung.schonGesehen(r.kennung) ? `${r.name} ✓` : r.name));
+  }
+  karte.append(reihe);
+  return karte;
+}
+
 
 /** Wo stehe ich im Lehrwerk — als eine Zeile auf der Karte.
  *
@@ -238,6 +294,11 @@ export async function zeichnen(behaelter) {
     api.sammlungen(zustand.benutzerId), stammdaten.sprachen(),
   ]);
   const gesamt = await api.stand(zustand.benutzerId, null);
+
+  // Der Einstieg ganz oben: Rundgänge und, solange nichts da ist, der
+  // Übungskurs. Weiter unten zwischen den Sammlungen fände ihn niemand,
+  // der zum ersten Mal hier ist — und für den ist er gemacht.
+  el.append(willkommen(behaelter, sammlungen));
 
   el.append(h('h1', { text: 'Heute' }));
   el.append(h('div', { class: 'karte' },

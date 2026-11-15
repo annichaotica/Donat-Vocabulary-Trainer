@@ -11,6 +11,7 @@
 import { api } from './api.js';
 import { h, leeren, meldung } from './hilfen.js';
 import { zustand } from './zustand.js';
+import * as fuehrung from './fuehrung.js';
 
 function abschnitt(titel, ...inhalt) {
   return h('details', { class: 'karte hilfe' },
@@ -36,6 +37,22 @@ export async function zeichnen(behaelter) {
         + 'Chatprogramm anschließt, damit es dir die Vokabeln einträgt.' }));
 
   /* ---------------------------------------------------------- Lernen */
+
+  el.append(h('h2', { text: 'Geführte Rundgänge' }));
+  el.append(h('p', { class: 'leise',
+    text: 'Kurz und einzeln. Jeder hört an einer Stelle auf, an der du '
+        + 'etwas ausprobieren kannst — die Anwendung bleibt dabei '
+        + 'bedienbar.' }));
+  const rundgaenge = h('div', { class: 'karte' });
+  for (const r of fuehrung.RUNDGAENGE) {
+    rundgaenge.append(h('div', { class: 'lehrgangszeile' },
+      h('button', { onclick: () => fuehrung.starten(r.kennung) },
+        'Starten'),
+      h('span', {}, h('b', { text: r.name }),
+        h('span', { class: 'leise', text: ` · ${r.dauer}` })),
+      h('span', { class: 'leise', text: r.beschreibung })));
+  }
+  el.append(rundgaenge);
 
   el.append(h('h2', { text: 'Lernen' }));
 

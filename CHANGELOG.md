@@ -16,6 +16,30 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Geführte Rundgänge und ein englischer Übungskurs
+
+Beim ersten Öffnen steht oben eine Karte mit vier kurzen Rundgängen —
+**Erste Schritte**, **Eine Abfrage von innen**, **Planen: Ziele und
+Lehrwerk**, **Texte lesen und übersetzen**. Jeder dauert zwei bis drei
+Minuten und hört an einer Stelle auf, an der man etwas ausprobieren
+kann. Die Anwendung bleibt währenddessen bedienbar; wer mitten im
+Rundgang etwas antippen will, darf das. Über die Anleitung sind sie
+jederzeit wieder erreichbar.
+
+Vier statt einer, weil eine Tour über fünfzehn Funktionen niemand zu
+Ende sieht. Die Karte verschwindet, sobald alle einmal gesehen sind —
+ein Hinweis, der nach dem zwanzigsten Mal noch dasteht, wird zu
+Hintergrundrauschen.
+
+Dazu ein **kleiner englischer Übungskurs** auf Knopfdruck: 17 Wörter,
+fünf Lektionen, Verben mit Simple past, unregelmäßige Plurale,
+gesteigerte Adjektive, zwei Sätze, ein Lesetext und eine
+Grammatikregel. Er ist nicht nach Nützlichkeit fürs Englischlernen
+zusammengestellt, sondern danach, dass jede Funktion darin etwas zu
+zeigen hat — auch die Lektionsschranke, deren Zuordnung gleich
+mitkommt. Alles ist freigegeben, man kann sofort loslegen, und löschen
+lässt er sich wie jede andere Sammlung.
+
 ### Ein Lernziel hält sich von selbst an seine Lektionen
 
 Zu merken war: »bei meinem Lernziel wird wieder der Aorist abgefragt,

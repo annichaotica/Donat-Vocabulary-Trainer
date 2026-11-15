@@ -645,3 +645,37 @@ input[type="file"] { max-width: 100%; }
 .wfw-paar { white-space: nowrap; }
 .wfw-paar b { font-weight: 600; }
 .wfw-paar > span { color: var(--leise, #667); }
+
+
+/* Akzentauswahl beim Gedrückthalten — wie am Betriebssystem.
+   Sie hängt am Elternteil des Feldes, nicht am Feld selbst: in ein
+   <input> lässt sich nichts hineinsetzen. */
+.akzentwahl {
+  position: absolute;
+  z-index: 53;
+  display: flex;
+  gap: .25rem;
+  padding: .3rem;
+  margin-top: .2rem;
+  background: var(--grund-2);
+  border: 1px solid var(--rand);
+  border-radius: var(--rund-klein);
+  box-shadow: var(--schatten);
+}
+.akzentwahl button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 2.4rem;
+  padding: .25rem .35rem;
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+.akzentwahl button small {
+  font-size: .62rem;
+  opacity: .6;
+  margin-top: .1rem;
+}
+/* Das Antwortfeld ist der Bezugsrahmen, sonst säße die Auswahl
+   irgendwo auf der Seite. */
+.antwortfeld { position: relative; }

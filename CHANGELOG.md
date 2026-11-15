@@ -16,6 +16,23 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Akzente wieder durch Gedrückthalten
+
+Zu merken war: »Da konnte man, wenn man länger auf einem Vokal blieb,
+mit den Nummerntasten den Akzent wählen. Jetzt wird der Vokal mehrfach
+ausgegeben.«
+
+Beides stimmte, und beides kam von der Umschrift: sie fängt jede Taste
+ab und setzt das Zeichen selbst. Jede Wiederholung beim Halten schrieb
+dadurch ein weiteres Zeichen — und das Auswahlfenster des
+Betriebssystems konnte gar nicht erscheinen, weil das Zeichen nie vom
+System kam.
+
+Jetzt macht die Umschrift die Auswahl selbst, mit derselben Bedienung:
+Vokal halten, dann die Ziffer. Bei ι stehen ι, ί, ϊ und ΐ zur Wahl;
+anklicken geht auch, weil es auf dem Telefon keine Zifferntasten gibt.
+Und eine gehaltene Taste schreibt nur noch ein Zeichen.
+
 ### Übersetzungsvorschlag und »Wort für Wort«
 
 Zu merken war die Frage: »Einen Übersetzungsvorschlag kann man sich

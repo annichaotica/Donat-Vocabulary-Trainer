@@ -115,6 +115,20 @@ const BETONT = {
 };
 const TREMA = { ι: 'ϊ', υ: 'ϋ', Ι: 'Ϊ', Υ: 'Ϋ' };
 
+// Beides zusammen, für die Auswahl beim Gedrückthalten.
+const BEIDES = { ι: 'ΐ', υ: 'ΰ' };
+
+/** Welche Varianten gibt es zu diesem Zeichen? Grundform zuerst. */
+function varianten(zeichen) {
+  return [zeichen, BETONT[zeichen], TREMA[zeichen], BEIDES[zeichen]]
+    .filter(Boolean);
+}
+
+// Wie lange halten, bis die Auswahl erscheint. 400 ms ist die Spanne,
+// die auch das Betriebssystem nimmt: kurz genug, dass man es findet,
+// lang genug, dass normales Tippen nie hineinläuft.
+const HALTEN_MS = 400;
+
 /** Gibt es für diese Sprache überhaupt etwas umzuschreiben? */
 export function kannUmschreiben(code) {
   return Boolean(code && Object.hasOwn(BELEGUNGEN, code)
@@ -144,6 +158,18 @@ export function umschriftAnhaengen(feld, code) {
 
   const behandler = (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // Zifferntasten gehören der Auswahl, solange sie offen ist.
+    if (auswahl.offen() && auswahl.taste(e)) { e.preventDefault(); return; }
+    // WIEDERHOLUNG beim Halten: nicht noch einmal einfügen.
+    //
+    // »Da konnte man, wenn man länger auf einem Vokal blieb, mit den
+    // Nummerntasten den Akzent wählen. Jetzt wird der Vokal mehrfach
+    // ausgegeben.« — Genau das: jede Wiederholung lief durch diesen
+    // Behandler und schrieb ein weiteres Zeichen. Das Auswahlfenster
+    // des Betriebssystems kann hier ohnehin nicht greifen, weil das
+    // Zeichen gar nicht vom System kommt; also macht die Umschrift
+    // die Auswahl jetzt selbst.
+    if (e.repeat) { e.preventDefault(); return; }
     // Schon in der Zielschrift? Dann ist das Layout umgeschaltet und
     // hier gibt es nichts zu tun.
     if (e.key.length === 1 && b.schrift.test(e.key)) { wartend = null; return; }
@@ -166,10 +192,103 @@ export function umschriftAnhaengen(feld, code) {
     else if (wartend === 'trema' && TREMA[aus]) aus = TREMA[aus];
     wartend = null;
     einfuegen(aus);
+    // Gehalten? Dann nach kurzer Zeit die Varianten anbieten.
+    if (varianten(aus).length > 1) auswahl.planen(e.code, aus);
   };
 
+  const loslassen = (e) => auswahl.loslassen(e.code);
+  const auswahl = akzentauswahl(feld, einfuegen);
+
   feld.addEventListener('keydown', behandler);
-  return () => feld.removeEventListener('keydown', behandler);
+  feld.addEventListener('keyup', loslassen);
+  feld.addEventListener('blur', auswahl.schliessen);
+  return () => {
+    auswahl.schliessen();
+    feld.removeEventListener('keydown', behandler);
+    feld.removeEventListener('keyup', loslassen);
+    feld.removeEventListener('blur', auswahl.schliessen);
+  };
+}
+
+
+/** Die Akzentauswahl beim Gedrückthalten — wie am Betriebssystem.
+ *
+ * Das Auswahlfenster von macOS kann hier nicht greifen: die Umschrift
+ * fängt die Taste ab und setzt das Zeichen selbst, das System bekommt
+ * sie gar nicht zu sehen. Statt die Umschrift dafür aufzugeben —
+ * ohne sie müsste man das Systemlayout umschalten, und genau das
+ * sollte sie ersparen — macht sie die Auswahl selbst.
+ *
+ * Dieselbe Bedienung: halten, dann die Ziffer. Zusätzlich anklickbar,
+ * weil es auf dem Telefon keine Zifferntasten gibt.
+ */
+function akzentauswahl(feld, einfuegen) {
+  let kasten = null;
+  let uhr = null;
+  let liste = [];
+  let taste = null;
+
+  const schliessen = () => {
+    clearTimeout(uhr); uhr = null;
+    if (kasten) { kasten.remove(); kasten = null; }
+    liste = []; taste = null;
+  };
+
+  const waehlen = (zeichen) => {
+    // Das eben eingefügte Grundzeichen ersetzen, nicht anhängen.
+    const ende = feld.selectionStart ?? feld.value.length;
+    feld.value = feld.value.slice(0, Math.max(0, ende - 1))
+               + zeichen + feld.value.slice(ende);
+    const neu = Math.max(0, ende - 1) + zeichen.length;
+    feld.setSelectionRange(neu, neu);
+    feld.dispatchEvent(new Event('input', { bubbles: true }));
+    schliessen();
+  };
+
+  const zeigen = (zeichen) => {
+    liste = varianten(zeichen);
+    kasten = document.createElement('div');
+    kasten.className = 'akzentwahl';
+    liste.forEach((z, i) => {
+      const knopf = document.createElement('button');
+      knopf.type = 'button';
+      knopf.innerHTML = '';
+      knopf.append(z, Object.assign(document.createElement('small'),
+                                    { textContent: String(i + 1) }));
+      // `mousedown` statt `click`: ein Klick nähme dem Feld erst den
+      // Fokus, und `blur` schlösse die Auswahl, bevor sie wirkt.
+      knopf.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        waehlen(z);
+      });
+      kasten.append(knopf);
+    });
+    feld.parentElement.append(kasten);
+  };
+
+  return {
+    offen: () => Boolean(kasten),
+    schliessen,
+    planen(code, zeichen) {
+      schliessen();
+      taste = code;
+      uhr = setTimeout(() => zeigen(zeichen), HALTEN_MS);
+    },
+    loslassen(code) {
+      // Loslassen vor Ablauf: es war normales Tippen. Ist die Auswahl
+      // schon offen, bleibt sie stehen — man muss ja noch wählen.
+      if (code === taste && !kasten) schliessen();
+    },
+    taste(e) {
+      if (e.key === 'Escape') { schliessen(); return true; }
+      const nr = Number(e.key);
+      if (Number.isInteger(nr) && nr >= 1 && nr <= liste.length) {
+        waehlen(liste[nr - 1]);
+        return true;
+      }
+      return false;
+    },
+  };
 }
 
 const SPEICHER = 'vokabeltrainer.tastatur.';

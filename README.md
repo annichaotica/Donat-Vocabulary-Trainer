@@ -177,13 +177,20 @@ Abfrage für sechs Aufgabentypen, Wortschatzverwaltung mit Eingabemaske,
 Sprachprofile als Daten, Qualitätsprüfung, Wörterbuchsuche über alle Formen,
 Lernziele mit dynamischen Blöcken, Legastheniemodus, MCP-Server, Docker.
 
+Dazu Textverständnis: Texte einwerfen, Deckungsanalyse gegen den eigenen
+Wortschatz, Übersetzen je Abschnitt, fehlende Wörter beim Chatprogramm
+anfordern. Geführte Rundgänge und ein englischer Übungskurs zum
+Ausprobieren.
+
 **Als Nächstes:** Import aus CSV und Anki, Paradigma-Generator,
 Wiktionary-Anbindung, Diktat und Aussprache, Paradigmentabellen als
 Aufgabentyp, Lückensätze, Statistik.
 
-**Später (Tabellen stehen schon):** Textverständnis — Texte mit Abschnitten
-und Referenzübersetzungen, Übersetzen in beide Richtungen,
-Verständnisfragen, Bewertung über den MCP-Server.
+**Erwogen und vorerst abgelehnt:** eine direkt angebundene KI. Der
+Trainer ruft heute nirgends nach außen; alles, was eine KI tut, tut sie
+über den MCP-Server und das Chatprogramm der Benutzerin. Warum das so
+bleibt und unter welchen Bedingungen es sich ändern dürfte, steht in
+[02-geplant-ki-adapter.md](02-geplant-ki-adapter.md).
 
 
 ## Lizenz und Mitarbeit

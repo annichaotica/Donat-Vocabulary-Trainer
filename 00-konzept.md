@@ -184,6 +184,17 @@ Französisch, Spanisch, Englisch, Griechisch. Import. MCP-Server.
 Lückensätze, Statistik und Einsicht in den Algorithmus, freies Üben,
 Wiktionary-Anbindung, Freigabe von Sammlungen.
 
-**Stufe 4 — Textverständnis.** Texte mit Abschnitten und
-Referenzübersetzungen, Übersetzen in beide Richtungen, Verständnisfragen,
-Bewertung über den MCP-Server. Die Tabellen dafür stehen bereits im Schema.
+**Stufe 4 — Textverständnis.** *Gebaut am 15.11.2026.* Texte einwerfen
+oder hochladen, Deckungsanalyse gegen den eigenen Wortschatz,
+Übersetzen je Abschnitt mit eigener Fassung, Wort-für-Wort-Hilfe aus
+dem eigenen Wortschatz, Referenzübersetzung über den MCP-Server, und
+das Anfordern fehlender Wörter beim angebundenen Chatprogramm.
+
+**Stufe 5 — offen.** Import aus CSV und Anki, Paradigma-Generator,
+Wiktionary-Anbindung, Diktat und Aussprache, Lückensätze, Statistik.
+
+**Erwogen und vorerst abgelehnt:** eine direkt angebundene KI statt des
+Umwegs über das Chatprogramm. Der Entwurf samt Begründung steht in
+[02-geplant-ki-adapter.md](02-geplant-ki-adapter.md) — er ist
+ausdrücklich auch dann nützlich, wenn es dabei bleibt: er hält fest,
+unter welchen Bedingungen so etwas hier hineingehörte.

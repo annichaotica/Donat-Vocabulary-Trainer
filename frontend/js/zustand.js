@@ -9,6 +9,12 @@ const anfang = {
   benutzerId: null,
   sammlungId: null,
   lektionId: null,
+  // Der Lernmodus — {wortart: [...], formgruppe: [...]} — steht
+  // ABSICHTLICH nicht in der Liste, die unten gespeichert wird: wer
+  // heute »nur Verben« übt, soll morgen nicht unbemerkt immer noch
+  // darin hängen und sich wundern, wo die Substantive sind. Er gilt
+  // für diese Sitzung und ist danach weg.
+  lernmodus: null,
 };
 
 function laden() {

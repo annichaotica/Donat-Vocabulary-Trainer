@@ -156,8 +156,9 @@ async function bearbeiten(behaelter, z) {
       const [lektionen, einstellungen] = await Promise.all([
         api.lektionen(sammlungId), api.sammlungEinstellungen(sammlungId),
       ]);
-      const [gruppen, typen] = await Promise.all([
+      const [gruppen, typen, wortarten] = await Promise.all([
         api.formgruppen(einstellungen.sprache), stammdaten.aufgabentypen(),
+        api.wortarten(sammlungId),
       ]);
       felder.lektionen = mehrfachwahl(
         'Lektionen', lektionen.map((l) => [String(l.id), l.name]),
@@ -171,6 +172,12 @@ async function bearbeiten(behaelter, z) {
         'Abfragearten',
         Object.entries(typen.typen).map(([k, t]) => [k, t.name]),
         'Nichts gewählt heißt: alle.', umfang.typen || []);
+      // »Verben lernen, bestimmte Worttypen, k.A. Adjektive oder so« —
+      // der Umfang konnte Wortarten längst, nur fragte kein Formular
+      // danach. Für ein Ziel wie »Verben bis Freitag« braucht es das.
+      felder.wortarten = mehrfachwahl(
+        'Wortarten', wortarten.map((w) => [w.wortart, `${wortartName(w.wortart)} · ${w.aufgaben}`]),
+        'Nichts gewählt heißt: alle.', umfang.wortarten || []);
       for (const f of Object.values(felder)) {
         if (f.element) umfangFelder.append(f.element);
       }
@@ -189,7 +196,6 @@ async function bearbeiten(behaelter, z) {
     const neu = {};
     if (umfang.sammlungen) neu.sammlungen = umfang.sammlungen;
     if (umfang.lexeme) neu.lexeme = umfang.lexeme;
-    if (umfang.wortarten) neu.wortarten = umfang.wortarten;
     for (const [schluessel, feld] of Object.entries(felder)) {
       const wahl = feld.gewaehlt();
       if (!wahl.length) continue;
@@ -232,6 +238,14 @@ async function bearbeiten(behaelter, z) {
       }, 'Speichern'),
       h('button', { onclick: () => zeichnen(behaelter) }, 'Abbrechen')));
   leeren(behaelter).append(kasten);
+}
+
+function wortartName(w) {
+  return { verb: 'Verben', substantiv: 'Substantive', adjektiv: 'Adjektive',
+           adverb: 'Adverbien', pronomen: 'Pronomen', numerale: 'Zahlwörter',
+           konjunktion: 'Konjunktionen', praeposition: 'Präpositionen',
+           artikel: 'Artikel', wendung: 'Wendungen',
+           sonstiges: 'Sonstiges' }[w] || w;
 }
 
 function zahl(wert, beschriftung, art) {
@@ -344,11 +358,17 @@ async function teilNeuesZiel(behaelter) {
     umfangFelder._formgruppen = mehrfachwahl(
       'Formgruppen', alleGruppen.map((g) => [g.kennung, g.kurz]),
       'Nur Formaufgaben dieser Zeiten. Leer heißt: alle.');
+    umfangFelder._wortarten = mehrfachwahl(
+      'Wortarten',
+      (await api.wortarten(sammlungId)).map(
+        (w) => [w.wortart, `${wortartName(w.wortart)} · ${w.aufgaben}`]),
+      'Nichts gewählt heißt: alle.');
     umfangFelder._typen = mehrfachwahl(
       'Aufgabentypen', Object.entries(typen.typen).map(([k, t]) => [k, t.name]),
       'Leer heißt: alle.');
     anfuegen(umfangFelder, umfangFelder._lektionen.element,
-             umfangFelder._formgruppen.element, umfangFelder._typen.element);
+             umfangFelder._formgruppen.element, umfangFelder._wortarten.element,
+             umfangFelder._typen.element);
   };
   sammlungWahl.addEventListener('change', umfangBauen);
 
@@ -366,6 +386,7 @@ async function teilNeuesZiel(behaelter) {
         if (sammlungWahl.value) umfang.sammlungen = [Number(sammlungWahl.value)];
         for (const [feld, schluessel] of [['_lektionen', 'lektionen'],
                                           ['_formgruppen', 'formgruppen'],
+                                          ['_wortarten', 'wortarten'],
                                           ['_typen', 'typen']]) {
           const wahl = umfangFelder[feld]?.gewaehlt();
           if (wahl?.length) {

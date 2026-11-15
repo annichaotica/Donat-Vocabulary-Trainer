@@ -16,6 +16,28 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Gezielt üben: Verben, Adjektive, eine einzelne Zeitform
+
+Zu merken war: »dann brauchen wir noch ein paar mehr Lernmodi: Verben
+lernen, Zeiten lernen, bestimmte Worttypen, k.A. Adjektive oder so«.
+
+Auf jeder Sammlungskarte gibt es den Knopf **Gezielt üben**. Dahinter
+stehen alle Wortarten, die wirklich in der Sammlung vorkommen — mit
+Zahlen daneben, damit man sieht, ob sich ein Ausschnitt lohnt — und
+darunter jede Zeit und jede Formentabelle einzeln.
+
+Das ist freies Üben: keine Tagesdosis, es geht, solange man mag. Mit
+dem Terminplan kam sonst »Nichts zu tun«, sobald die Tagesdosis an
+neuen Wörtern verbraucht war und zufällig nichts aus dem gewählten
+Ausschnitt fällig stand — gemessen: 737 Adjektivaufgaben, und die
+Abfrage lieferte null. Der Lernstand zählt ganz normal mit.
+
+Der Modus gilt für die Sitzung und wird nicht gespeichert: wer heute
+nur Verben übt, soll morgen nicht unbemerkt darin hängen.
+
+Dieselben Ausschnitte gibt es jetzt auch als Lernziel — die Wortarten
+fehlten dort, obwohl der Umfang sie längst konnte.
+
 ### Keine Zeitform, die das Lehrwerk noch nicht eingeführt hat
 
 Zu merken war: »bei den Anfängerkapiteln, die ich mir gerade ansehe,

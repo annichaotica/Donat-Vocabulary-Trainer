@@ -118,7 +118,14 @@ export class Sitzung {
         : { benutzer_id: zustand.benutzerId,
             sammlung_id: this.optionen.sammlungId ?? zustand.sammlungId,
             lektion_id: this.optionen.lektionId,
-            nur: this.optionen.nur, anzahl: 1, ...grenze });
+            anzahl: 1,
+            // Erst der Modus, dann der Weg: wer ausdrücklich
+            // »Fehler wiederholen« aufruft, meint das auch, wenn
+            // noch ein Ausschnitt eingestellt ist. Andersherum
+            // überschriebe das »frei« des Modus die Absicht.
+            ...(zustand.lernmodus || {}),
+            ...(this.optionen.nur ? { nur: this.optionen.nur } : {}),
+            ...grenze });
     } catch (fehler) {
       this.zeichneFehler(fehler.message);
       return;

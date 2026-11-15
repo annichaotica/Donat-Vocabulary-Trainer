@@ -80,6 +80,86 @@ function profilpunkt(p) {
   return punkt;
 }
 
+/** »Gezielt üben« — Verben, Adjektive, eine einzelne Zeitform.
+ *
+ * »Dann brauchen wir noch ein paar mehr Lernmodi: Verben lernen, Zeiten
+ * lernen, bestimmte Worttypen, k.A. Adjektive oder so.«
+ *
+ * Ein Modus ist KEIN eigener Mechanismus, sondern ein Ausschnitt —
+ * dieselben Begriffe, die auch der Umfang eines Lernziels kennt, und
+ * dieselben Spalten in der Abfrage. Ein zweiter Weg daneben liefe
+ * früher oder später auseinander; genau das war bei den Übungen schon
+ * einmal passiert.
+ *
+ * Er gilt für diese Sitzung und wird nicht gespeichert. Wer heute nur
+ * Verben übt, soll morgen nicht unbemerkt darin hängen.
+ */
+async function modusWaehlen(behaelter, s) {
+  let gruppen = { wortarten: {} };
+  let vorhanden = [];
+  try {
+    [gruppen, vorhanden] = await Promise.all([
+      api.formgruppen(s.sprache), api.wortarten(s.id),
+    ]);
+  } catch (fehler) { meldung(fehler.message, 'fehler'); }
+
+  const el = leeren(behaelter);
+  el.append(h('h1', { text: 'Gezielt üben' }));
+  el.append(h('p', { class: 'leise',
+    text: `${s.name} — ein Ausschnitt statt des ganzen Plans, und ohne `
+        + 'Tagesdosis: hier wird geübt, solange du magst. Der Lernstand '
+        + 'zählt ganz normal mit. Beim nächsten »Lernen« gilt wieder '
+        + 'der Plan.' }));
+
+  // FREIES Üben, nicht der Plan.
+  //
+  // Mit dem Plan kam »Nichts zu tun«, sobald die Tagesdosis an neuen
+  // Wörtern verbraucht war und zufällig nichts aus dem gewählten
+  // Ausschnitt fällig stand — gemessen: 737 Adjektivaufgaben, und die
+  // Abfrage lieferte null. Das ist rechnerisch richtig und als Angebot
+  // unbrauchbar: wer ein Thema anklickt, will es üben. Der Lernstand
+  // zählt dabei normal mit, nur der Terminplan steuert nicht.
+  const starten = (modus, name) => {
+    merken({ sammlungId: s.id, lektionId: null,
+             lernmodus: { ...modus, nur: 'frei' } });
+    meldung(`Gezielt üben: ${name}`);
+    location.hash = '#/lernen';
+  };
+
+  const nachWortart = h('div', { class: 'karte' },
+    h('h2', { style: 'margin-top:0', text: 'Nach Wortart' }),
+    h('div', { class: 'gruppenwahl' },
+      ...vorhanden.map((w) => h('button', {
+        type: 'button',
+        onclick: () => starten({ wortart: [w.wortart] },
+                               wortartName(w.wortart)),
+      }, `${wortartName(w.wortart)} · ${w.aufgaben}`))));
+
+  // Jede Formgruppe einzeln — das ist das »Zeiten lernen«. Mit der
+  // Wortart davor, weil »maskulin Nominativ Singular« bei Adjektiv,
+  // Pronomen, Artikel und Zahlwort gleich heißt.
+  const zeiten = h('div', { class: 'karte' },
+    h('h2', { style: 'margin-top:0', text: 'Nach Zeit oder Tabelle' }));
+  for (const [wortart, liste] of Object.entries(gruppen.wortarten || {})) {
+    if (!liste.length) continue;
+    zeiten.append(h('h3', { text: wortartName(wortart) }),
+      h('div', { class: 'gruppenwahl' },
+        ...liste.map((g) => h('button', {
+          type: 'button',
+          onclick: () => starten({ formgruppe: [g.kennung] }, g.name),
+        }, g.name))));
+  }
+
+  el.append(nachWortart);
+  if (vorhanden.length) el.append(zeiten);
+  el.append(h('div', { class: 'frage-werkzeuge',
+                       style: 'justify-content:flex-start' },
+    h('button', { onclick: () => { merken({ lernmodus: null });
+                                   zeichnen(behaelter); } },
+      'Zurück')));
+}
+
+
 /** Schalter »lerne ich diese Sammlung aktiv« — samt Erklärung daneben.
  *
  * Die Vorgabe steckt im Rücken: eigene Sammlungen ja, fremde nein. Hier
@@ -236,6 +316,7 @@ export async function zeichnen(behaelter) {
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/texte'; },
         }, 'Texte'),
+        h('button', { onclick: () => modusWaehlen(behaelter, s) }, 'Gezielt üben'),
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/import'; },
         }, 'Einlesen'),
@@ -254,6 +335,14 @@ export async function zeichnen(behaelter) {
   }
   el.append(reihe);
   el.append(await teilNeueSammlung(behaelter, sprachen));
+}
+
+function wortartName(w) {
+  return { verb: 'Verben', substantiv: 'Substantive', adjektiv: 'Adjektive',
+           adverb: 'Adverbien', pronomen: 'Pronomen', numerale: 'Zahlwörter',
+           konjunktion: 'Konjunktionen', praeposition: 'Präpositionen',
+           artikel: 'Artikel', wendung: 'Wendungen',
+           sonstiges: 'Sonstiges' }[w] || w;
 }
 
 function zahlKasten(wert, beschriftung, art) {

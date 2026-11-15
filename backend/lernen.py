@@ -605,6 +605,8 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
              sammlung_id: int | None = None,
              lektion_id: int | None = None,
              typen: list[str] | None = None,
+             wortarten: list[str] | None = None,
+             formgruppen: list[str] | None = None,
              nur: str | None = None,
              anzahl: int = 1,
              lernziel_id: int | None = None,
@@ -717,6 +719,18 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     bedingungen = [f"l.sammlung_id IN ({','.join('?' * len(sammlungen))})",
                    "a.aktiv = 1", LEKTIONSSCHRANKE_SQL]
     werte: list = [benutzer_id, *sammlungen, benutzer_id]
+    # Die Lernmodi: »nur Verben«, »nur eine Zeitform«, »nur Adjektive«.
+    #
+    # Dieselben Begriffe, die der Umfang eines Lernziels kennt — und
+    # dieselben Spalten. Ein Modus ist kein eigener Mechanismus,
+    # sondern ein Ausschnitt; ein zweiter Weg daneben liefe früher oder
+    # später auseinander, wie es `uebung_lernen` schon einmal tat.
+    for auswahl, spalte in ((wortarten, "l.wortart"),
+                            (formgruppen, "a.formgruppe")):
+        if auswahl:
+            bedingungen.append(
+                f"{spalte} IN ({','.join('?' * len(auswahl))})")
+            werte += list(auswahl)
     if lektion_id is not None:
         bedingungen.append("l.lektion_id = ?")
         werte.append(lektion_id)
@@ -868,8 +882,11 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     if not reihe and vorzug is not None:
         # Der bevorzugte Topf ist leer — dann eben der andere. Eine halb
         # ungenutzte Tagesdosis hilft niemandem.
-        return naechste(db, benutzer_id, sammlung_id, lektion_id, typen, nur,
-                        anzahl, lernziel_id, bis_lektion, ohne_grenze,
+        return naechste(db, benutzer_id, sammlung_id=sammlung_id,
+                        lektion_id=lektion_id, typen=typen,
+                        wortarten=wortarten, formgruppen=formgruppen,
+                        nur=nur, anzahl=anzahl, lernziel_id=lernziel_id,
+                        bis_lektion=bis_lektion, ohne_grenze=ohne_grenze,
                         _ohne_vorzug=True)
     zaehler = _schon_gefragt_heute(db, benutzer_id)
     nachschub = None

@@ -764,6 +764,32 @@ def sammlung_einstellungen_setzen(sammlung_id: int, eingabe: SammlungEinstellung
             "aufgaben": bilanz}
 
 
+@app.get("/api/sammlungen/{sammlung_id}/wortarten")
+def sammlung_wortarten(sammlung_id: int, benutzer_id: int | None = None,
+                       request: Request = None,
+                       db: sqlite3.Connection = DB):
+    """Welche Wortarten kommen in dieser Sammlung vor, mit Zahlen.
+
+    Aus dem Bestand, nicht aus dem Sprachprofil: das Profil kennt nur
+    die Wortarten mit Formentabellen, also keine Adverbien und keine
+    Konjunktionen. Zum gezielten Üben braucht man aber genau die Liste,
+    die wirklich dasteht — und die Zahlen daneben, damit man sieht, ob
+    sich ein Ausschnitt lohnt.
+    """
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    _holen(db, "sammlung", sammlung_id)
+    return dbm.zeilen(db, """
+        SELECT l.wortart,
+               COUNT(DISTINCT l.id) AS woerter,
+               COUNT(a.id) AS aufgaben
+          FROM lexem l
+          LEFT JOIN aufgabe a ON a.lexem_id = l.id AND a.aktiv = 1
+         WHERE l.sammlung_id = ?
+         GROUP BY l.wortart
+        HAVING aufgaben > 0
+         ORDER BY aufgaben DESC""", (sammlung_id,))
+
+
 @app.get("/api/sammlungen/{sammlung_id}/lehrgang")
 def lehrgang_lesen(sammlung_id: int, benutzer_id: int | None = None,
                    request: Request = None, db: sqlite3.Connection = DB):
@@ -1882,6 +1908,14 @@ def lern_naechste(benutzer_id: int, sammlung_id: int | None = None,
                                   "Nummer — der übliche Schnitt beim "
                                   "Mitlernen mit einem Lehrwerk"),
                   typ: list[str] | None = Query(default=None),
+                  wortart: list[str] | None = Query(
+                      default=None,
+                      description="Lernmodus: nur diese Wortarten, z.B. "
+                                  "verb oder adjektiv"),
+                  formgruppe: list[str] | None = Query(
+                      default=None,
+                      description="Lernmodus: nur diese Formgruppen, z.B. "
+                                  "eine einzelne Zeitform"),
                   nur: str | None = None,
                   anzahl: int = Query(default=1, ge=1, le=50),
                   lernziel_id: int | None = None,
@@ -1896,9 +1930,16 @@ def lern_naechste(benutzer_id: int, sammlung_id: int | None = None,
     _holen(db, "benutzer", benutzer_id)
     if nur not in (None, "neu", "faellig", "fehler", "frei"):
         raise HTTPException(400, "nur muss neu, faellig, fehler oder frei sein")
-    return lernmodul.naechste(db, benutzer_id, sammlung_id, lektion_id,
-                              typ, nur, anzahl, lernziel_id, bis_lektion,
-                              ohne_grenze)
+    # Mit Namen, nicht nach Stellung: die Reihenfolge der Parameter hat
+    # sich schon einmal geändert, und ein positionaler Aufruf rutschte
+    # dabei stillschweigend um eine Stelle.
+    return lernmodul.naechste(db, benutzer_id, sammlung_id=sammlung_id,
+                              lektion_id=lektion_id, typen=typ,
+                              wortarten=wortart, formgruppen=formgruppe,
+                              nur=nur, anzahl=anzahl,
+                              lernziel_id=lernziel_id,
+                              bis_lektion=bis_lektion,
+                              ohne_grenze=ohne_grenze)
 
 
 @app.post("/api/lernen/pruefen")

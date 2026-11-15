@@ -511,6 +511,13 @@ class ImportEingabe(BaseModel):
     doppelte: Literal["ueberspringen", "ergaenzen", "trotzdem"] = "ueberspringen"
 
 
+class AbtippenEingabe(BaseModel):
+    """Eine abgetippte Vokabel. Prüft nur — schreibt keinen Lernstand."""
+
+    lexem_id: int
+    eingabe: str
+
+
 class OAuthClientAnlegen(BaseModel):
     """Ein Konnektor, der sich über OAuth anmeldet.
 

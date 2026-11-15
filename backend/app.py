@@ -26,6 +26,7 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                RedirectResponse, Response)
 from fastapi.staticfiles import StaticFiles
 
+import abtippen
 import aufgaben
 import einlesen
 import drossel
@@ -61,6 +62,7 @@ from modelle import (RegelEingabe, RegelAendern,
                      LernzielAendern, LernzielAnlegen,
                      SammelimportEingabe,
                      McpTokenAnlegen, OAuthClientAnlegen,
+                     AbtippenEingabe,
                      FormAendern, FreigabeEingabe,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
@@ -2393,6 +2395,25 @@ def wer_bin_ich(request: Request, db: sqlite3.Connection = DB):
     bisher aus der Liste.
     """
     return identitaet.wer_bin_ich(db, request.headers)
+
+
+# ============================================================== Abtippen
+
+@app.get("/api/sammlungen/{sammlung_id}/abtippen")
+def abtippen_reihe(sammlung_id: int, lektion_id: int | None = None,
+                   db: sqlite3.Connection = DB):
+    """Die Wörter zum Abtippen, in der Reihenfolge des Lehrwerks."""
+    _holen(db, "sammlung", sammlung_id)
+    return abtippen.reihe(db, sammlung_id, lektion_id)
+
+
+@app.post("/api/abtippen/pruefen")
+def abtippen_pruefen(eingabe: AbtippenEingabe, db: sqlite3.Connection = DB):
+    """Stimmt das Abgetippte? Schreibt bewusst KEINEN Lernstand fort."""
+    try:
+        return abtippen.pruefen(db, eingabe.lexem_id, eingabe.eingabe)
+    except KeyError as fehler:
+        raise HTTPException(404, str(fehler))
 
 
 # ================================================================ OAuth

@@ -841,3 +841,34 @@ input[type="file"] { max-width: 100%; }
 }
 
 .fuehrung-mehr { margin: 0 0 .7rem; font-size: .9em; }
+
+
+/* Abtippen: sich mit den Wörtern vertraut machen.
+   Die Vorlage ist das Wichtigste auf der Seite und wird entsprechend
+   groß gesetzt — abgeschrieben wird, was man gut sieht. */
+.abtippen-kopf {
+  display: flex; justify-content: space-between; gap: 1rem;
+  margin-bottom: .4rem;
+}
+.abtippen-balken {
+  height: 4px; border-radius: 2px; background: rgba(0, 0, 0, .08);
+  overflow: hidden; margin-bottom: 1rem;
+}
+.abtippen-balken i { display: block; height: 100%; background: var(--akzent); }
+.abtippkarte { text-align: center; padding: 1.4rem 1rem; }
+.abtipp-deutsch { margin: 0; font-size: 1.05rem; color: var(--leise, #667); }
+.abtipp-fremd {
+  margin: .5rem 0 0; font-size: 2rem; font-weight: 600; line-height: 1.25;
+  /* Umbruch erlauben: »Entschuldigung« passt sonst nicht aufs Handy. */
+  overflow-wrap: anywhere;
+}
+.abtippfeld {
+  width: 100%; font: inherit; font-size: 1.4rem; text-align: center;
+  padding: .6rem .8rem; margin: .8rem 0;
+  border: 1px solid #ccc; border-radius: .4rem;
+}
+.abtippfeld:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
+/* Kurz grün, dann kommt von selbst die nächste Karte. */
+.abtippfeld.richtig {
+  border-color: var(--richtig); background: #e8f5e9; color: #1b5e20;
+}

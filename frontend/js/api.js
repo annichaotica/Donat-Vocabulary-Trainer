@@ -110,6 +110,11 @@ export const api = {
   // Text oder Merkmalsbündel, fällt die Form von selbst auf »ungeprüft«
   // zurück — was geändert wurde, ist nicht mehr das, was jemand
   // freigegeben hat.
+  abtippenReihe: (sammlungId, lektionId = null) =>
+    ruf(`/sammlungen/${sammlungId}/abtippen`,
+        { frage: lektionId ? { lektion_id: lektionId } : {} }),
+  abtippenPruefen: (daten) => ruf('/abtippen/pruefen', { methode: 'POST', daten }),
+
   oauthClients: () => ruf('/oauth/clients'),
   oauthClientAnlegen: (daten) => ruf('/oauth/clients', { methode: 'POST', daten }),
   oauthClientZuruecknehmen: (id) =>

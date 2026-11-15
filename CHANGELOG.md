@@ -16,6 +16,42 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Abtippen — ein Modus zum Vertrautmachen
+
+»Alle Vokabeln zeigen, deutsch französisch und abtippen, erfolgreich
+abgetippt, dann nächste. Sie muss sich erst mal mit den Wörtern
+vertraut machen.«
+
+Neben **Lernen** steht jetzt **Abtippen**. Es geht alle Wörter einer
+Sammlung durch, in der Reihenfolge des Lehrwerks: deutsche Seite oben,
+das fremde Wort groß darunter — sichtbar, es ist eine Vorlage und kein
+Rätsel. Richtig abgetippt springt es von selbst weiter; die
+Eingabetaste genügt, man muss die Hände nicht von der Tastatur nehmen.
+Falsch abgetippt passiert fast nichts: es steht da, was abweicht
+(»Ein t fehlt«), und man tippt weiter. Kein Fehlerzähler.
+
+**Es wird dabei kein Lernstand geschrieben** — keine Note, kein
+Termin, kein Eintrag im Protokoll. Das ist der Kern und nicht eine
+Auslassung: die Abfrage fragt ab, was man kennt, und rechnet daraus
+einen Termin. Wer ein Wort zum ersten Mal sieht, hat darauf keine
+Antwort, und eine abgeschriebene Vokabel als »gewusst« zu verbuchen
+würde den Plan genau für die Wörter verfälschen, die noch niemand
+kann. Es steht auch auf der Seite, damit niemand sich täuscht.
+
+Geprüft wird trotzdem genau, mit dem Sprachprofil: `l'ete` statt
+`l'été` gilt nicht. Beim Abtippen ist die Vorlage ja sichtbar, also
+ist jede Abweichung ein Vertipper — und gerade den soll man sehen. Die
+Akzentleiste steht darunter wie in der Abfrage.
+
+Wörter, die noch niemand durchgesehen hat, werden **gekennzeichnet,
+aber nicht weggelassen**. Der erste Entwurf wollte sie aussperren —
+beim Abschreiben prägt sich auch eine falsche Schreibung ein. Das
+hätte aber bedeutet, dass der Trainer ein Wort abfragt, das er zum
+Abtippen verschweigt: die Vokabelabfrage entsteht allein daraus, dass
+eine Übersetzung da ist. Zwei Maßstäbe für dieselbe Vokabel wären
+schlimmer als ein Hinweis.
+
+
 ### OAuth — damit auch ChatGPT angebunden werden kann
 
 Der Dialog »Benutzerdefinierten MCP-Server hinzufügen« in ChatGPT

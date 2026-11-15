@@ -528,6 +528,15 @@ export async function zeichnen(behaelter) {
           class: 'wichtig',
           onclick: () => { merken({ sammlungId: s.id, lektionId: null }); location.hash = '#/lernen'; },
         }, 'Lernen'),
+        // Vor der Abfrage, nicht dahinter: wer eine Lektion neu
+        // bekommt, macht sich erst vertraut und wird dann abgefragt.
+        // In der Leiste steht es deshalb gleich neben »Lernen«.
+        h('button', {
+          onclick: () => { merken({ sammlungId: s.id, lektionId: null });
+                           location.hash = '#/abtippen'; },
+          title: 'Alle Wörter durchgehen und abtippen — die Lösung steht '
+               + 'dabei. Zählt nicht für die Abfrage.',
+        }, 'Abtippen'),
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/wortschatz'; },
         }, 'Wortschatz'),

@@ -89,6 +89,108 @@ export async function zeichnen(behaelter) {
       'Bei Sätzen wird Wort für Wort verglichen, und du siehst genau, '
       + 'welches Wort anders war.')));
 
+  el.append(abschnitt('Was heute drankommt',
+    h('p', {}, 'Du suchst dir nicht aus, was abgefragt wird — der Trainer '
+      + 'rechnet es aus. Jedes Wort bekommt einen Termin: was du sicher '
+      + 'kannst, kommt in Wochen wieder, was wackelt, morgen. Oben in der '
+      + 'Abfrage steht, wie weit du heute bist.'),
+    h('p', {}, h('b', { text: 'Das Tagespensum ist eine Zahl, keine Mauer. ' }),
+      'Steht daneben ein Rückstand, heißt das nur: so viel wäre außerdem '
+      + 'fällig. Du musst ihn nicht aufholen — er wird kleiner, wenn du '
+      + 'dranbleibst.'),
+    h('p', {}, h('b', { text: 'Erst jedes Wort einmal, dann das zweite Mal. ' }),
+      'Auch wenn du etwas dreimal hintereinander falsch hast, kommt es '
+      + 'nicht dreimal hintereinander — erst sind die anderen dran.'),
+    h('p', { class: 'leise' }, 'Wie viele Fragen am Tag und wie viel Neues '
+      + 'dazwischen, stellst du unter Einstellungen ein.')));
+
+  el.append(abschnitt('Lernziele: ein Block mit Termin',
+    h('p', {}, 'Ein Lernziel ist ein Ausschnitt mit einem Ziel davor: ',
+      h('b', { text: 'Lektion 3 bis Freitag' }), '. Du sagst, was dazugehört '
+      + '— Lektionen, Wortarten, Zeiten, Abfragearten —, und wenn du einen '
+      + 'Termin einträgst, rechnet der Trainer aus, wie viel täglich nötig '
+      + 'wäre. Reicht dein Pensum dafür nicht, sagt er es dir.'),
+    h('p', {}, h('b', { text: 'Was käme dran? ' }),
+      'zeigt den nächsten Block, bevor du anfängst, und begründet ihn: so '
+      + 'viel Fälliges, so viel Wackliges, so viel Neues.'),
+    h('p', {}, h('b', { text: 'Neu würfeln ' }),
+      'stellt denselben Block aus anderen Wörtern zusammen. Wie viel '
+      + 'fällig, wacklig und neu ist, bleibt gleich — das entscheidet der '
+      + 'Termin, nicht der Würfel.'),
+    h('p', { class: 'leise' }, 'Ein Lernziel lässt sich jederzeit ändern, '
+      + 'auch nachträglich ein Datum setzen oder wieder entfernen.')));
+
+  el.append(abschnitt('Gezielt üben',
+    h('p', {}, 'Manchmal will man nicht den Plan, sondern ein Thema: nur '
+      + 'Verben, nur Adjektive, nur den Aorist. Auf jeder Sammlungskarte '
+      + 'steht dafür ', h('b', { text: 'Gezielt üben' }), '. Dahinter '
+      + 'stehen alle Wortarten, die es in deiner Sammlung wirklich gibt, '
+      + 'und jede Zeit einzeln — mit der Zahl daneben, damit du siehst, '
+      + 'ob sich das lohnt.'),
+    h('p', {}, h('b', { text: 'Ohne Tagespensum. ' }),
+      'Hier wird geübt, solange du magst. Dein Lernstand zählt ganz normal '
+      + 'mit; nur der Terminplan steuert nicht.'),
+    h('p', { class: 'leise' }, 'Das gilt für diese Sitzung. Beim nächsten '
+      + '»Lernen« bist du wieder im Plan — wer heute nur Verben übt, soll '
+      + 'morgen nicht unbemerkt darin hängen.')));
+
+  el.append(abschnitt('Nur das, was ihr schon hattet',
+    h('p', {}, 'Eine Vokabelsammlung bringt oft alle Formen mit, auch die '
+      + 'aus Kapiteln, die ihr noch gar nicht hattet. Dann fragt der '
+      + 'Trainer nach dem Aorist, während ihr beim Präsens seid.'),
+    h('p', {}, 'Unter ', h('b', { text: 'Einstellungen' }), ' steht darum ',
+      h('b', { text: 'Wo stehst du im Lehrwerk?' }), '. Dort trägst du '
+      + 'zweierlei ein: ab welcher Lektion eine Zeitform im Buch '
+      + 'vorkommt — das schlägt der Trainer aus euren Lektionsnamen vor — '
+      + 'und bei welcher Lektion du gerade bist.'),
+    h('p', {}, 'Was später kommt, bleibt dann draußen. Kommst du dort an, '
+      + 'ist es von selbst wieder dabei; du musst nichts umstellen.'),
+    h('p', {}, h('b', { text: 'Nichts geht verloren. ' }),
+      'Ausgeblendet heißt wartet, nicht gelöscht — auch dein Lernstand '
+      + 'bleibt stehen.'),
+    h('p', { class: 'leise' }, 'Trägst du keine Lektion ein, ändert sich '
+      + 'gar nichts; dann kommt alles dran wie bisher. Bedeutungen sind '
+      + 'nie betroffen — ein Wort kann man lernen, bevor man seine Zeiten '
+      + 'kennt.')));
+
+  el.append(abschnitt('Welche Sammlungen mitgelernt werden',
+    h('p', {}, 'Wenn dir jemand eine Sammlung freigibt, heißt das erst '
+      + 'einmal nur: du darfst hineinsehen und mithelfen. Gelernt wird sie '
+      + 'nicht automatisch — sonst lägen fremde Vokabeln zwischen deinen.'),
+    h('p', {}, 'Auf jeder Sammlungskarte steht dafür ein Häkchen. Eigene '
+      + 'Sammlungen sind angehakt, freigegebene nicht. Wollt ihr dasselbe '
+      + 'zusammen lernen, hakt es jeder für sich an.'),
+    h('p', { class: 'leise' }, 'Das betrifft nur die allgemeine Abfrage. '
+      + 'Über »Lernen« auf der Karte kommst du in jede Sammlung hinein, '
+      + 'auch in eine nicht angehakte.')));
+
+  el.append(abschnitt('Texte lesen und übersetzen',
+    h('p', {}, 'Unter ', h('b', { text: 'Texte' }), ' auf der '
+      + 'Sammlungskarte kannst du einen Text einfügen oder als Datei '
+      + 'hochladen — ein Stück aus dem Buch, eine Zeitungsmeldung, was du '
+      + 'willst. Leerzeilen trennen die Absätze; in diesen Abschnitten '
+      + 'übersetzt du dann.'),
+    h('p', {}, h('b', { text: 'Vorher sagt er dir, ob du das kannst. ' }),
+      'Jedes Wort wird mit deinem Wortschatz verglichen — Grundformen und '
+      + 'alle eingetragenen Formen. Darüber steht ein Satz wie ',
+      h('i', { text: '»Fast — 2 Wörter fehlen dir noch«' }), '.'),
+    h('p', {}, h('b', { text: 'Geraten wird dabei nicht. ' }),
+      'Steht μικρός in deinem Wortschatz, aber die Form μικρό nicht, gilt '
+      + 'μικρό als unbekannt. Lieber eine zu vorsichtige Auskunft als eine '
+      + 'Zusage, vor der du dann sitzt.'),
+    h('p', {}, h('b', { text: 'Jedes Wort ist anklickbar. ' }),
+      'Ein Klick zeigt deinen eigenen Eintrag dazu, samt der Form, die im '
+      + 'Text steht: bei ', h('b', { text: 'διαβάζει' }), ' also ',
+      h('b', { text: 'διαβάζω' }), ' — lesen, 3. Person Singular Präsens. '
+      + 'Keine Maschinenübersetzung, dein eigener Wortschatz.'),
+    h('p', {}, 'Deine Übersetzung sichert sich beim Tippen. Es gibt kein '
+      + 'Abschicken, und du kannst jederzeit aufhören.'),
+    h('p', {}, h('b', { text: 'Was dir fehlt, kannst du anfordern. ' }),
+      'Rot unterlegte Wörter kennst du noch nicht — antippen und ',
+      h('i', { text: '»Für die KI merken«' }), '. Dein Chatprogramm liest '
+      + 'diese Liste über die Schnittstelle, legt die Vokabeln an und hakt '
+      + 'sie ab. Wie du es anschließt, steht weiter unten.')));
+
   el.append(abschnitt('Griechisch tippen',
     h('p', {}, h('b', { text: 'Du musst nichts umschalten. ' }),
       'Tippst du ', h('b', { text: 'grafo' }), ', steht im Feld ',
@@ -203,6 +305,13 @@ export async function zeichnen(behaelter) {
       + 'bis ein Mensch es angesehen hat. Das ist Absicht: ein Programm, '
       + 'das seine eigenen Einträge freigibt, hätte die Prüfung '
       + 'abgeschafft, nicht erledigt.'),
+    h('p', {}, h('b', { text: 'Es sieht auch, was dir fehlt. ' }),
+      'Die Wörter, die du beim Lesen angefordert hast, kann es abrufen — '
+      + 'mit dem Satz, in dem sie standen, damit es die richtige Bedeutung '
+      + 'erwischt. Es kann dir auch selbst einen Text hinlegen und vorher '
+      + 'nachsehen, welche Wörter dir dafür noch fehlen. Sag ihm einfach: ',
+      h('i', { text: '»Schau nach, welche Wörter ich angefordert habe, und '
+                     + 'trag sie ein.«' })),
     h('p', {}, h('button', {
       onclick: () => { location.hash = '#/freigabe'; },
     }, 'Zur Freigabe'))));

@@ -16,6 +16,21 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Die Anleitung kennt den Trainer wieder
+
+Sie hatte zwei Abschnitte — wie eine Abfrage abläuft und wie man sein
+Chatprogramm anschließt — und das war schon länger nicht mehr alles.
+Weder Lernziele noch Tagespensum standen darin, von den Sachen von
+heute ganz zu schweigen. Eine Funktion, die niemand findet, gibt es
+nicht.
+
+Sechs Abschnitte dazu: was heute drankommt (Pensum, Rückstand, die
+Runde), Lernziele und Blöcke samt »Neu würfeln«, gezielt üben, »nur
+das, was ihr schon hattet«, welche Sammlungen mitgelernt werden, und
+Texte lesen und übersetzen. Dazu im Teil über das Chatprogramm ein
+Absatz darüber, dass es die angeforderten Wörter abrufen und selbst
+Texte hinlegen kann.
+
 ### Gezielt üben: Verben, Adjektive, eine einzelne Zeitform
 
 Zu merken war: »dann brauchen wir noch ein paar mehr Lernmodi: Verben

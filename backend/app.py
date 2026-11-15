@@ -62,7 +62,7 @@ from modelle import (RegelEingabe, RegelAendern,
                      LernzielAendern, LernzielAnlegen,
                      SammelimportEingabe,
                      McpTokenAnlegen, OAuthClientAnlegen,
-                     AbtippenEingabe,
+                     AbtippenEingabe, WuenscheAbhaken,
                      FormAendern, FreigabeEingabe,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
@@ -2423,6 +2423,21 @@ def wer_bin_ich(request: Request, db: sqlite3.Connection = DB):
     bisher aus der Liste.
     """
     return identitaet.wer_bin_ich(db, request.headers)
+
+
+@app.post("/api/wortwuensche/abhaken")
+def wortwuensche_abhaken(benutzer_id: int, eingabe: WuenscheAbhaken,
+                         db: sqlite3.Connection = DB):
+    """Viele Wortwünsche auf einmal abhaken.
+
+    Einzeln wären es bei einem Zeitungsartikel über achthundert
+    Aufrufe. Abgehakt wird nur, was diese Person erledigen darf —
+    eigene Wünsche und die aus Sammlungen mit Schreibrecht.
+    """
+    _holen(db, "benutzer", benutzer_id)
+    return lesetexte.wuensche_abhaken(
+        db, benutzer_id, [z.model_dump() for z in eingabe.zuordnungen],
+        zugang.beschreibbare_sammlungen(db, benutzer_id))
 
 
 # ============================================================== Abtippen

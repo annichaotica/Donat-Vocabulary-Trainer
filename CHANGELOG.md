@@ -14,6 +14,50 @@ Eintrag wiederfindet.
 
 ---
 
+## 16.11.2026
+
+### Kapitel 101 eingespielt — und drei Dinge dabei gelernt
+
+Das Paket aus `kapitel101.zip`: **550 neue Wörter mit 7.216 Formen**,
+dazu 123 Formen für 55 Wörter, die es schon gab, und 767 abgehakte
+Wortwünsche. Die Deckung des Artikels ist damit von 27 % auf **98 %**
+gestiegen — von 840 unbekannten Wörtern sind 24 übrig.
+
+Vor dem ersten Schreibzugriff ein Abzug nach
+`daten/abzug/vor-kapitel101-…`; er hat sich noch am selben Abend
+bezahlt gemacht, siehe unten.
+
+### Wortwünsche: ein Sammelwerkzeug zum Abhaken
+
+Einzeln abzuhaken wären bei einem Zeitungsartikel über achthundert
+Aufrufe gewesen — länger als das Eintragen selbst. `POST
+/api/wortwuensche/abhaken` und das MCP-Werkzeug
+`offene_woerter_abhaken` nehmen jetzt eine ganze Liste.
+
+**Beim ersten Lauf an echten Daten ging es schief**, und der Grund ist
+lehrreich: im griechischen Artikel stehen deutsche Zitate, also stand
+»ich« auf der griechischen Wunschliste — und hakte das gleichlautende
+»ich« in Max' mittelhochdeutscher Liste gleich mit ab. 89 fremde
+Wünsche auf einen Schlag. Aus dem Abzug wiederhergestellt und gegen
+ihn geprüft; der Abgleich bleibt jetzt in einer Sammlung, und wo das
+Wort in mehreren offen steht, wird nichts geraten, sondern gemeldet.
+
+### Großbuchstaben und Enklise im Textabgleich
+
+Zwei Rechtschreibregeln, die bisher als Wissenslücke gezählt wurden:
+
+**Griechische Großbuchstaben tragen keinen Akzent.** Zeitungen
+schreiben »Ηταν«, »Ελληνας«, »Οχι«; im Wortschatz steht ήταν,
+Έλληνας, όχι. Das waren zwölf der verbliebenen Unbekannten.
+
+**Enklise.** »το πελατολόγιό του« — das Substantiv trägt einen
+zweiten Akzent, den das angehängte Wörtchen erzwingt.
+
+Beides gilt nur dort, wo es eindeutig ist: wo zwei Wörter sich allein
+im Akzent unterscheiden (»πότε« wann, »ποτέ« nie), wird nichts
+zugeordnet. Ein falsch erkanntes Wort im Lesetext ist schlimmer als
+ein als unbekannt gemeldetes — das eine merkt man, das andere nicht.
+
 ## 15.11.2026
 
 ### Die KI sieht jetzt auch die Wünsche der anderen

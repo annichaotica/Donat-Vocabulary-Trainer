@@ -160,7 +160,52 @@ def _lernstaende(db: sqlite3.Connection, sammlung_id: int,
     return stand
 
 
-def _zuordnen(folge: list[dict], karte: dict[str, int]) -> list[dict]:
+def _ohne_akzent_karte(karte: dict[str, int]) -> dict[str, int]:
+    """Dieselbe Karte, akzentlos — für den Rückfall bei Großschreibung.
+
+    Nur eindeutige Schlüssel: wo zwei verschiedene Wörter ohne Akzent
+    gleich aussehen (»πότε« wann und »ποτέ« nie), wird nichts
+    geraten. Ein falsch zugeordnetes Wort im Lesetext ist schlimmer
+    als ein als unbekannt gemeldetes — das eine merkt man, das andere
+    nicht.
+    """
+    zaehler: dict[str, set] = {}
+    for form, lexem_id in karte.items():
+        zaehler.setdefault(pruefung.ohne_diakritika(form), set()).add(lexem_id)
+    return {form: next(iter(ids)) for form, ids in zaehler.items()
+            if len(ids) == 1}
+
+
+_AKZENTE = "άέήίόύώΐΰ"
+
+
+def _ohne_zweitakzent(wort: str) -> str | None:
+    """Enklise: ein zweiter Akzent, den ein angehängtes Wörtchen erzwingt.
+
+    »το πελατολόγιό του«, »το πρόγραμμά τους«, »το νόημά της« — das
+    Substantiv trägt dann zwei Akzente, im Wortschatz steht es mit
+    einem. Gibt die Form ohne den LETZTEN Akzent zurück, sonst None.
+
+    Nur bei genau zwei Akzenten: bei einem ist nichts zu tun, bei
+    mehr als zweien ist es kein Enklisefall, sondern etwas anderes.
+    """
+    stellen = [i for i, z in enumerate(wort) if z in _AKZENTE]
+    if len(stellen) != 2:
+        return None
+    i = stellen[-1]
+    return wort[:i] + pruefung.ohne_diakritika(wort[i]) + wort[i + 1:]
+
+
+def _gross_geschrieben(wort: str) -> bool:
+    """Fängt das Wort mit einem Großbuchstaben an?"""
+    for z in wort:
+        if z.isalpha():
+            return z.isupper()
+    return False
+
+
+def _zuordnen(folge: list[dict], karte: dict[str, int],
+              ohne_akzent: dict[str, int] | None = None) -> list[dict]:
     """Legt den Wortschatz über die Wortfolge — längstes Stück zuerst.
 
     »Το μήλο είναι κόκκινο« soll als »το μήλο« + »είναι« + »κόκκινο«
@@ -180,6 +225,33 @@ def _zuordnen(folge: list[dict], karte: dict[str, int]) -> list[dict]:
             teile = folge[i:i + laenge]
             zusammen = " ".join(w["vergleichsform"] for w in teile)
             lexem_id = karte.get(zusammen)
+            # GRIECHISCHE GROSSBUCHSTABEN TRAGEN KEINEN AKZENT.
+            #
+            # Zeitungen schreiben »Ηταν«, »Ελληνας«, »Οχι« — im
+            # Wortschatz steht ήταν, Έλληνας, όχι. Das ist keine Lücke
+            # im Bestand, sondern eine Rechtschreibregel, und sie
+            # gehört darum in den Vergleich. Im Artikel waren es zwölf
+            # von 47 verbliebenen »unbekannten« Wörtern.
+            #
+            # Nur für großgeschriebene Wörter, und nur wo die
+            # akzentlose Form eindeutig ist: sonst fiele »ποτέ« (nie)
+            # mit »πότε« (wann) zusammen, und zwar unbemerkt.
+            if (lexem_id is None and ohne_akzent
+                    and all(_gross_geschrieben(w["wort"]) for w in teile)):
+                lexem_id = ohne_akzent.get(
+                    pruefung.ohne_diakritika(zusammen))
+            # Enklise: »πελατολόγιό« ist »πελατολόγιο« mit dem Akzent,
+            # den das folgende »του« erzwingt. Hier wird nur EIN
+            # Akzent entfernt, nicht alle — die Form bleibt also
+            # unterscheidbar, und geraten wird nichts.
+            # Auch über die Wortgruppe: griechische Substantive stehen
+            # mit Artikel im Wortschatz (»το πελατολόγιο«), und der
+            # Enklise-Akzent sitzt auf dem Substantiv. Über das
+            # Einzelwort allein fände man den Eintrag nie.
+            if lexem_id is None:
+                einfach = _ohne_zweitakzent(zusammen)
+                if einfach:
+                    lexem_id = karte.get(einfach)
             if lexem_id or laenge == 1:
                 ergebnis.append({
                     "wort": " ".join(w["wort"] for w in teile),
@@ -212,7 +284,8 @@ def deckung(db: sqlite3.Connection, text_id: int, benutzer_id: int) -> dict:
     # zwanzigmal steht, ist nicht zu 95 % gedeckt, nur weil ein
     # Allerweltswort oft vorkommt.
     gesehen: dict[str, dict] = {}
-    for stueck in _zuordnen(woerter(t["inhalt"], profil), karte):
+    ohne_akzent = _ohne_akzent_karte(karte)
+    for stueck in _zuordnen(woerter(t["inhalt"], profil), karte, ohne_akzent):
         lexem_id = stueck["lexem_id"]
         art = staende.get(lexem_id, "neu") if lexem_id else "unbekannt"
         eintrag = {**stueck, "art": art,
@@ -445,6 +518,118 @@ def wortwunsch_erledigen(db: sqlite3.Connection, wunsch_id: int,
     db.execute("UPDATE wortwunsch SET erledigt = 1, lexem_id = ? WHERE id = ?",
                (lexem_id, wunsch_id))
     return dbm.zeile(db, "SELECT * FROM wortwunsch WHERE id = ?", (wunsch_id,))
+
+
+def wuensche_abhaken(db: sqlite3.Connection, benutzer_id: int,
+                     zuordnungen: list[dict],
+                     erlaubte_sammlungen: list[int] | None = None) -> dict:
+    """Viele Wünsche auf einmal abhaken.
+
+    »Über die Schnittstelle geht nur einer pro Aufruf, das wären über
+    800 Aufrufe.«
+
+    Je Zuordnung entweder `wunsch_id` oder `wort` — beim Wort wird über
+    die Vergleichsform gesucht, denn so steht es in der Liste. Dazu die
+    `lexem_id` des Eintrags, der das Wort jetzt abdeckt; sie darf
+    fehlen, wenn das Wort bewusst ohne Vokabel abgehakt wird (ein
+    Eigenname, eine Zahl, eine flektierte Form eines vorhandenen
+    Wortes).
+
+    Abgehakt wird nur, was diese Person auch erledigen DARF: eigene
+    Wünsche und solche aus Sammlungen, in die sie schreiben kann —
+    dieselbe Regel wie beim Lesen der Liste.
+
+    DIE SUCHE ÜBER DAS WORT BLEIBT IN EINER SAMMLUNG. Beim ersten Lauf
+    tat sie das nicht, und das Ergebnis war lehrreich: in einem
+    griechischen Zeitungsartikel stehen deutsche Zitate, also stand
+    »ich« auf der griechischen Wunschliste — und hakte prompt das
+    gleichlautende »ich« in Max' mittelhochdeutscher Liste mit ab, 89
+    Wünsche auf einen Schlag. Die Sammlung ergibt sich aus der
+    `lexem_id`; ohne sie kann `sammlung_id` mitgegeben werden. Fehlt
+    beides, bleibt es bei der sammlungsübergreifenden Suche — dann
+    aber nur, wenn das Wort eindeutig ist.
+    """
+    import pruefung
+    import sprachen
+
+    wo = ["w.benutzer_id = ?"]
+    werte: list = [benutzer_id]
+    if erlaubte_sammlungen:
+        platz = ",".join("?" * len(erlaubte_sammlungen))
+        wo.append(f"w.sammlung_id IN ({platz})")
+        werte += list(erlaubte_sammlungen)
+    erlaubt = f"({' OR '.join(wo)})"
+
+    # Einmal alle offenen holen statt je Zuordnung zu suchen: bei 777
+    # Zuordnungen wären das 777 Abfragen, und die Vergleichsform muss
+    # ohnehin nach den Regeln der Sprache gebildet werden.
+    offen = dbm.zeilen(db, f"""
+        SELECT w.*, s.sprache FROM wortwunsch w
+          JOIN sammlung s ON s.id = w.sammlung_id
+         WHERE w.erledigt = 0 AND {erlaubt}""", tuple(werte))
+    nach_id = {w["id"]: w for w in offen}
+    nach_form: dict[tuple, dict] = {}
+    for w in offen:
+        nach_form.setdefault((w["sammlung_id"], w["vergleichsform"]), w)
+        # Zusätzlich die Schreibung selbst, falls die Zuordnung sie nennt.
+        nach_form.setdefault((w["sammlung_id"], w["wort"]), w)
+
+    # Zu welcher Sammlung gehört ein Lexem? Einmal nachschlagen statt
+    # je Zuordnung.
+    sammlung_von_lexem = {
+        z["id"]: z["sammlung_id"] for z in dbm.zeilen(
+            db, "SELECT id, sammlung_id FROM lexem")}
+
+    abgehakt, unbekannt, schon, mehrdeutig = 0, [], 0, []
+    for z in zuordnungen:
+        w = None
+        if z.get("wunsch_id"):
+            w = nach_id.get(int(z["wunsch_id"]))
+        else:
+            wort = (z.get("wort") or "").strip()
+            if not wort:
+                continue
+            # Die Sammlung eingrenzen, sobald sie bekannt ist.
+            grenze = z.get("sammlung_id") or sammlung_von_lexem.get(
+                z.get("lexem_id"))
+            infrage = [k for k in offen
+                       if grenze is None or k["sammlung_id"] == grenze]
+            treffer = [k for k in infrage
+                       if wort in (k["vergleichsform"], k["wort"])]
+            if not treffer:
+                # Noch einmal über die Vergleichsform der Sprache — so
+                # findet »Έλληνας« auch den Wunsch »έλληνας«.
+                treffer = [k for k in infrage
+                           if pruefung.normalisieren(
+                               wort, sprachen.profil(k["sprache"]))
+                           == k["vergleichsform"]]
+            if len(treffer) > 1:
+                # Ohne Sammlung und mit mehreren Treffern wird NICHT
+                # geraten: lieber stehenlassen und melden.
+                mehrdeutig.append(wort)
+                continue
+            w = treffer[0] if treffer else None
+        if w is None:
+            unbekannt.append(z.get("wort") or z.get("wunsch_id"))
+            continue
+        if w["erledigt"]:
+            schon += 1
+            continue
+        db.execute("UPDATE wortwunsch SET erledigt = 1, lexem_id = ? "
+                   "WHERE id = ?", (z.get("lexem_id"), w["id"]))
+        w["erledigt"] = 1
+        abgehakt += 1
+    return {"abgehakt": abgehakt, "schon_erledigt": schon,
+            "nicht_gefunden": len(unbekannt),
+            "beispiele_nicht_gefunden": unbekannt[:20],
+            # Mehrdeutig heißt: dasselbe Wort steht in mehreren
+            # Sammlungen offen und es wurde keine genannt. Dann wird
+            # nichts abgehakt — raten wäre hier teuer.
+            "mehrdeutig": len(mehrdeutig),
+            "beispiele_mehrdeutig": mehrdeutig[:20],
+            "noch_offen": dbm.wert(db, f"""SELECT COUNT(*) FROM wortwunsch w
+                                            WHERE w.erledigt = 0 AND {erlaubt}""",
+                                   tuple(werte))}
 
 
 # -------------------------------------------------------------- Texte selbst

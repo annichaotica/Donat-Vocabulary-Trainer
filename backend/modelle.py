@@ -511,6 +511,25 @@ class ImportEingabe(BaseModel):
     doppelte: Literal["ueberspringen", "ergaenzen", "trotzdem"] = "ueberspringen"
 
 
+class WunschZuordnung(BaseModel):
+    """Ein abzuhakender Wunsch: entweder über seine Kennung oder über
+    das Wort selbst. `lexem_id` darf fehlen — manche Wörter werden
+    bewusst ohne eigene Vokabel abgehakt (Eigennamen, Zahlen, Formen
+    eines vorhandenen Wortes)."""
+
+    wunsch_id: int | None = None
+    wort: str | None = None
+    lexem_id: int | None = None
+    # Grenzt die Suche über das Wort auf eine Sammlung ein. Ohne sie
+    # und ohne lexem_id wird sammlungsübergreifend gesucht — und bei
+    # mehreren Treffern nichts abgehakt.
+    sammlung_id: int | None = None
+
+
+class WuenscheAbhaken(BaseModel):
+    zuordnungen: list[WunschZuordnung] = Field(min_length=1, max_length=5000)
+
+
 class AbtippenEingabe(BaseModel):
     """Eine abgetippte Vokabel. Prüft nur — schreibt keinen Lernstand."""
 

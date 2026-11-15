@@ -616,3 +616,278 @@ def test_fremden_wunsch_darf_man_auch_abhaken(klient):
                         (cur.lastrowid,)) == 1
     finally:
         db.close()
+
+
+def test_sammelabhaken(klient):
+    """»Über die Schnittstelle geht nur einer pro Aufruf, das wären
+    über 800 Aufrufe.«
+
+    Bei einem Zeitungsartikel mit 840 unbekannten Wörtern ist das kein
+    Komfortproblem: einzeln abzuhaken dauerte länger als das Eintragen.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+
+    b = klient.post("/api/benutzer", json={"name": "Lesende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "το κόμμα", "wortart": "substantiv",
+                       "kennung": "el-k",
+                       "merkmale": {"genus": "n"},
+                       "bedeutungen": [{"uebersetzungen": ["Partei"]}]}]})
+    lexem = klient.get(f"/api/sammlungen/{s['id']}/lexeme",
+                       params={"suche": "κόμμα"}).json()["lexeme"][0]
+
+    db = dbm.verbindung()
+    try:
+        for wort in ("κόμμα", "κόμματος", "ξένο"):
+            db.execute("""INSERT INTO wortwunsch
+                            (benutzer_id, sammlung_id, wort, vergleichsform,
+                             vorkommen)
+                          VALUES (?, ?, ?, ?, 1)""",
+                       (b["id"], s["id"], wort, wort))
+        db.commit()
+    finally:
+        db.close()
+
+    antwort = klient.post("/api/wortwuensche/abhaken",
+                          params={"benutzer_id": b["id"]},
+                          json={"zuordnungen": [
+                              {"wort": "κόμμα", "lexem_id": lexem["id"]},
+                              {"wort": "κόμματος", "lexem_id": lexem["id"]},
+                              # Bewusst ohne Vokabel — ein Eigenname etwa.
+                              {"wort": "ξένο"},
+                              {"wort": "gibtsnicht", "lexem_id": lexem["id"]}]})
+    assert antwort.status_code == 200, antwort.text
+    d = antwort.json()
+    assert d["abgehakt"] == 3
+    assert d["nicht_gefunden"] == 1
+    assert d["noch_offen"] == 0
+    # Die Zuordnung ist festgehalten — sie ist der Beleg, woher die
+    # Vokabel stammt.
+    offen = klient.get("/api/wortwuensche",
+                       params={"benutzer_id": b["id"], "offen": False}).json()
+    nach_wort = {w["wort"]: w for w in offen}
+    assert nach_wort["κόμμα"]["lexem_id"] == lexem["id"]
+    assert nach_wort["ξένο"]["lexem_id"] is None
+
+
+def test_fremde_wuensche_nur_mit_schreibrecht_abhaken(klient):
+    """Dieselbe Grenze wie beim Lesen der Liste."""
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+
+    anni = klient.post("/api/benutzer", json={"name": "Annuschka"}).json()
+    max_ = klient.post("/api/benutzer", json={"name": "Max"}).json()
+    seine = klient.post("/api/sammlungen", json={
+        "besitzer_id": max_["id"], "name": "Mhd", "sprache": "gmh"}).json()
+    db = dbm.verbindung()
+    try:
+        db.execute("""INSERT INTO wortwunsch
+                        (benutzer_id, sammlung_id, wort, vergleichsform,
+                         vorkommen)
+                      VALUES (?, ?, 'ouwê', 'ouwê', 1)""",
+                   (max_["id"], seine["id"]))
+        db.commit()
+    finally:
+        db.close()
+
+    # Ohne Freigabe: nicht gefunden, nicht abgehakt.
+    d = klient.post("/api/wortwuensche/abhaken",
+                    params={"benutzer_id": anni["id"]},
+                    json={"zuordnungen": [{"wort": "ouwê"}]}).json()
+    assert d["abgehakt"] == 0 and d["nicht_gefunden"] == 1
+
+    klient.put(f"/api/sammlungen/{seine['id']}/zugriff", json={
+        "benutzer_id": anni["id"], "recht": "schreiben"})
+    d = klient.post("/api/wortwuensche/abhaken",
+                    params={"benutzer_id": anni["id"]},
+                    json={"zuordnungen": [{"wort": "ouwê"}]}).json()
+    assert d["abgehakt"] == 1
+
+
+def test_abhaken_greift_nicht_in_fremde_sammlungen(klient):
+    """Beim ersten Lauf an echten Daten passierte genau das.
+
+    In einem griechischen Zeitungsartikel stehen deutsche Zitate, also
+    stand »ich« auf der griechischen Wunschliste. Das Abhaken suchte
+    über alle Sammlungen und erwischte das gleichlautende »ich« in der
+    mittelhochdeutschen Liste gleich mit — 89 fremde Wünsche auf einen
+    Schlag als erledigt markiert, obwohl niemand sie angelegt hatte.
+
+    Die Sammlung ergibt sich aus der lexem_id. Ist sie nicht zu
+    ermitteln und das Wort steht in mehreren Sammlungen offen, wird
+    NICHTS abgehakt und das gemeldet.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+
+    b = klient.post("/api/benutzer", json={"name": "Lesende"}).json()
+    el = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    gmh = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Mhd", "sprache": "gmh"}).json()
+    klient.post(f"/api/sammlungen/{el['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "ich", "wortart": "sonstiges",
+                       "bedeutungen": [{"uebersetzungen": ["ich (deutsch)"]}]}]})
+    lexem = klient.get(f"/api/sammlungen/{el['id']}/lexeme",
+                       params={"suche": "ich"}).json()["lexeme"][0]
+
+    db = dbm.verbindung()
+    try:
+        for sid in (el["id"], gmh["id"]):
+            db.execute("""INSERT INTO wortwunsch
+                            (benutzer_id, sammlung_id, wort, vergleichsform,
+                             vorkommen)
+                          VALUES (?, ?, 'ich', 'ich', 1)""", (b["id"], sid))
+        db.commit()
+    finally:
+        db.close()
+
+    d = klient.post("/api/wortwuensche/abhaken",
+                    params={"benutzer_id": b["id"]},
+                    json={"zuordnungen": [
+                        {"wort": "ich", "lexem_id": lexem["id"]}]}).json()
+    assert d["abgehakt"] == 1
+
+    offen = klient.get("/api/wortwuensche",
+                       params={"benutzer_id": b["id"]}).json()
+    # Der mittelhochdeutsche steht NOCH offen.
+    assert [w["sammlung_id"] for w in offen] == [gmh["id"]]
+
+
+def test_ohne_sammlung_und_mehrdeutig_wird_nichts_abgehakt(klient):
+    """Raten wäre hier teuer: ein falsch abgehakter Wunsch verschwindet
+    aus der Liste und kommt nie wieder."""
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+
+    b = klient.post("/api/benutzer", json={"name": "Lesende"}).json()
+    a = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "A", "sprache": "el"}).json()
+    c = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "B", "sprache": "gmh"}).json()
+    db = dbm.verbindung()
+    try:
+        for sid in (a["id"], c["id"]):
+            db.execute("""INSERT INTO wortwunsch
+                            (benutzer_id, sammlung_id, wort, vergleichsform,
+                             vorkommen)
+                          VALUES (?, ?, 'ich', 'ich', 1)""", (b["id"], sid))
+        db.commit()
+    finally:
+        db.close()
+
+    d = klient.post("/api/wortwuensche/abhaken",
+                    params={"benutzer_id": b["id"]},
+                    json={"zuordnungen": [{"wort": "ich"}]}).json()
+    assert d["abgehakt"] == 0
+    assert d["mehrdeutig"] == 1
+    assert len(klient.get("/api/wortwuensche",
+                          params={"benutzer_id": b["id"]}).json()) == 2
+
+
+def test_grossbuchstaben_ohne_akzent_gelten_als_bekannt(klient):
+    """Griechische Großbuchstaben tragen keinen Akzent.
+
+    Zeitungen schreiben »Ηταν«, »Ελληνας«, »Οχι«; im Wortschatz steht
+    ήταν, Έλληνας, όχι. Das ist keine Lücke im Bestand, sondern eine
+    Rechtschreibregel — und sie gehört in den Vergleich. In einem
+    echten Artikel waren das zwölf von 47 verbliebenen »unbekannten«
+    Wörtern.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lesende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [
+            {"lemma": "ήταν", "wortart": "verb",
+             "bedeutungen": [{"uebersetzungen": ["war"]}]},
+            {"lemma": "όχι", "wortart": "adverb",
+             "bedeutungen": [{"uebersetzungen": ["nein"]}]}]})
+    t = klient.post(f"/api/sammlungen/{s['id']}/texte", json={
+        "titel": "Zeitung", "inhalt": "Ηταν καλά. Οχι."}).json()
+    d = klient.get(f"/api/texte/{t['id']}/deckung",
+                   params={"benutzer_id": b["id"]}).json()
+    nach_wort = {w["wort"]: w for w in d["woerter"]}
+    assert nach_wort["Ηταν"]["lexem_id"], "Ηταν wurde nicht erkannt"
+    assert nach_wort["Οχι"]["lexem_id"], "Οχι wurde nicht erkannt"
+
+
+def test_kleingeschriebenes_bleibt_streng(klient):
+    """Der Rückfall gilt NUR für großgeschriebene Wörter. Sonst fiele
+    »ποτέ« (nie) mit »πότε« (wann) zusammen — und zwar unbemerkt, denn
+    ein falsch zugeordnetes Wort meldet sich nie."""
+    b = klient.post("/api/benutzer", json={"name": "Lesende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "πότε", "wortart": "adverb",
+                       "bedeutungen": [{"uebersetzungen": ["wann"]}]}]})
+    t = klient.post(f"/api/sammlungen/{s['id']}/texte", json={
+        "titel": "Satz", "inhalt": "ποτε δεν."}).json()
+    d = klient.get(f"/api/texte/{t['id']}/deckung",
+                   params={"benutzer_id": b["id"]}).json()
+    nach_wort = {w["wort"]: w for w in d["woerter"]}
+    assert not nach_wort["ποτε"]["lexem_id"], \
+        "kleingeschrieben darf der Akzent nicht wegfallen"
+
+
+def test_mehrdeutiges_wird_auch_gross_nicht_geraten(klient):
+    """Zwei Wörter, die sich nur im Akzent unterscheiden: dann wird
+    auch bei Großschreibung nichts zugeordnet."""
+    b = klient.post("/api/benutzer", json={"name": "Lesende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [
+            {"lemma": "πότε", "wortart": "adverb",
+             "bedeutungen": [{"uebersetzungen": ["wann"]}]},
+            {"lemma": "ποτέ", "wortart": "adverb",
+             "bedeutungen": [{"uebersetzungen": ["nie"]}]}]})
+    t = klient.post(f"/api/sammlungen/{s['id']}/texte", json={
+        "titel": "Satz", "inhalt": "Ποτε ήρθε;"}).json()
+    d = klient.get(f"/api/texte/{t['id']}/deckung",
+                   params={"benutzer_id": b["id"]}).json()
+    nach_wort = {w["wort"]: w for w in d["woerter"]}
+    assert not nach_wort["Ποτε"]["lexem_id"], "hier darf nicht geraten werden"
+
+
+def test_enklise_akzent_wird_erkannt(klient):
+    """»το πελατολόγιό του« — das Substantiv trägt einen zweiten
+    Akzent, den das angehängte Wörtchen erzwingt. Im Wortschatz steht
+    es mit einem.
+
+    Entfernt wird nur der LETZTE der beiden Akzente, nicht alle: die
+    Form bleibt damit unterscheidbar und es wird nichts geraten.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lesende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "το πελατολόγιο", "wortart": "substantiv",
+                       "merkmale": {"genus": "n"},
+                       "bedeutungen": [{"uebersetzungen": ["Kundenstamm"]}]}]})
+    t = klient.post(f"/api/sammlungen/{s['id']}/texte", json={
+        "titel": "Satz", "inhalt": "το πελατολόγιό του μεγάλωνε."}).json()
+    d = klient.get(f"/api/texte/{t['id']}/deckung",
+                   params={"benutzer_id": b["id"]}).json()
+    nach = {w["wort"]: w for w in d["woerter"]}
+    assert any(w["lexem_id"] for k, w in nach.items() if "πελατολόγι" in k), \
+        f"nicht erkannt: {list(nach)}"
+
+
+def test_ein_einzelner_akzent_wird_nicht_angetastet(klient):
+    """Nur bei GENAU zwei Akzenten wird einer entfernt. Sonst wäre es
+    kein Enklisefall, sondern ein anderes Wort."""
+    import sys
+    sys.path.insert(0, "backend")
+    import lesetexte
+    assert lesetexte._ohne_zweitakzent("ποτέ") is None
+    assert lesetexte._ohne_zweitakzent("πελατολόγιό") == "πελατολόγιο"
+    assert lesetexte._ohne_zweitakzent("καλημέρα") is None

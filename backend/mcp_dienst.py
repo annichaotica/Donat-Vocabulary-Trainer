@@ -704,6 +704,14 @@ def offenes_wort_erledigen(db: sqlite3.Connection, person: dict,
                                 wunsch_id, lexem_id))
 
 
+def offene_woerter_abhaken(db: sqlite3.Connection, person: dict,
+                           zuordnungen: list):
+    """Viele Wortwünsche auf einmal abhaken."""
+    return lesetexte.wuensche_abhaken(
+        db, person["id"], [dict(z) for z in zuordnungen],
+        zugang.beschreibbare_sammlungen(db, person["id"]))
+
+
 def texte_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int):
     """Welche Lesetexte liegen in dieser Sammlung?"""
     zugang.sammlung_pruefen(db, person["id"], sammlung_id)
@@ -1410,6 +1418,39 @@ WERKZEUGE: list[dict] = [
                                         "Vorgabe 40, höchstens 200")},
         },
         "funktion": offene_woerter_lesen,
+    },
+    {
+        "name": "offene_woerter_abhaken",
+        "funktion": offene_woerter_abhaken,
+        "description": "Viele Wortwünsche auf einmal abhaken. Einzeln "
+                       "wären es bei einem Zeitungsartikel über "
+                       "achthundert Aufrufe.\n\n"
+                       "Je Zuordnung entweder wunsch_id oder wort, dazu "
+                       "die lexem_id des Eintrags, der das Wort jetzt "
+                       "abdeckt. Die lexem_id darf fehlen, wenn ein Wort "
+                       "bewusst ohne eigene Vokabel abgehakt wird — ein "
+                       "Eigenname, eine Zahl, oder eine flektierte Form, "
+                       "die an ein vorhandenes Wort ergänzt wurde.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "zuordnungen": {
+                    "type": "array",
+                    "description": "Liste aus {wort oder wunsch_id, "
+                                   "lexem_id}",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "wort": _s("string", "die Schreibung aus der Liste"),
+                            "wunsch_id": _s("integer", "statt wort"),
+                            "lexem_id": _s("integer", "der Eintrag, der es "
+                                                      "abdeckt; darf fehlen"),
+                        },
+                    },
+                },
+            },
+            "required": ["zuordnungen"],
+        },
     },
     {
         "name": "offenes_wort_erledigen",

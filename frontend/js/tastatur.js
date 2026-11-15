@@ -431,7 +431,9 @@ export function zeichenleiste(sprache, feldHolen, beiAenderung) {
      * kostet die halbe Sitzung.
      */
     const hinweise = h('div', { hidden: true, class: 'merktafel-hinweise' });
-    for (const [titel, ...rest] of (b.hinweise || [])) {
+    const belegt = Object.hasOwn(BELEGUNGEN, sprache.code)
+      ? BELEGUNGEN[sprache.code] : {};
+    for (const [titel, ...rest] of (belegt.hinweise || [])) {
       hinweise.append(h('p', {}, h('b', { text: titel + ': ' }), ...rest.map(
         (t) => (Array.isArray(t) ? h(t[0], { text: t[1] }) : t))));
     }

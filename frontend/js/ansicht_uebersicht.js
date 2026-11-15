@@ -155,15 +155,18 @@ function teilSortierung(behaelter) {
 
 /** Eine eingeklappte Sammlung: Name, Farbe, das Nötigste. */
 function teilEingeklappt(behaelter, s, stand) {
+  // EINE Zeile: Name, Zahl, zwei Knöpfe. Vorher standen Name und
+  // Knöpfe untereinander, und im Raster wurde der Kasten auf die Höhe
+  // der ausgeklappten Karte gestreckt — eingeklappt sah nach mehr aus
+  // als ausgeklappt.
   return h('div', {
     class: 'karte sammlungskarte eingeklappt',
     style: `--sammlungsfarbe:${s.farbe_wirksam || 'var(--rand)'}`,
   },
-    h('div', { style: 'display:flex;justify-content:space-between;gap:.5rem;align-items:baseline' },
-      h('strong', { text: s.name }),
-      h('span', { class: 'leise',
-                  text: (stand?.faellig || 0) + ' fällig' })),
-    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:.4rem' },
+    h('strong', { text: s.name }),
+    h('span', { class: 'leise',
+                text: `${stand?.faellig || 0} fällig · ${s.lexeme ?? 0} Wörter` }),
+    h('span', { class: 'eingeklappt-knoepfe' },
       h('button', {
         onclick: () => { merken({ sammlungId: s.id, lektionId: null });
                          location.hash = '#/lernen'; },

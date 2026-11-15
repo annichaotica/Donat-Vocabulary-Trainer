@@ -791,3 +791,30 @@ input[type="file"] { max-width: 100%; }
   vertical-align: baseline;
   position: relative; top: -.03em;
 }
+
+
+/* Sammlungen untereinander, nicht nebeneinander.
+   Im Raster waren sie zu schmal — die Knopfreihe brach in vier Zeilen
+   um — und eine eingeklappte Karte wurde auf die Höhe der
+   ausgeklappten gestreckt: ein leerer Kasten über den halben
+   Bildschirm. Untereinander löst beides, und die Karte hat Platz für
+   ihre Zahlen und Knöpfe in je einer Zeile. */
+.karte-reihe.sammlungen {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.sammlungskarte .zahlen { gap: 1.4rem; }
+
+/* Eine eingeklappte Sammlung ist eine Zeile. */
+.sammlungskarte.eingeklappt {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  flex-wrap: wrap;
+}
+.eingeklappt-knoepfe {
+  margin-left: auto;
+  display: flex;
+  gap: .4rem;
+}

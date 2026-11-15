@@ -2533,17 +2533,40 @@ def oauth_kennblatt():
     }
 
 
-# Die Ressource HAT einen Pfad (/mcp), hier gehört er also hinter den
-# .well-known-Teil. Die Fassung unter /mcp daneben ist die, auf die
-# die WWW-Authenticate-Kopfzeile zeigt; RFC 9728 lässt dort jede
-# Adresse zu, und sie kommt auch ohne Tunnelroute durch.
+def _ressourcenblatt(ressource: str) -> dict:
+    return {"resource": ressource,
+            "authorization_servers": [_mcp_wurzel()],
+            "scopes_supported": ["vokabeln"]}
+
+
+# WELCHE Ressource gemeint ist, hängt davon ab, wen man fragt, und
+# beide Antworten sind richtig: der Trainer ist über diesen Namen
+# erreichbar, und sein MCP-Endpunkt liegt unter /mcp. ChatGPT hält den
+# NAMEN für die Ressource — in seiner Autorisierungsanfrage steht
+# `resource=https://mcp.<domain>`, ohne Pfad — und sucht das Blatt
+# entsprechend unter /.well-known/oauth-protected-resource.
+#
+# Das stand hier schon einmal und ist dann herausgeflogen, weil darin
+# eine Ressource MIT Pfad genannt war: ein Blatt, dessen Inhalt nicht
+# zu seiner Adresse passt, ist schlimmer als keines. Die Lehre war
+# richtig, die Folgerung falsch — gebraucht wurde nicht weniger
+# Blätter, sondern je Adresse das passende. Genau daran ist nach
+# geglückter Anmeldung die Werkzeugliste gescheitert.
+@app.get("/.well-known/oauth-protected-resource")
+def oauth_ressource_name():
+    """Für Clients, die den ganzen Namen als Ressource ansehen."""
+    _oauth_bereit()
+    return _ressourcenblatt(_mcp_wurzel())
+
+
 @app.get("/.well-known/oauth-protected-resource/mcp")
 @app.get("/mcp/.well-known/oauth-protected-resource")
 def oauth_ressource():
+    """Für die Ressource mit Pfad — darauf zeigt die
+    WWW-Authenticate-Kopfzeile, und sie kommt auch ohne die
+    Tunnelroute für /.well-known durch."""
     _oauth_bereit()
-    return {"resource": MCP_URL,
-            "authorization_servers": [_mcp_wurzel()],
-            "scopes_supported": ["vokabeln"]}
+    return _ressourcenblatt(MCP_URL)
 
 
 def _einwilligungsseite(*, vorgang: dict, handgriff: str, person: dict,

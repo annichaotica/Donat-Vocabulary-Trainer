@@ -200,6 +200,16 @@ def test_die_blaetter_liegen_an_den_passenden_stellen(klient, eingerichtet):
         assert a.json()["resource"] == "https://mcp.example.org/mcp", pfad
         assert a.json()["authorization_servers"] == ["https://mcp.example.org"]
 
+    # Beim Ressourcenblatt gibt es ZWEI richtige Antworten, je nachdem
+    # wen man fragt: der Name ist erreichbar, und der Endpunkt liegt
+    # unter /mcp. Jede Adresse nennt die Ressource, die zu ihr gehört
+    # — nicht dieselbe an beiden Stellen. ChatGPT fragt die erste ab
+    # (es schickt resource=<name> ohne Pfad); daran ist nach geglückter
+    # Anmeldung die Werkzeugliste gescheitert.
+    wurzel = klient.get("/.well-known/oauth-protected-resource").json()
+    assert wurzel["resource"] == "https://mcp.example.org"
+    assert wurzel["authorization_servers"] == ["https://mcp.example.org"]
+
     # Und NICHT dort, wo der Herausgeber nicht zur Adresse passte: ein
     # Blatt an falscher Stelle ist schlimmer als keines.
     assert klient.get(

@@ -16,6 +16,39 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Anmeldung geglückt, Werkzeugliste gescheitert
+
+Der ganze OAuth-Ablauf lief durch — Weiterleitung, Access-Anmeldung,
+Einwilligung, Token:
+
+```
+GET  /mcp/oauth/authorize    302
+GET  /oauth/authorize        200     Einwilligungsseite
+POST /oauth/authorize        303     »Erlauben« gedrückt
+POST /mcp/oauth/token        200     Token ausgegeben
+```
+
+Danach meldete ChatGPT »authentication successful, action discovery
+failed«, und im Protokoll stand sofort der Grund:
+
+```
+GET /.well-known/oauth-protected-resource   404   ← die hatte ich entfernt
+```
+
+In der Autorisierungsanfrage stand auch, warum es gerade diese Stelle
+abfragt: `resource=https://mcp.<domain>` — **ohne** `/mcp`. ChatGPT
+hält den ganzen Namen für die Ressource, nicht den Pfad.
+
+Diese Stelle gab es einmal und ich hatte sie entfernt, weil darin eine
+Ressource mit Pfad stand und ein Blatt, dessen Inhalt nicht zu seiner
+Adresse passt, schlimmer ist als keines. Die Lehre war richtig, die
+Folgerung falsch: gebraucht wurden nicht weniger Blätter, sondern je
+Adresse das passende. Beide Lesarten sind zutreffend — der Trainer ist
+über diesen Namen erreichbar, und sein MCP-Endpunkt liegt unter
+`/mcp`. Jetzt nennt jedes Blatt die Ressource, die zu seiner eigenen
+Adresse gehört.
+
+
 ### Die Einwilligungsseite nannte das Falsche
 
 Vor dem ersten echten Durchlauf habe ich die Seite probeweise geladen.

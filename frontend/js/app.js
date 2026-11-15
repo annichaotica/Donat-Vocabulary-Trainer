@@ -8,6 +8,7 @@ import * as uebersicht from './ansicht_uebersicht.js';
 import * as lernansicht from './ansicht_lernen.js';
 import * as texte from './ansicht_texte.js';
 import * as statistik from './ansicht_statistik.js';
+import * as lehrgang from './ansicht_lehrgang.js';
 import * as wortschatz from './ansicht_wortschatz.js';
 import * as einstellungen from './ansicht_einstellungen.js';
 import * as tastatur from './tastatur.js';
@@ -87,6 +88,7 @@ async function kopfzeile() {
     neu: 'Neues Wort', lernen: 'Abfrage', ziele: 'Lernziele',
     freigabe: 'Freigabe', import: 'Datei einlesen', ueben: 'Sätze üben',
     hilfe: 'Anleitung', texte: 'Texte', statistik: 'Fortschritt',
+    lehrgang: 'Lehrgang',
     einstellungen: 'Einstellungen',
     tastatur: 'Tastatur', profile: 'Profil wählen',
   }[weg[0]] || 'Vokabeltrainer';
@@ -211,6 +213,11 @@ async function wegweisen() {
           await sitzung.start();
           return;
         }
+      case 'lehrgang':
+        // #/lehrgang listet, #/lehrgang/pflegen/2 öffnet ein Kapitel.
+        return await lehrgang.zeichnen(
+          inhalt, teile[1] || null,
+          teile[2] !== undefined ? Number(teile[2]) : null);
       case 'statistik':
         return await statistik.zeichnen(inhalt);
       case 'texte':

@@ -158,6 +158,51 @@ WOERTER = [
                 {"text": "best", "merkmale": {"stufe": "superlativ"}}]},
 ]
 
+# Drei Einträge, die NICHT freigegeben werden — mit Absicht.
+#
+# Am Übungskurs ließ sich die Freigabe nicht üben: er war durchgehend
+# freigegeben, und die Prüfansicht sagte »Alles freigegeben — es wartet
+# nichts«. Ein Beispielkurs, an dem der wichtigste Handgriff nicht
+# vorkommt, ist als Beispiel unvollständig.
+#
+# Einer davon ist absichtlich FALSCH: »goed« statt »went«. So etwas
+# erfindet eine KI wirklich — sie wendet die regelmäßige Endung auf ein
+# unregelmäßiges Verb an. Wer es durchwinkt, paukt es; wer hinsieht,
+# hat verstanden, wozu die Freigabe da ist. Der Fehler steht hier und
+# nicht in der Anleitung, weil man ihn einmal selbst finden muss.
+UNGEPRUEFT = [
+    {"lemma": "to drink", "wortart": "verb", "lektion_nr": 2,
+     "bedeutungen": [{"uebersetzungen": ["trinken"]}],
+     "formen": [
+         {"text": "drinks", "merkmale": {"modus": "indikativ",
+                                         "tempus": "praesens",
+                                         "person": "3", "numerus": "sg"}},
+         {"text": "drank", "merkmale": {"modus": "indikativ",
+                                        "tempus": "praeteritum"}},
+     ]},
+    {"lemma": "to see", "wortart": "verb", "lektion_nr": 2,
+     "bedeutungen": [{"uebersetzungen": ["sehen"]}],
+     "formen": [
+         {"text": "sees", "merkmale": {"modus": "indikativ",
+                                       "tempus": "praesens",
+                                       "person": "3", "numerus": "sg"}},
+         {"text": "saw", "merkmale": {"modus": "indikativ",
+                                      "tempus": "praeteritum"}},
+     ]},
+    {"lemma": "to walk", "wortart": "verb", "lektion_nr": 4,
+     "bedeutungen": [{"uebersetzungen": ["gehen", "zu Fuß gehen"]}],
+     "formen": [
+         {"text": "walks", "merkmale": {"modus": "indikativ",
+                                        "tempus": "praesens",
+                                        "person": "3", "numerus": "sg"}},
+         # Falsch: regelmäßige Endung an ein Verb, das sie nicht hat.
+         # Richtig wäre »walked« — hier steht die Form, die eine KI
+         # gern erfindet, wenn sie das Muster überträgt.
+         {"text": "goed", "merkmale": {"modus": "indikativ",
+                                       "tempus": "praeteritum"}},
+     ]},
+]
+
 SAETZE = [
     {"typ": "satz", "lektion_nr": 2,
      "zielsprache": "The child reads a book.",
@@ -240,11 +285,17 @@ def anlegen(db: sqlite3.Connection, benutzer_id: int) -> dict:
                (sammlung_id,))
     aufgaben.erzeugen_fuer_sammlung(db, sammlung_id)
 
+    # Erst JETZT die ungeprüften — sonst hätte sie die Freigabe oben
+    # mit erwischt, und die Prüfansicht wäre wieder leer.
+    sammelimport.importieren(db, sammlung_id, UNGEPRUEFT, quelle="ki")
+    aufgaben.erzeugen_fuer_sammlung(db, sammlung_id)
+
     return {
         "sammlung_id": sammlung_id,
         "neu": True,
         "name": NAME,
-        "woerter": len(WOERTER),
+        "woerter": len(WOERTER) + len(UNGEPRUEFT),
+        "ungeprueft": len(UNGEPRUEFT),
         "saetze": len(SAETZE),
         "lektionen": len(LEKTIONEN),
         "aufgaben": dbm.wert(db, """SELECT COUNT(*) FROM aufgabe a

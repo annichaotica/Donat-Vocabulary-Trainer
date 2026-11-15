@@ -16,6 +16,35 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Neu: der Lehrgang, mit Bildern und zum Mitmachen
+
+Die vier Rundgänge waren zu kurz und zu oberflächlich — aber nicht,
+weil sie schlecht gemacht wären. Eine Sprechblase trägt drei Sätze und
+kann nur zeigen, was gerade auf dem Bildschirm steht. Was fehlte, ist
+das Weltbild: Lexem, Bedeutungen, Formen, und dass Aufgaben **erzeugt**
+werden. Ohne das sind Merkmale, Freigabe und die Rolle der KI nicht
+erklärbar, weil die Wörter fehlen, in denen man es sagen könnte.
+
+Darum jetzt beides. Die Rundgänge zeigen weiter, wo was liegt. Der
+**Lehrgang** (in der Anleitung oder unter »Lehrgang«) erklärt, warum —
+in zwei Spuren:
+
+- **Ich will lernen** (drei Kapitel, acht Minuten): wie der Trainer
+  fragt, Tippen und Antworten, was heute drankommt.
+- **Ich pflege den Bestand** (sechs Kapitel, 45 Minuten): wie der
+  Trainer die Vokabeln sieht, Merkmale und Formgruppen, Freigabe,
+  Berichtigen und Löschen, die Rolle der KI, Ziele und Lehrwerk. Die
+  ersten vier sind die Pflicht.
+
+Ein Kapitel ist eine Seite, kein Ausklapper — wer eine Seite sieht,
+liest sie zu Ende. Jedes endet mit einer Handlung im Übungskurs, und
+fünf Kapitel haben ein Bildschirmfoto.
+
+Der Übungskurs hat dafür drei **ungeprüfte** Einträge bekommen, einen
+davon absichtlich falsch (»goed« statt »walked«). Vorher war er
+durchgehend freigegeben — man konnte den wichtigsten Handgriff an ihm
+also gar nicht üben.
+
 ### Berichtigt: die KI kann ihre Einträge doch freigeben
 
 In der Anleitung stand »Freigeben kann es nicht. Alles, was es

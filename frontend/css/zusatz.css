@@ -729,3 +729,28 @@ input[type="file"] { max-width: 100%; }
   .tempozeile { grid-template-columns: 1fr auto; }
   .tempozeile > :nth-child(2) { grid-column: 1 / -1; order: 3; }
 }
+
+
+/* --------------------------------------------------------- Lehrgang
+   Ein Kapitel ist eine Seite und wird gelesen, nicht überflogen. Also
+   etwas breitere Zeilen als sonst und mehr Luft zwischen den Absätzen. */
+.lehrgangstext { max-width: 42rem; line-height: 1.65; }
+.lehrgangstext p { margin: 0 0 .9rem; }
+.lehrgangstext ul { margin: 0 0 .9rem; padding-left: 1.2rem; }
+.lehrgangstext li { margin-bottom: .35rem; }
+
+.lehrgangsbild { margin: 1rem 0; }
+.lehrgangsbild img {
+  width: 100%; height: auto; display: block;
+  border: 1px solid var(--rand);
+  border-radius: var(--rund-klein);
+}
+.lehrgangsbild figcaption { margin-top: .35rem; font-size: .88em; }
+
+/* Die Handlung am Kapitelende hebt sich ab — sie ist der Punkt, an dem
+   man die Seite verlässt und etwas tut. */
+.lehrgangstun {
+  border-top: 1px solid var(--rand);
+  padding-top: .8rem;
+  margin-top: 1.2rem !important;
+}

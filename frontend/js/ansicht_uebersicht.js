@@ -1,7 +1,7 @@
 /* Profilwahl und Übersicht über die Sammlungen. */
 
 import { api } from './api.js';
-import { h, leeren, meldung } from './hilfen.js';
+import { h, leeren, meldung, anfuegen } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 import * as fuehrung from './fuehrung.js';
@@ -120,8 +120,12 @@ function willkommen(behaelter, sammlungen) {
     }, 'Übungskurs einrichten'));
   }
 
-  karte.append(h('p', { class: 'leise', style: 'margin:.8rem 0 .4rem',
-                        text: 'Kurze Rundgänge — einzeln, jederzeit:' }));
+  karte.append(h('p', { style: 'margin:.8rem 0 .4rem' },
+    h('b', { text: 'Ausführlich: ' }),
+    h('a', { href: '#/lehrgang' }, 'der Lehrgang'),
+    ' — zwei Spuren, neun Kapitel, jedes zum Mitmachen.'));
+  karte.append(h('p', { class: 'leise', style: 'margin:.4rem 0',
+                        text: 'Oder kurze Rundgänge durch die Oberfläche:' }));
   const reihe = h('div', { class: 'gruppenwahl' });
   for (const r of fuehrung.RUNDGAENGE) {
     reihe.append(h('button', {
@@ -308,7 +312,12 @@ export async function zeichnen(behaelter) {
   // Der Einstieg ganz oben: Rundgänge und, solange nichts da ist, der
   // Übungskurs. Weiter unten zwischen den Sammlungen fände ihn niemand,
   // der zum ersten Mal hier ist — und für den ist er gemacht.
-  el.append(willkommen(behaelter, sammlungen));
+  // `anfuegen`, nicht `append`: die Karte ist null, sobald alle
+  // Rundgänge gesehen sind, und `append(null)` schreibt das Wort
+  // »null« in die Seite. Genau davor warnt der Kommentar bei
+  // `anfuegen` — ich habe ihn überlesen und es stand oben auf
+  // der Übersicht.
+  anfuegen(el, willkommen(behaelter, sammlungen));
 
   el.append(h('h1', { text: 'Heute' }));
   el.append(h('div', { class: 'karte' },

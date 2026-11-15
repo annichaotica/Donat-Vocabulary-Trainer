@@ -110,9 +110,12 @@ def test_die_lektionsschranke_laesst_sich_vorfuehren(kurs, klient):
 
     klient.put(f"/api/sammlungen/{d['sammlung_id']}/buchstand",
                json={"benutzer_id": b["id"], "bis_lektion": 2})
+    # Freies Üben: der Planweg deckelt die neuen Wörter je Sitzung, und
+    # dann fehlt die gesuchte Formgruppe womöglich nur deshalb. Seit der
+    # Kurs drei ungeprüfte Wörter mehr hat, ist das eingetreten.
     liste = klient.get("/api/lernen/naechste", params={
         "benutzer_id": b["id"], "sammlung_id": d["sammlung_id"],
-        "anzahl": 40}).json()
+        "nur": "frei", "anzahl": 50}).json()
     import datenbank as dbm
     db = dbm.verbindung()
     try:
@@ -131,3 +134,53 @@ def test_er_laesst_sich_wieder_loeschen(kurs, klient):
     assert antwort.status_code in (200, 204), antwort.text
     assert klient.get("/api/sammlungen",
                       params={"benutzer_id": b["id"]}).json() == []
+
+
+def test_an_ihm_laesst_sich_die_freigabe_ueben(kurs, klient):
+    """Der Kurs war durchgehend freigegeben — und damit ließ sich der
+    wichtigste Handgriff an ihm nicht zeigen. Die Prüfansicht sagte
+    »Alles freigegeben, es wartet nichts«; das Bildschirmfoto für den
+    Lehrgang bewies es.
+    """
+    b, d = kurs
+    offen = klient.get(
+        f"/api/sammlungen/{d['sammlung_id']}/freigabe/lektionen").json()
+    assert offen["offen_gesamt"] > 0, "nichts zu prüfen"
+
+
+def test_ein_eintrag_ist_absichtlich_falsch(kurs, klient):
+    """»goed« statt »walked« — so etwas erfindet eine KI wirklich: sie
+    überträgt die regelmäßige Endung auf ein Verb, das sie nicht hat.
+    Wer es durchwinkt, paukt es. Der Fehler muss drinbleiben, sonst
+    übt man die Freigabe an lauter richtigen Einträgen und lernt, sie
+    durchzuklicken."""
+    b, d = kurs
+    import datenbank as dbm
+    db = dbm.verbindung()
+    try:
+        falsch = dbm.zeile(db, """SELECT f.text, f.geprueft
+                                    FROM form f JOIN lexem l ON l.id = f.lexem_id
+                                   WHERE l.sammlung_id = ? AND f.text = 'goed'""",
+                           (d["sammlung_id"],))
+    finally:
+        db.close()
+    assert falsch is not None, "der absichtliche Fehler fehlt"
+    assert falsch["geprueft"] == 0, "er ist freigegeben — dann fällt er nie auf"
+
+
+def test_das_ungepruefte_wird_nicht_abgefragt(kurs, klient):
+    """Die Zusage, auf der alles ruht."""
+    b, d = kurs
+    liste = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "sammlung_id": d["sammlung_id"],
+        "nur": "frei", "anzahl": 50}).json()
+    import datenbank as dbm
+    db = dbm.verbindung()
+    try:
+        ziele = {dbm.wert(db, """SELECT f.text FROM aufgabe a
+                                   JOIN form f ON f.id = a.ziel_id
+                                  WHERE a.id = ? AND a.ziel_art = 'form'""",
+                          (a["aufgabe_id"],)) for a in liste}
+    finally:
+        db.close()
+    assert "goed" not in ziele, "der ungeprüfte Fehler wird abgefragt"

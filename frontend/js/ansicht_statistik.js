@@ -15,7 +15,7 @@
  */
 
 import { api } from './api.js';
-import { h, leeren, meldung } from './hilfen.js';
+import { h, leeren, anfuegen } from './hilfen.js';
 import { zustand, merken } from './zustand.js';
 
 const FARBE = {
@@ -54,22 +54,19 @@ export async function zeichnen(behaelter) {
     return;
   }
 
-  el.append(teilAuswahl(behaelter, sammlungen));
+  anfuegen(el, teilAuswahl(behaelter, sammlungen));
 
   if (!d.gesamt.antworten) {
     el.append(h('div', { class: 'karte' },
       h('p', { text: 'Noch keine Antwort in den letzten '
                    + `${d.gesamt.tage_betrachtet} Tagen. Sobald du lernst, `
                    + 'steht hier, wie es läuft.' })));
-    el.append(teilWortschatz(d));
+    anfuegen(el, teilWortschatz(d));
     return;
   }
 
-  el.append(teilZahlen(d));
-  el.append(teilTaetigkeit(d));
-  el.append(teilVorschau(d));
-  el.append(teilWortschatz(d));
-  el.append(teilTempo(d));
+  anfuegen(el, teilZahlen(d), teilTaetigkeit(d), teilVorschau(d),
+           teilWortschatz(d), teilTempo(d));
 }
 
 

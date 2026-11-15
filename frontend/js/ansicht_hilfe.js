@@ -38,6 +38,18 @@ export async function zeichnen(behaelter) {
 
   /* ---------------------------------------------------------- Lernen */
 
+  el.append(h('h2', { text: 'Lehrgang' }));
+  el.append(h('div', { class: 'karte' },
+    h('p', { style: 'margin-top:0' },
+      'Ausführlich und zum Mitmachen: zwei Spuren, neun Kapitel, jedes '
+      + 'endet mit etwas, das du im Übungskurs ausprobierst. Hier steht '
+      + 'auch, was die Rundgänge nicht erklären können — wie der Trainer '
+      + 'die Vokabeln sieht, was Merkmale und Formgruppen sind, wozu die '
+      + 'Freigabe da ist und was die KI darf.'),
+    h('button', { class: 'wichtig',
+                  onclick: () => { location.hash = '#/lehrgang'; } },
+      'Zum Lehrgang')));
+
   el.append(h('h2', { text: 'Geführte Rundgänge' }));
   el.append(h('p', { class: 'leise',
     text: 'Kurz und einzeln. Jeder hört an einer Stelle auf, an der du '

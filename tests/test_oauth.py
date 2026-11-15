@@ -120,6 +120,39 @@ def test_das_kennblatt_nennt_zwei_verschiedene_namen(klient, eingerichtet):
     assert d["code_challenge_methods_supported"] == ["S256"]
 
 
+def test_der_401_sagt_wo_die_angaben_stehen(klient, eingerichtet):
+    """RFC 9728 sieht die Kopfzeile vor, die MCP-Spezifikation verlangt
+    sie — und hier ist sie der einzige Weg: die vorgeschriebenen
+    Stellen unter /.well-known sind auf diesem Namen vom Tunnel
+    gesperrt. Ohne diese Kopfzeile muss ein Client raten, und ChatGPT
+    hat die Einrichtung genau deshalb abgelehnt, ohne den Server auch
+    nur einmal anzufragen."""
+    # Irgendein Merkmal muss es geben, sonst meldet die Schnittstelle
+    # »noch nicht eingerichtet« (503) statt »abgewiesen« (401) — und
+    # dann gibt es nichts zu verweisen.
+    b = _profil(klient)
+    klient.post(f"/api/benutzer/{b['id']}/mcp-token", json={"name": "Claude"})
+
+    antwort = klient.post("/mcp", json={"jsonrpc": "2.0", "id": 1,
+                                        "method": "initialize", "params": {}})
+    assert antwort.status_code == 401
+    kopf = antwort.headers.get("www-authenticate", "")
+    assert kopf.startswith("Bearer ")
+    # Und zwar auf die Adresse, die durch den Tunnel kommt — unter /mcp.
+    assert 'resource_metadata="https://mcp.example.org/mcp/.well-known/' \
+           'oauth-protected-resource"' in kopf
+
+
+def test_der_herausgeber_zeigt_auf_das_erreichbare_blatt(klient, eingerichtet):
+    """Ein Client sucht das Kennblatt bei <Herausgeber>/.well-known/….
+    Stünde dort nur der Name ohne Pfad, landete er unter /.well-known/…
+    und damit bei Cloudflares leerem 404."""
+    d = klient.get("/.well-known/oauth-authorization-server").json()
+    assert d["issuer"] == "https://mcp.example.org/mcp"
+    r = klient.get("/.well-known/oauth-protected-resource").json()
+    assert r["authorization_servers"] == ["https://mcp.example.org/mcp"]
+
+
 def test_ohne_anlage_kein_oauth(klient):
     """Ohne die beiden Adressen bietet der Trainer gar nichts an, statt
     einen Endpunkt zu nennen, der ungeschützt wäre."""

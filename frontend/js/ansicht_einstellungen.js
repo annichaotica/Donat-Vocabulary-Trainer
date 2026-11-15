@@ -752,8 +752,13 @@ async function teilOAuth(behaelter) {
   knopf.addEventListener('click', () => tun(async () => {
     const neu = await api.oauthClientAnlegen({
       name: name.value.trim(), rueckadresse: rueck.value.trim() });
+    // Das Feld NICHT leeren und die Liste nicht neu zeichnen: beides
+    // sah aus, als wäre nichts gespeichert worden. »Ich glaube, die
+    // Callback-URL wird nicht gespeichert« — sie wurde, zweimal
+    // sogar. Was fehlte, war die Bestätigung.
     zeigeClient(kasten, neu);
-    rueck.value = '';
+    knopf.disabled = true;
+    knopf.textContent = 'Angelegt';
   }));
 
   kasten.append(h('div', { style: 'display:grid;gap:.5rem;margin-top:.8rem' },
@@ -775,6 +780,8 @@ function zeigeClient(kasten, neu) {
   kasten.append(h('div', { class: 'rueckmeldung fast', style: 'margin-top:.8rem' },
     h('div', { class: 'rueckmeldung-kopf' },
       h('span', { text: '!' }), h('span', { text: 'Schlüssel nur jetzt sichtbar' })),
+    h('p', {}, 'Angelegt: ', h('b', { text: neu.name }),
+      ' → ', h('code', { text: neu.rueckadresse })),
     h('p', { text: 'Beides in den Dialog des Konnektors eintragen. Den '
                  + 'Schlüssel kannst du auch weglassen — ChatGPT führt ihn '
                  + 'als freiwillig; wird er mitgeschickt, muss er stimmen.' }),

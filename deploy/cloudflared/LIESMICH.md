@@ -93,6 +93,28 @@ Der Name `vokabeln.` ist **nicht** so beschränkt: dort geht jeder Pfad
 durch, und davor steht Access. Genau deshalb liegt der Schritt, in dem
 ein Mensch einwilligt, auf diesem Namen.
 
+### Falls ein Konnektor die vorgeschriebenen Stellen verlangt
+
+ChatGPT hat die Einrichtung am 15.11.2026 abgelehnt, ohne den Server
+auch nur einmal anzufragen — es suchte die Anmeldeangaben unter
+`/.well-known/…` und bekam Cloudflares leeres 404. Behoben ist das
+über die Kopfzeile `WWW-Authenticate`, mit der der Server die
+erreichbare Stelle selbst nennt.
+
+Ein Client, der darauf besteht, die Angaben an der vorgeschriebenen
+Stelle zu finden, braucht eine Freigabe im Tunnel. In der
+Cloudflare-Verwaltung unter **Networks → Tunnels → Public Hostname**
+einen ZWEITEN Eintrag für denselben Namen anlegen, mit dem Pfad für
+`.well-known` und demselben Dienst wie der bestehende
+`mcp`-Eintrag — die Schreibweise des Pfads genauso wie dort.
+
+> **Die bestehende Beschränkung dabei NICHT entfernen.** Hinter dem
+> Namen liegt dieselbe Anwendung wie hinter `vokabeln.`, aber ohne
+> Access davor. Fällt die Beschränkung auf `/mcp`, steht damit auch
+> `/api` offen — und das hat überhaupt keine Anmeldung. Der ganze
+> Bestand wäre lesbar und änderbar. Ein zusätzlicher Eintrag für
+> `.well-known` ist richtig, das Löschen der Beschränkung nicht.
+
 ## Wartung
 
 ```sh

@@ -16,6 +16,44 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### ChatGPT lehnte die Einrichtung ab — zwei Ursachen
+
+**»Ich glaube, die Callback-URL wird nicht gespeichert.«** Sie wurde,
+sogar zweimal. Das war ein Fehler meiner Oberfläche: sie leerte das
+Feld nach dem Anlegen und zeichnete die Liste nicht neu, also sah es
+aus, als sei nichts passiert. Jetzt bleibt das Feld stehen, der Knopf
+schaltet auf »Angelegt«, und im Bestätigungskasten steht, was
+gespeichert wurde — Name und Rückadresse im Klartext.
+
+**»Einige App-Einstellungen wurden abgelehnt.«** Im Serverprotokoll
+stand keine einzige Anfrage von ChatGPT: es kam nie bis hierher. Der
+Grund ist der Tunnel. Ein Konnektor sucht die Anmeldeangaben an vier
+vorgeschriebenen Stellen unter `/.well-known/…`, und die sind auf dem
+Namen der Schnittstelle alle gesperrt — nur `/mcp` kommt durch.
+Nachgemessen:
+
+```
+404  /.well-known/oauth-protected-resource/mcp      0 Byte  ← Cloudflare
+404  /.well-known/oauth-authorization-server        0 Byte  ← Cloudflare
+200  /mcp/.well-known/oauth-authorization-server  405 Byte  ← der Server
+```
+
+Dafür gibt es einen vorgesehenen Ausweg, den ich nicht gebaut hatte:
+die Kopfzeile **`WWW-Authenticate`** auf der Abweisung. Mit ihr sagt
+der Server selbst, wo seine Angaben stehen, statt den Client raten zu
+lassen. RFC 9728 sieht sie vor, die MCP-Spezifikation verlangt sie —
+und hier ist sie der einzige Weg. Dazu nennt sich die Schnittstelle
+jetzt **mit Pfad** als Herausgeber, damit auch der zweite Suchweg
+(`<Herausgeber>/.well-known/…`) auf der erreichbaren Stelle landet.
+
+Die ganze Kette liegt damit innerhalb von `/mcp` und kommt ohne
+Änderung bei Cloudflare aus. Ein Client, der auf der dritten
+vorgeschriebenen Schreibweise besteht, braucht sie trotzdem — wie das
+geht, steht in `deploy/cloudflared/LIESMICH.md`, samt der Warnung,
+die Pfadbeschränkung nicht einfach zu entfernen: dahinter liegt
+`/api`, und das hat keine Anmeldung.
+
+
 ### Abtippen — ein Modus zum Vertrautmachen
 
 »Alle Vokabeln zeigen, deutsch französisch und abtippen, erfolgreich

@@ -2277,6 +2277,24 @@ def _mcp_geheimnis(request: Request) -> str:
     return ""
 
 
+def _mcp_hinweis() -> dict:
+    """Die Kopfzeile, mit der ein 401 sagt, WO die Anmeldeangaben stehen.
+
+    RFC 9728 sieht sie vor, und die MCP-Spezifikation verlangt sie vom
+    Ressourcenserver. Sie ist hier aber nicht bloß Formsache, sondern
+    der einzige Weg: die vorgeschriebenen Stellen unter /.well-known
+    sind auf diesem Namen von Cloudflare gesperrt — nur /mcp kommt
+    durch. Über diese Kopfzeile nennt der Server die Adresse, die
+    tatsächlich erreichbar ist, statt darauf zu hoffen, dass der Client
+    rät.
+    """
+    if not MCP_URL:
+        return {}
+    return {"WWW-Authenticate":
+            f'Bearer resource_metadata='
+            f'"{MCP_URL}/.well-known/oauth-protected-resource"'}
+
+
 def _mcp_person(request: Request, db: sqlite3.Connection) -> dict:
     # Ohne Access davor trägt das Merkmal die Last allein. Darum eine Sperre
     # gegen Durchprobieren — erraten lässt sich ein 256-Bit-Merkmal zwar
@@ -2308,7 +2326,8 @@ def _mcp_person(request: Request, db: sqlite3.Connection) -> dict:
                    if sperre > 0 else "")
         raise HTTPException(401, "Kein gültiges Zugangsmerkmal. Erwartet wird "
                                  "es in der Kopfzeile Authorization (Bearer) "
-                                 "oder x-account-key." + hinweis)
+                                 "oder x-account-key." + hinweis,
+                            headers=_mcp_hinweis())
     drossel.geschafft(wer)
     return dict(treffer["benutzer"])
 
@@ -2483,7 +2502,13 @@ def oauth_kennblatt():
     """
     _oauth_bereit()
     return {
-        "issuer": _mcp_wurzel(),
+        # Der Herausgeber ist die MCP-Adresse MIT Pfad, nicht bloß der
+        # Name. Daran hängt, wo ein Client dieses Blatt sucht: an
+        # <Herausgeber>/.well-known/… — und das ist hier
+        # /mcp/.well-known/…, also das, was durch den Tunnel kommt.
+        # Mit dem bloßen Namen als Herausgeber landete die Suche unter
+        # /.well-known/… und damit bei Cloudflares leerem 404.
+        "issuer": MCP_URL,
         "authorization_endpoint": f"{WEB_URL}/oauth/authorize",
         # Unter /mcp, weil nur dieser Pfad durch den Tunnel kommt.
         "token_endpoint": f"{_mcp_wurzel()}/mcp/oauth/token",
@@ -2500,7 +2525,7 @@ def oauth_kennblatt():
 def oauth_ressource():
     _oauth_bereit()
     return {"resource": MCP_URL,
-            "authorization_servers": [_mcp_wurzel()],
+            "authorization_servers": [MCP_URL],
             "scopes_supported": ["vokabeln"]}
 
 

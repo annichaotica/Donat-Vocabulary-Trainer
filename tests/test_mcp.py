@@ -475,3 +475,47 @@ def test_die_api_bleibt_ohne_cors(klient):
     Heimnetz sie öffnet."""
     antwort = klient.get("/api/sprachen", headers={"Origin": "https://boese.example"})
     assert "access-control-allow-origin" not in antwort.headers
+
+
+def test_kein_werkzeugtext_nennt_ein_werkzeug_das_es_nicht_gibt():
+    """Die KI liest diese Beschreibungen und handelt danach.
+
+    `formen_bestaetigen` wurde absichtlich entfernt — stand aber noch
+    in zwei Werkzeugtexten und in der README-Tabelle. Ein Agent, der
+    danach sucht, findet nichts und hält den Trainer für kaputt;
+    schlimmer, er könnte versuchen, die Freigabe anders zu erzwingen.
+
+    Geprüft wird klein: jeder Bezeichner in einer Beschreibung, der wie
+    ein Werkzeugname aussieht (kleingeschrieben, mit Unterstrich), muss
+    es auch sein.
+    """
+    import re
+    import sys
+    sys.path.insert(0, "backend")
+    import mcp_dienst
+    namen = {w["name"] for w in mcp_dienst.WERKZEUGE}
+    muster = re.compile(r"\b([a-zäöü]+_[a-zäöü_]+)\b")
+    # Felder und Fachwörter, die zufällig so aussehen.
+    erlaubt = {"lektion_nr", "sammlung_id", "lexem_id", "form_id", "text_id",
+               "benutzer_id", "abschnitt_id", "wunsch_id", "aufgabe_id",
+               "als_geprueft", "nur_pruefen", "ist_grundform", "genus_verbi",
+               "ist_variante", "bewertung_art", "grund_sprache",
+               "ungeprueft_abfragen", "ab_lektion", "bis_lektion",
+               "textaufgabe_id", "formgruppe_lektion", "zielsprache_text",
+               # Feldnamen und Fachwörter, die zufällig wie ein
+               # Werkzeugname aussehen.
+               "alternativen_grundsprache", "alternativen_zielsprache",
+               "formgruppen_standard", "lektion_titel", "nur_ungepruefte",
+               "zu_spaet"}
+    fehlend = set()
+    for w in mcp_dienst.WERKZEUGE:
+        texte = [w["description"]]
+        for e in (w["inputSchema"].get("properties") or {}).values():
+            texte.append(e.get("description", ""))
+        for text in texte:
+            for treffer in muster.findall(text or ""):
+                if treffer in namen or treffer in erlaubt:
+                    continue
+                fehlend.add(treffer)
+    assert not fehlend, (
+        f"Werkzeugtexte nennen das, was es nicht gibt: {sorted(fehlend)}")

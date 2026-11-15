@@ -166,8 +166,8 @@ def vokabel_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
         "hinweis": ("Die Formen sind als ungeprüft eingetragen und werden noch "
                     "nicht abgefragt. Das ist Absicht: eine erfundene Form, die "
                     "unbemerkt gepaukt wird, ist schlimmer als eine fehlende. "
-                    "Freigabe durch einen Menschen in der Oberfläche oder mit "
-                    "formen_bestaetigen.") if not als_geprueft else None,
+                    "Die Freigabe geschieht in der Oberfläche, unter "
+                    "»Freigabe« bei der Sammlung.") if not als_geprueft else None,
     }
 
 
@@ -972,7 +972,7 @@ WERKZEUGE: list[dict] = [
             "text": _s("string", "die Erklärung selbst"),
             "muster": _s("object",
                 "worauf die Regel zutrifft; alle Felder freigestellt. "
-                "wortart, formgruppe (Kennung aus formgruppen_auflisten), "
+                "wortart, formgruppe (Kennung aus formgruppen_zeigen), "
                 "merkmale (Merkmalsbündel wie bei den Formen)"),
             "beispiele": _s("array",
                 "[{\"form\": \"έγραψα\", \"bedeutung\": \"ich schrieb\"}]",
@@ -1173,8 +1173,9 @@ WERKZEUGE: list[dict] = [
     {
         "name": "vokabel_lesen",
         "description": "Einen Eintrag mit allen Formen, Bedeutungen und "
-                       "Form-Kennungen lesen. Die Kennungen braucht man für "
-                       "formen_bestaetigen.",
+                       "Form-Kennungen lesen — etwa um eine Form zu "
+                       "berichtigen (form_aendern) oder eine fehlende "
+                       "nachzutragen (formen_ergaenzen).",
         "inputSchema": {"type": "object", "properties": {
             "lexem_id": _s("integer", "")}, "required": ["lexem_id"]},
         "funktion": vokabel_lesen,

@@ -125,7 +125,6 @@ In `~/Library/Application Support/Claude/claude_desktop_config.json`:
 | `vokabel_nachschlagen` | Über Lemma, **alle Formen** und alle Übersetzungen |
 | `formen_ergaenzen` | Einem bestehenden Eintrag eine weitere Zeit anfügen |
 | `eintrag_pruefen`, `sammlung_pruefen` | Taugt das für die Fähigkeiten des Trainers? |
-| `formen_bestaetigen` | Freigabe — erst danach wird abgefragt |
 | `sprachprofil_lesen`, `sprachprofil_anpassen`, `sprache_einrichten` | Eine Sprache zum Laufen bringen, ohne Codeänderung |
 
 **Eingetragene Formen bleiben ungeprüft**, bis ein Mensch sie freigibt. Das

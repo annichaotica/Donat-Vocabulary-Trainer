@@ -74,6 +74,9 @@ export const api = {
   beispielkursAnlegen: (benutzerId) =>
     ruf('/beispielkurs', { methode: 'POST',
                            frage: { benutzer_id: benutzerId } }),
+  statistik: (benutzerId, sammlungId) =>
+    ruf('/statistik', { frage: { benutzer_id: benutzerId,
+                                 sammlung_id: sammlungId } }),
   wortarten: (sammlungId) => ruf(`/sammlungen/${sammlungId}/wortarten`),
   lehrgang: (sammlungId, benutzerId) =>
     ruf(`/sammlungen/${sammlungId}/lehrgang`,

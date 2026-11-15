@@ -16,6 +16,24 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Neu: Dein Fortschritt
+
+Auf der Übersicht neben »Fehler wiederholen« ein Knopf **Fortschritt**.
+Fünf Kacheln: was du getan hast (Antworten je Tag, nach Urteil
+getrennt), was auf dich zukommt (Fälligkeiten der nächsten Wochen, mit
+dem Überfälligen vorweg), wo dein Wortschatz steht, wie schnell du
+antwortest — und darüber vier Zahlen, die man ohne Diagramm versteht.
+
+Zugeschnitten auf **wenig** Daten. Beim Bauen standen 101 Antworten an
+zwei Tagen im Protokoll, und genau damit muss jede Kachel etwas sagen;
+eine Statistik, die erst nach einem halben Jahr aufwacht, sieht man
+einmal an und nie wieder. Wo nichts auszusagen ist, steht ein Satz
+statt eines leeren Gerüsts.
+
+Die Zahlen stimmen mit denen der Übersicht überein — fremde
+Sammlungen, die du nur mitpflegst, und Zeitformen hinter der
+Lektionsschranke zählen hier wie dort nicht mit.
+
 ### Akzente wieder durch Gedrückthalten
 
 Zu merken war: »Da konnte man, wenn man länger auf einem Vokal blieb,

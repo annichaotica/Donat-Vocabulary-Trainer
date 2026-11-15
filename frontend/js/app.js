@@ -7,6 +7,7 @@ import { zustand, merken, darstellungSetzen } from './zustand.js';
 import * as uebersicht from './ansicht_uebersicht.js';
 import * as lernansicht from './ansicht_lernen.js';
 import * as texte from './ansicht_texte.js';
+import * as statistik from './ansicht_statistik.js';
 import * as wortschatz from './ansicht_wortschatz.js';
 import * as einstellungen from './ansicht_einstellungen.js';
 import * as tastatur from './tastatur.js';
@@ -85,7 +86,7 @@ async function kopfzeile() {
     uebersicht: 'Übersicht', wortschatz: 'Wortschatz', wort: 'Wort',
     neu: 'Neues Wort', lernen: 'Abfrage', ziele: 'Lernziele',
     freigabe: 'Freigabe', import: 'Datei einlesen', ueben: 'Sätze üben',
-    hilfe: 'Anleitung', texte: 'Texte',
+    hilfe: 'Anleitung', texte: 'Texte', statistik: 'Fortschritt',
     einstellungen: 'Einstellungen',
     tastatur: 'Tastatur', profile: 'Profil wählen',
   }[weg[0]] || 'Vokabeltrainer';
@@ -210,6 +211,8 @@ async function wegweisen() {
           await sitzung.start();
           return;
         }
+      case 'statistik':
+        return await statistik.zeichnen(inhalt);
       case 'texte':
         // #/texte listet, #/texte/7 öffnet die Werkbank.
         return teile[1]

@@ -327,7 +327,10 @@ export async function zeichnen(behaelter) {
       h('button', { onclick: () => { merken({ sammlungId: null }); location.hash = '#/lernen/frei'; } },
         'Frei üben'),
       h('button', { onclick: () => { merken({ sammlungId: null }); location.hash = '#/lernen/fehler'; } },
-        'Fehler wiederholen'))));
+        'Fehler wiederholen'),
+      h('button', { class: 'schlicht',
+                    onclick: () => { location.hash = '#/statistik'; } },
+        'Fortschritt'))));
 
   // Lernziele: Ausschnitte des Bestands mit Termin, auch über Lektionen
   // und Sammlungen hinweg.

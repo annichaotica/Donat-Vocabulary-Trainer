@@ -347,6 +347,12 @@ def test_die_anleitung_nennt_keine_feste_adresse():
             u for u in re.findall(r"https?://[\w.:-]+", text)
             if "localhost" not in u and "127.0.0.1" not in u
             and "github.com" not in u and "gnu.org" not in u
+            # Der XML-Namensraum für SVG ist keine Adresse, sondern eine
+            # Kennung: `createElementNS` verlangt sie wörtlich, und
+            # abgerufen wird sie nie. Eng ausgenommen, nicht als
+            # »w3.org« — sonst ginge hier irgendwann ein echter Verweis
+            # durch.
+            and u != "http://www.w3.org"
         ]
         assert not fremde, f"{datei.name}: {fremde}"
 

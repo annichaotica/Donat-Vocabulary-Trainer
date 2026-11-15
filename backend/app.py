@@ -42,6 +42,7 @@ import merkmale as mk
 import qualitaet
 import regeln as regelmodul
 import sammelimport
+import statistik
 import sprachen
 import uebung_lernen
 import uebungen
@@ -1928,6 +1929,16 @@ def lernstand_lesen(sammlung_id: int, benutzer_id: int,
     _holen(db, "sammlung", sammlung_id)
     _holen(db, "benutzer", benutzer_id)
     return lernmodul.lernstand(db, benutzer_id, sammlung_id, anzahl)
+
+
+@app.get("/api/statistik")
+def statistik_lesen(benutzer_id: int, sammlung_id: int | None = None,
+                    request: Request = None, db: sqlite3.Connection = DB):
+    """Der eigene Lernfortschritt — alles für die Seite in einem Aufruf."""
+    _wache_rumpf(db, request, benutzer_id=benutzer_id,
+                 sammlung_id=sammlung_id)
+    _holen(db, "benutzer", benutzer_id)
+    return statistik.alles(db, benutzer_id, sammlung_id)
 
 
 @app.get("/api/lernen/stand")

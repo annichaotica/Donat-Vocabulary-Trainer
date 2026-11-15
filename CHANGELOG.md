@@ -16,6 +16,32 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Die openid-Adresse antwortet — verspricht aber nichts
+
+Jeder ChatGPT-Durchlauf endete gleich, über mehr als eine Stunde
+hinweg:
+
+```
+GET /.well-known/oauth-protected-resource     200
+GET /.well-known/oauth-authorization-server   200
+GET /.well-known/openid-configuration         404   ← und dann Schluss
+```
+
+Das ausgegebene Token blieb dabei unbenutzt. Damit war die Adresse
+der einzige verbliebene Verdacht.
+
+Der Trainer spricht **kein OpenID Connect**: er gibt keine
+Identitätstoken aus, hat keinen Schlüsselsatz und weiß vom Menschen
+nur die Mailadresse, die Cloudflare Access geprüft hat. Trotzdem
+antwortet er dort jetzt — mit genau denselben Angaben wie im
+OAuth-Blatt und mit **keiner einzigen** darüber hinaus. Die Felder,
+die OpenID Connect verlangt und die hier gelogen wären (`jwks_uri`,
+`id_token_signing_alg_values_supported`, `subject_types_supported`),
+fehlen bewusst. Wer echtes OpenID Connect braucht, sieht das und
+scheitert sichtbar, statt auf ein Identitätstoken zu warten, das nie
+kommt. Ein Test hält fest, dass diese Felder nicht hineinwandern.
+
+
 ### Anmeldung geglückt, Werkzeugliste gescheitert
 
 Der ganze OAuth-Ablauf lief durch — Weiterleitung, Access-Anmeldung,

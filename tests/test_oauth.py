@@ -216,6 +216,28 @@ def test_die_blaetter_liegen_an_den_passenden_stellen(klient, eingerichtet):
         "/.well-known/oauth-authorization-server/mcp").status_code == 404
 
 
+def test_openid_adresse_antwortet_verspricht_aber_nichts(klient,
+                                                        eingerichtet):
+    """Der Trainer spricht kein OpenID Connect und soll es auch nicht
+    behaupten.
+
+    Geantwortet wird hier trotzdem, weil ChatGPT sonst abbricht: es
+    holt beide OAuth-Blätter mit 200, fragt dann diese Adresse,
+    bekommt 404 und benutzt das längst ausgegebene Token nie. Das
+    Blatt enthält aber NUR die OAuth-Angaben. Die Felder, die hier
+    gelogen wären, fehlen — wer echtes OpenID Connect braucht, merkt
+    es und scheitert sichtbar.
+    """
+    d = klient.get("/.well-known/openid-configuration").json()
+    assert d["issuer"] == "https://mcp.example.org"
+    assert d["token_endpoint"].endswith("/mcp/oauth/token")
+    for gelogen in ("jwks_uri", "id_token_signing_alg_values_supported",
+                    "subject_types_supported", "userinfo_endpoint"):
+        assert gelogen not in d, f"{gelogen} verspricht etwas, was fehlt"
+    # Und ohne Anlage auch hier nichts.
+    assert d["scopes_supported"] == ["vokabeln"]
+
+
 def test_ohne_anlage_kein_oauth(klient):
     """Ohne die beiden Adressen bietet der Trainer gar nichts an, statt
     einen Endpunkt zu nennen, der ungeschützt wäre."""

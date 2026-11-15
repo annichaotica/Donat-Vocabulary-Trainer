@@ -2552,6 +2552,32 @@ def _ressourcenblatt(ressource: str) -> dict:
 # richtig, die Folgerung falsch — gebraucht wurde nicht weniger
 # Blätter, sondern je Adresse das passende. Genau daran ist nach
 # geglückter Anmeldung die Werkzeugliste gescheitert.
+# OpenID Connect spricht der Trainer NICHT. Er gibt keine
+# Identitätstoken aus, hat keinen Schlüsselsatz und weiß vom Menschen
+# nur die Mailadresse, die Cloudflare Access geprüft hat.
+#
+# Trotzdem antwortet er hier, und zwar mit demselben Blatt wie unter
+# oauth-authorization-server. Der Grund steht im Protokoll: ChatGPT
+# holt beide OAuth-Blätter mit 200, fragt dann diese Adresse, bekommt
+# 404 und bricht ab — in jedem einzelnen Durchlauf, über eine Stunde
+# hinweg, ohne das längst ausgegebene Token je zu benutzen.
+#
+# WAS DIESES BLATT NICHT TUT: es behauptet keine Fähigkeiten, die
+# fehlen. Die Felder, die OpenID Connect verlangt und die hier gelogen
+# wären — jwks_uri, id_token_signing_alg_values_supported,
+# subject_types_supported —, stehen bewusst NICHT darin. Ein Client,
+# der echtes OpenID Connect braucht, sieht das und scheitert sichtbar,
+# statt ein Identitätstoken zu erwarten, das nie kommt. Ein Client,
+# der nur nachsieht, ob es die Adresse gibt, findet die
+# OAuth-Angaben, die stimmen.
+@app.get("/.well-known/openid-configuration")
+@app.get("/.well-known/openid-configuration/mcp")
+@app.get("/mcp/.well-known/openid-configuration")
+def oauth_kennblatt_oidc():
+    """Dieselben Angaben wie das OAuth-Kennblatt — siehe Kommentar."""
+    return oauth_kennblatt()
+
+
 @app.get("/.well-known/oauth-protected-resource")
 def oauth_ressource_name():
     """Für Clients, die den ganzen Namen als Ressource ansehen."""

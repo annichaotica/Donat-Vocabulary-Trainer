@@ -208,11 +208,21 @@ function teilAbschnitt(a, deckung, textId, behaelter) {
 
   return h('div', { class: 'karte' },
     original,
+    // Wort für Wort aus dem EIGENEN Wortschatz — keine Übersetzung,
+    // und das steht auch so da. Eine echte Übersetzung kann der
+    // Trainer nicht; er hat keine Übersetzungsmaschine und soll keine
+    // erfinden. Was er hat, sind deine Einträge, und die reichen, um
+    // beim Entziffern nicht an jedem zweiten Wort hängenzubleiben.
+    wortFuerWort(a, deckung),
     feld,
     a.referenz
       ? h('details', { style: 'margin-top:.4rem' },
-          h('summary', { class: 'leise', text: 'Referenzübersetzung' }),
-          h('p', { text: a.referenz }))
+          h('summary', { class: 'leise',
+                         text: 'Übersetzungsvorschlag vergleichen' }),
+          h('p', { text: a.referenz }),
+          h('p', { class: 'leise', style: 'margin:.3rem 0 0',
+                   text: 'Von deinem Chatprogramm hinterlegt. Deine '
+                       + 'eigene Fassung oben bleibt davon unberührt.' }))
       : null);
 }
 
@@ -243,6 +253,37 @@ function woerterDesAbschnitts(original, deckung) {
   }
   if (zuletzt < original.length) stuecke.push({ text: original.slice(zuletzt) });
   return stuecke;
+}
+
+
+/** Wort für Wort — die Lesehilfe, die ohne KI auskommt.
+ *
+ * »Einen Übersetzungsvorschlag kann man sich vermutlich wieder nur von
+ * der angeschlossenen KI holen?« — Für eine richtige Übersetzung ja.
+ * Für das Entziffern nicht: die Bedeutungen stehen ja in deinem
+ * Wortschatz. Das ist ausdrücklich KEINE Übersetzung, und die
+ * Überschrift sagt es, damit niemand sie dafür hält.
+ */
+function wortFuerWort(abschnitt, deckung) {
+  const nach = new Map();
+  for (const w of deckung.woerter) if (!nach.has(w.wort)) nach.set(w.wort, w);
+  const stuecke = woerterDesAbschnitts(abschnitt.original, deckung)
+    .filter((x) => x.lexem_id !== undefined && x.bedeutung);
+  if (!stuecke.length) return null;
+
+  const liste = h('div', { class: 'wortfuerwort' });
+  const gesehen = new Set();
+  for (const x of stuecke) {
+    if (gesehen.has(x.vergleichsform)) continue;
+    gesehen.add(x.vergleichsform);
+    liste.append(h('span', { class: 'wfw-paar' },
+      h('b', { text: x.wort }), ' ', h('span', { text: x.bedeutung })));
+  }
+  return h('details', { class: 'wfw' },
+    h('summary', { class: 'leise',
+                   text: `Wort für Wort (${gesehen.size} aus deinem `
+                       + 'Wortschatz)' }),
+    liste);
 }
 
 

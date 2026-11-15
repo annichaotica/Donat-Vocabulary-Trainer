@@ -632,3 +632,16 @@ input[type="file"] { max-width: 100%; }
     transform: none;
   }
 }
+
+
+/* Wort für Wort: Paare, die beim Umbruch zusammenbleiben müssen —
+   ein Wort in der einen und seine Bedeutung in der nächsten Zeile
+   wäre schlimmer als keine Hilfe. */
+.wfw { margin: .2rem 0 .6rem; }
+.wortfuerwort {
+  display: flex; flex-wrap: wrap; gap: .15rem .9rem;
+  margin-top: .4rem; font-size: .92em; line-height: 1.6;
+}
+.wfw-paar { white-space: nowrap; }
+.wfw-paar b { font-weight: 600; }
+.wfw-paar > span { color: var(--leise, #667); }

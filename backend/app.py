@@ -51,7 +51,7 @@ from modelle import (RegelEingabe, RegelAendern,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
-                     BuchstandSetzen, FassungSichern,
+                     BuchstandSetzen, FassungSichern, ReferenzSetzen,
                      ImportEingabe, LehrgangSetzen, LernwahlSetzen,
                      LesetextAnlegen, WortMerken,
                      LernzielAendern, LernzielAnlegen,
@@ -1123,6 +1123,19 @@ def fassung_sichern(abschnitt_id: int, eingabe: FassungSichern,
                                          eingabe.benutzer_id, eingabe.fassung)
     except KeyError as f:
         raise HTTPException(404, str(f))
+
+
+@app.put("/api/texte/{text_id}/referenz")
+def text_referenz_setzen(text_id: int, eingabe: ReferenzSetzen,
+                         request: Request = None,
+                         db: sqlite3.Connection = DB):
+    """Die Referenzübersetzung je Abschnitt — meist von der KI."""
+    try:
+        return lesetexte.referenz_setzen(db, text_id, eingabe.fassungen)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+    except ValueError as f:
+        raise HTTPException(400, str(f))
 
 
 @app.post("/api/texte/{text_id}/wortwunsch", status_code=201)

@@ -619,6 +619,33 @@ def text_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
             "abschnitte": len(t["abschnitte"])}
 
 
+def text_lesen(db: sqlite3.Connection, person: dict, text_id: int):
+    """Den Text mit seinen Abschnitten — zum Übersetzen."""
+    t = dbm.zeile(db, "SELECT sammlung_id FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    zugang.sammlung_pruefen(db, person["id"], t["sammlung_id"])
+    d = _fehler_wandeln(lesetexte.lesen, db, text_id)
+    return {"titel": d["titel"], "sprache": d["sprache"],
+            "abschnitte": [{"abschnitt_id": a["id"], "original": a["original"],
+                            "referenz": a["referenz"]}
+                           for a in d["abschnitte"]]}
+
+
+def text_uebersetzen(db: sqlite3.Connection, person: dict, text_id: int,
+                     fassungen: dict):
+    """Hinterlegt je Abschnitt eine Referenzübersetzung."""
+    t = dbm.zeile(db, "SELECT sammlung_id FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    zugang.sammlung_pruefen(db, person["id"], t["sammlung_id"], schreiben=True)
+    sauber = {int(k): str(v) for k, v in (fassungen or {}).items()}
+    d = _fehler_wandeln(lesetexte.referenz_setzen, db, text_id, sauber)
+    return {**d, "hinweis": "Sie erscheint im Text als aufklappbare "
+                            "Referenzübersetzung. Die eigene Fassung der "
+                            "Lernenden bleibt davon unberührt."}
+
+
 def text_deckung_lesen(db: sqlite3.Connection, person: dict, text_id: int):
     """Welche Wörter des Textes fehlen ihr noch?
 
@@ -1338,6 +1365,37 @@ WERKZEUGE: list[dict] = [
             "required": ["sammlung_id", "zuordnung"],
         },
         "funktion": lehrgang_zuordnen,
+    },
+    {
+        "name": "text_lesen",
+        "description": "Einen Lesetext mit seinen Abschnitten. Jeder "
+                       "Abschnitt hat eine Kennung — die braucht "
+                       "text_uebersetzen.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"text_id": _s("integer", "aus texte_auflisten")},
+            "required": ["text_id"],
+        },
+        "funktion": text_lesen,
+    },
+    {
+        "name": "text_uebersetzen",
+        "description": "Hinterlegt je Abschnitt eine Referenzübersetzung. "
+                       "Sie erscheint im Text als aufklappbarer Vorschlag "
+                       "— zum Vergleichen, NACHDEM man selbst übersetzt "
+                       "hat. Die eigene Fassung wird dabei nicht "
+                       "angerührt. Übersetze so, wie es im Unterricht "
+                       "gälte: nah am Original, aber in gutem Deutsch.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text_id": _s("integer", "aus texte_auflisten"),
+                "fassungen": _s("object",
+                                "Abschnitts-Kennung -> Übersetzung, "
+                                'z.B. {"12": "Das Kind liest ein Buch."}')},
+            "required": ["text_id", "fassungen"],
+        },
+        "funktion": text_uebersetzen,
     },
 ]
 

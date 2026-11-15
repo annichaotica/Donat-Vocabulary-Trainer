@@ -581,3 +581,13 @@ class BuchstandSetzen(BaseModel):
     """Wo stehe ich in diesem Lehrwerk? `null` hebt die Schranke auf."""
     benutzer_id: int
     bis_lektion: int | None = None
+
+
+class ReferenzSetzen(BaseModel):
+    """Abschnitts-Kennung -> Referenzübersetzung.
+
+    Getrennt von der eigenen Fassung: die Referenz gehört zum Text,
+    der Versuch zur Person. Ein Vorschlag von außen darf die eigene
+    Arbeit nicht überschreiben.
+    """
+    fassungen: dict[int, str]

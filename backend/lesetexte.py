@@ -81,6 +81,26 @@ def woerter(inhalt: str, profil: dict) -> list[dict]:
     return gefunden
 
 
+def _bedeutungen(db: sqlite3.Connection, sammlung_id: int) -> dict[int, str]:
+    """lexem_id -> erste Übersetzung.
+
+    Für die Wort-für-Wort-Hilfe. In EINER Abfrage, nicht je Wort: ein
+    Absatz hat schnell vierzig Wörter, und vierzig Rundläufe für eine
+    Lesehilfe wären keine Hilfe.
+    """
+    gefunden: dict[int, str] = {}
+    for z in dbm.zeilen(db, """
+            SELECT b.lexem_id, u.text
+              FROM bedeutung b
+              JOIN lexem l ON l.id = b.lexem_id
+              JOIN uebersetzung u ON u.bedeutung_id = b.id
+             WHERE l.sammlung_id = ?
+             ORDER BY b.reihenfolge DESC, u.ist_haupt, u.id DESC""",
+            (sammlung_id,)):
+        gefunden[z["lexem_id"]] = z["text"]
+    return gefunden
+
+
 def _wortschatz(db: sqlite3.Connection, sammlung_id: int,
                 profil: dict) -> dict[str, int]:
     """Vergleichsform -> lexem_id, über Grundformen UND Formen.
@@ -185,6 +205,7 @@ def deckung(db: sqlite3.Connection, text_id: int, benutzer_id: int) -> dict:
     karte = _wortschatz(db, t["sammlung_id"], profil)
     staende = _lernstaende(db, t["sammlung_id"], benutzer_id)
     gewuenscht = _wortwunsch_formen(db, benutzer_id, t["sammlung_id"])
+    bedeutungen = _bedeutungen(db, t["sammlung_id"])
 
     treffer: list[dict] = []
     # Je Vergleichsform nur einmal zählen — ein Text, in dem »και«
@@ -195,6 +216,7 @@ def deckung(db: sqlite3.Connection, text_id: int, benutzer_id: int) -> dict:
         lexem_id = stueck["lexem_id"]
         art = staende.get(lexem_id, "neu") if lexem_id else "unbekannt"
         eintrag = {**stueck, "art": art,
+                   "bedeutung": bedeutungen.get(lexem_id),
                    "gewuenscht": stueck["vergleichsform"] in gewuenscht}
         treffer.append(eintrag)
         gesehen.setdefault(stueck["vergleichsform"], eintrag)
@@ -481,3 +503,30 @@ def nachschlagen(db: sqlite3.Connection, text_id: int, wort: str) -> dict:
         "bedeutungen": bedeutungen,
         "merkmale": json.loads(form["merkmale"]) if form else None,
     }
+
+
+def referenz_setzen(db: sqlite3.Connection, text_id: int,
+                    fassungen: dict[int, str]) -> dict:
+    """Die Referenzübersetzung je Abschnitt — der Vorschlag von außen.
+
+    Sie wird angezeigt, seit es Abschnitte gibt, war aber nirgends zu
+    setzen: kein Formular, kein Endpunkt, kein Werkzeug. Die
+    angebundene KI konnte also gar keinen Vorschlag hinterlegen,
+    obwohl der Platz dafür dastand.
+
+    Sie überschreibt NICHT die eigene Fassung. Das sind zwei Dinge:
+    die Referenz gehört zum Text, der Versuch gehört zur Person —
+    sonst hätte ein Vorschlag von außen die eigene Arbeit gelöscht.
+    """
+    if dbm.zeile(db, "SELECT 1 FROM text WHERE id = ?", (text_id,)) is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    eigene = {z["id"] for z in dbm.zeilen(db, """
+        SELECT id FROM textabschnitt WHERE text_id = ?""", (text_id,))}
+    fremd = set(map(int, fassungen or {})) - eigene
+    if fremd:
+        raise ValueError(f"Diese Abschnitte gehören nicht zum Text: "
+                         f"{sorted(fremd)}")
+    for abschnitt_id, fassung in (fassungen or {}).items():
+        db.execute("UPDATE textabschnitt SET referenz = ? WHERE id = ?",
+                   (fassung or None, int(abschnitt_id)))
+    return {"text_id": text_id, "abschnitte": len(fassungen or {})}

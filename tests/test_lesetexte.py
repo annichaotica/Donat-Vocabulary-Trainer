@@ -317,3 +317,70 @@ def test_die_wortwuensche_sind_persoenlich(bestand, klient):
                 json={"benutzer_id": b["id"], "wort": "κόκκινο"})
     assert klient.get("/api/wortwuensche",
                       params={"benutzer_id": zweite["id"]}).json() == []
+
+
+# -------------------------------------------- Übersetzungsvorschlag
+
+def test_eine_referenzuebersetzung_laesst_sich_hinterlegen(bestand, klient):
+    """»Einen Übersetzungsvorschlag kann man sich vermutlich wieder nur
+    von der angeschlossenen KI holen?«
+
+    Ja — und bis hierher konnte sie es nicht einmal. Der Platz dafür
+    stand im Schema, die Oberfläche zeigte ihn an, aber es gab keinen
+    Weg, ihn zu füllen: kein Formular, kein Endpunkt, kein Werkzeug.
+    Eine halbe Funktion, die aussah wie eine ganze.
+    """
+    b, s = bestand
+    t = _text(klient, s)
+    a = t["abschnitte"][0]
+    antwort = klient.put(f"/api/texte/{t['id']}/referenz", json={
+        "fassungen": {str(a["id"]): "Georg schreibt einen Brief."}})
+    assert antwort.status_code == 200, antwort.text
+
+    wieder = klient.get(f"/api/texte/{t['id']}",
+                        params={"benutzer_id": b["id"]}).json()
+    assert wieder["abschnitte"][0]["referenz"] == "Georg schreibt einen Brief."
+
+
+def test_der_vorschlag_ueberschreibt_die_eigene_fassung_nicht(bestand, klient):
+    """Zwei verschiedene Dinge: die Referenz gehört zum Text, der
+    Versuch zur Person. Liefe das zusammen, löschte ein Vorschlag von
+    außen die eigene Arbeit."""
+    b, s = bestand
+    t = _text(klient, s)
+    a = t["abschnitte"][0]
+    klient.put(f"/api/abschnitte/{a['id']}/fassung",
+               json={"benutzer_id": b["id"], "fassung": "mein Versuch"})
+    klient.put(f"/api/texte/{t['id']}/referenz",
+               json={"fassungen": {str(a["id"]): "die Musterlösung"}})
+
+    wieder = klient.get(f"/api/texte/{t['id']}",
+                        params={"benutzer_id": b["id"]}).json()
+    assert wieder["abschnitte"][0]["meine_fassung"] == "mein Versuch"
+    assert wieder["abschnitte"][0]["referenz"] == "die Musterlösung"
+
+
+def test_ein_fremder_abschnitt_wird_abgewiesen(bestand, klient):
+    """Sonst schriebe ein Vorschlag in einen anderen Text."""
+    b, s = bestand
+    eins = _text(klient, s, titel="Eins")
+    zwei = _text(klient, s, titel="Zwei")
+    antwort = klient.put(f"/api/texte/{eins['id']}/referenz", json={
+        "fassungen": {str(zwei["abschnitte"][0]["id"]): "falsch zugeordnet"}})
+    assert antwort.status_code == 400, antwort.text
+
+
+def test_die_deckung_bringt_die_bedeutungen_mit(bestand, klient):
+    """Für die Wort-für-Wort-Hilfe — ohne sie bräuchte die Oberfläche
+    je Wort einen eigenen Rundlauf."""
+    b, s = bestand
+    t = _text(klient, s)
+    d = klient.get(f"/api/texte/{t['id']}/deckung",
+                   params={"benutzer_id": b["id"]}).json()
+    bekannt = [w for w in d["woerter"] if w["lexem_id"]]
+    assert bekannt, "nichts erkannt — dann prüft der Test nichts"
+    assert any(w.get("bedeutung") for w in bekannt), bekannt[:3]
+    # Unbekannte haben keine, und das muss so sein: eine erfundene
+    # Bedeutung wäre schlimmer als keine.
+    assert all(w.get("bedeutung") is None
+               for w in d["woerter"] if not w["lexem_id"])

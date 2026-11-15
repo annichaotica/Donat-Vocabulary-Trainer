@@ -16,6 +16,26 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Übersetzungsvorschlag und »Wort für Wort«
+
+Zu merken war die Frage: »Einen Übersetzungsvorschlag kann man sich
+vermutlich wieder nur von der angeschlossenen KI holen?«
+
+Für eine richtige Übersetzung ja — der Trainer hat keine
+Übersetzungsmaschine und soll keine erfinden. Nur konnte die KI es
+bisher auch nicht: der Platz dafür stand im Schema, die Oberfläche
+zeigte ihn an, aber es gab keinen Weg, ihn zu füllen. Eine halbe
+Funktion, die aussah wie eine ganze. Jetzt gibt es `text_lesen` und
+`text_uebersetzen`; der Vorschlag erscheint unter dem Abschnitt als
+»Übersetzungsvorschlag vergleichen« und lässt die eigene Fassung
+unangetastet.
+
+Ohne KI gibt es neu **Wort für Wort**: unter jedem Abschnitt die
+Bedeutungen aus dem eigenen Wortschatz, aufklappbar. Das ist
+ausdrücklich keine Übersetzung — es steht auch so da —, aber es
+genügt, um beim Entziffern nicht an jedem zweiten Wort
+hängenzubleiben.
+
 ### Rundgänge: ausblendbar, und mit einem Weg zurück
 
 Drei Dinge aus dem ersten Durchlauf:

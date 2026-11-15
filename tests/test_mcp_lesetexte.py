@@ -193,3 +193,26 @@ def test_eine_fremde_sammlung_laesst_sich_nicht_zuordnen(gelesen, mcp, klient):
                        zuordnung={"aoristos": 3})
     assert antwort.get("_werkzeugfehler") or antwort.get("_protokollfehler"), \
         antwort
+
+
+def test_die_ki_kann_einen_uebersetzungsvorschlag_hinterlegen(gelesen, mcp):
+    """Der Weg, nach dem sie gefragt hat — und er fehlte ganz."""
+    b, s, t = gelesen
+    d = werkzeug(mcp, "text_lesen", text_id=t["id"])
+    assert d["abschnitte"], d
+    kennung = d["abschnitte"][0]["abschnitt_id"]
+    assert d["abschnitte"][0]["referenz"] is None
+
+    werkzeug(mcp, "text_uebersetzen", text_id=t["id"],
+             fassungen={str(kennung): "Der Apfel ist rot."})
+    wieder = werkzeug(mcp, "text_lesen", text_id=t["id"])
+    assert wieder["abschnitte"][0]["referenz"] == "Der Apfel ist rot."
+
+
+def test_ein_fremder_text_laesst_sich_nicht_uebersetzen(gelesen, mcp, klient):
+    b, s, t = gelesen
+    zweite = person_mit_token(klient, "Zweite")
+    antwort = werkzeug(zweite, "text_uebersetzen", text_id=t["id"],
+                       fassungen={"1": "egal"})
+    assert antwort.get("_werkzeugfehler") or antwort.get("_protokollfehler"), \
+        antwort

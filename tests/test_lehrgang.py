@@ -302,3 +302,95 @@ def test_ein_unbekannter_teil_wird_als_unsicher_gemeldet():
     lektionen = [{"nr": 45, "name": "Passiv Präsens"}]
     _l, nr, eindeutig = lehrgang._einfuehrung({"imperfekt", "passiv"}, lektionen)
     assert nr == 45 and eindeutig is False
+
+
+# ------------------------- die Lektionsgrenze des Ziels selbst
+
+def test_ein_lernziel_auf_fruehen_lektionen_bekommt_keine_spaete_zeitform(
+        buch, klient):
+    """»Bei meinem Lernziel wird wieder der Aorist abgefragt, obwohl er
+    gar nicht für diese Lektionen freigeschaltet wurde.«
+
+    Der Fall aus dem Betrieb, und er war berechtigt. Die Zuordnung war
+    eingetragen (21 Zeilen), der persönliche Buchstand nicht — also tat
+    die Schranke nichts. Dieselbe Auskunft zweimal zu verlangen war der
+    Entwurfsfehler: ein Ziel auf Lektion 2 und 3 sagt schon, wie weit
+    jemand ist.
+    """
+    b, s = buch
+    _lehrgang(klient, s, {"enestotas": 2, "aoristos": 3})
+    # KEIN Buchstand — genau ihre Lage.
+    lektionen = klient.get(f"/api/sammlungen/{s['id']}/lektionen").json()
+    bis_zwei = [l["id"] for l in lektionen if l["nr"] in (1, 2)]
+    z = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Lektion 1 und 2",
+        "umfang": {"sammlungen": [s["id"]], "lektionen": bis_zwei}}).json()
+
+    block = klient.get(f"/api/lernziele/{z['id']}/block", params={
+        "benutzer_id": b["id"], "anzahl": 30}).json()
+    assert block["aufgaben"], "der Block ist leer"
+
+    import datenbank as dbm
+    db = dbm.verbindung()
+    try:
+        gruppen = {dbm.wert(db, "SELECT formgruppe FROM aufgabe WHERE id = ?",
+                            (a["aufgabe_id"],))
+                   for a in block["aufgaben"]}
+    finally:
+        db.close()
+    assert "aoristos" not in gruppen, (
+        f"Aorist im Block, obwohl das Ziel nur bis Lektion 2 reicht: {gruppen}")
+    assert "enestotas" in gruppen, "das Präsens fehlt jetzt auch"
+
+
+def test_ein_ziel_ohne_lektionsauswahl_bekommt_weiter_alles(buch, klient):
+    """Keine Lektionsgrenze heißt keine Grenze — sonst nähme ein Ziel
+    über den ganzen Stoff plötzlich Stoff weg."""
+    b, s = buch
+    _lehrgang(klient, s, {"aoristos": 3})
+    z = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alles",
+        "umfang": {"sammlungen": [s["id"]]}}).json()
+    block = klient.get(f"/api/lernziele/{z['id']}/block", params={
+        "benutzer_id": b["id"], "anzahl": 30}).json()
+    import datenbank as dbm
+    db = dbm.verbindung()
+    try:
+        gruppen = {dbm.wert(db, "SELECT formgruppe FROM aufgabe WHERE id = ?",
+                            (a["aufgabe_id"],)) for a in block["aufgaben"]}
+    finally:
+        db.close()
+    assert "aoristos" in gruppen
+
+
+def test_eine_ausdruecklich_gewaehlte_formgruppe_schlaegt_die_grenze(buch, klient):
+    """Wer »nur Aorist, Lektion 1 bis 2« einstellt, meint das — sonst
+    wäre das Ziel stumm leer und niemand wüsste, warum."""
+    b, s = buch
+    _lehrgang(klient, s, {"aoristos": 3})
+    lektionen = klient.get(f"/api/sammlungen/{s['id']}/lektionen").json()
+    bis_zwei = [l["id"] for l in lektionen if l["nr"] in (1, 2)]
+    z = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Aorist üben",
+        "umfang": {"sammlungen": [s["id"]], "lektionen": bis_zwei,
+                   "formgruppen": ["aoristos"]}}).json()
+    block = klient.get(f"/api/lernziele/{z['id']}/block", params={
+        "benutzer_id": b["id"], "anzahl": 30}).json()
+    assert block["aufgaben"], "ausdrücklich gewählt und trotzdem leer"
+
+
+def test_bis_lektion_greift_auch_auf_die_formen(buch, klient):
+    """Derselbe Gedanke im normalen Lernweg: »mitlernen bis Lektion N«."""
+    b, s = buch
+    _lehrgang(klient, s, {"aoristos": 3})
+    liste = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"],
+        "bis_lektion": 2, "anzahl": 30}).json()
+    import datenbank as dbm
+    db = dbm.verbindung()
+    try:
+        gruppen = {dbm.wert(db, "SELECT formgruppe FROM aufgabe WHERE id = ?",
+                            (a["aufgabe_id"],)) for a in liste}
+    finally:
+        db.close()
+    assert "aoristos" not in gruppen, gruppen

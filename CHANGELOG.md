@@ -16,6 +16,40 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Ein Lernziel hält sich von selbst an seine Lektionen
+
+Zu merken war: »bei meinem Lernziel wird wieder der Aorist abgefragt,
+obwohl er gar nicht für diese Lektionen freigeschaltet wurde«.
+
+Zu Recht. Die Zuordnung war eingetragen, die eigene Lektionsnummer
+nicht — und ohne die tat die Schranke nichts. Dieselbe Auskunft
+zweimal zu verlangen war der Fehler: ein Ziel auf Lektion 2 und 3 sagt
+schon, wie weit jemand ist. Die höchste Lektion im Umfang gilt jetzt
+als Grenze, ganz ohne zweite Eingabe. Dasselbe beim »mitlernen bis
+Lektion N« im normalen Weg.
+
+Wer eine Formgruppe ausdrücklich in den Umfang schreibt, bekommt sie
+trotzdem — sonst wäre ein Ziel »nur Aorist, Lektion 1 bis 2« stumm
+leer.
+
+Und die Stelle zum Eintragen war nicht zu finden: sie lag zweieinhalb
+Bildschirme tief hinter sechsundzwanzig Ankreuzfeldern. Sie steht
+jetzt oben, und auf jeder Sammlungskarte steht eine Zeile »Lehrwerk: …
+· Lektion eintragen«, die direkt dorthin springt. Eine gespeicherte
+Zuordnung ohne eigene Lektion sagt außerdem, dass sie noch nichts tut.
+
+### Die KI kann die Lektionszuordnung übernehmen
+
+Zwei neue Werkzeuge für das angebundene Chatprogramm:
+`lehrgang_lesen` und `lehrgang_zuordnen`. Der Namensvorschlag des
+Trainers ist reine Wortsuche; ein Chat versteht dagegen, dass
+»Konjunktiv und Futur (να / θα)« zwei Formgruppen auf einmal einführt.
+
+Was dabei NICHT hilft und wovor die Werkzeugbeschreibung ausdrücklich
+warnt: die Formen der Vokabeln. Nachgemessen erschien jede Formgruppe
+ab Lektion 1, weil zu fast jedem Wort das volle Paradigma eingetragen
+ist.
+
 ### Die Anleitung kennt den Trainer wieder
 
 Sie hatte zwei Abschnitte — wie eine Abfrage abläuft und wie man sein

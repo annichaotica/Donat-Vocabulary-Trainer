@@ -90,6 +90,23 @@ def _zugaenglich(db: sqlite3.Connection, benutzer_id: int) -> list[int]:
         (benutzer_id, benutzer_id))]
 
 
+def _hoechste_lektion(db: sqlite3.Connection,
+                      lektion_ids: list | None) -> int | None:
+    """Die größte Lektionsnummer im Umfang — oder None.
+
+    None heißt »keine Lektionsgrenze«: ein Ziel ohne Lektionsauswahl
+    umfasst den ganzen Stoff, und dann soll auch alles drankommen.
+    Lektionen ohne Nummer zählen nicht mit; sie sind meist selbst
+    angelegt und sagen nichts über den Lehrgang.
+    """
+    if not lektion_ids:
+        return None
+    platzhalter = ",".join("?" * len(lektion_ids))
+    return dbm.wert(db, f"""SELECT MAX(nr) FROM lektion
+                             WHERE id IN ({platzhalter}) AND nr IS NOT NULL""",
+                    tuple(lektion_ids))
+
+
 def aufgaben_im_umfang(db: sqlite3.Connection, benutzer_id: int,
                        umfang: dict) -> list[dict]:
     """Alle aktiven Aufgaben, die in den Ausschnitt fallen, mit Lernstand.
@@ -119,6 +136,21 @@ def aufgaben_im_umfang(db: sqlite3.Connection, benutzer_id: int,
         if auswahl:
             bedingungen.append(f"{spalte} IN ({','.join('?' * len(auswahl))})")
             werte += list(auswahl)
+
+    # Ein Ziel auf Lektion 2 und 3 sagt schon, wie weit jemand ist.
+    #
+    # »Bei meinem Lernziel wird wieder der Aorist abgefragt, obwohl er
+    # gar nicht für diese Lektionen freigeschaltet wurde.« — Die
+    # Schranke oben hing am persönlichen Buchstand, und der war nicht
+    # eingetragen; die Zuordnung allein tat nichts. Dieselbe Auskunft
+    # zweimal zu verlangen war der Fehler: die höchste Lektion im
+    # Umfang IST die Grenze. Wer ausdrücklich eine Formgruppe in den
+    # Umfang schreibt, meint sie trotzdem — die Auswahl oben steht
+    # schon da und holt sie wieder herein.
+    grenze = _hoechste_lektion(db, umfang.get("lektionen"))
+    if grenze is not None and not umfang.get("formgruppen"):
+        bedingungen.append(lernmodul.LEKTIONSGRENZE_SQL)
+        werte.append(grenze)
 
     reihe = dbm.zeilen(db, f"""
         SELECT a.id AS aufgabe_id, a.typ, a.ziel_art, a.ziel_id,

@@ -180,6 +180,24 @@ LEKTIONSSCHRANKE_SQL = """(a.formgruppe IS NULL OR NOT EXISTS (
        AND g.ab_lektion > b.bis_lektion))"""
 
 
+# Dieselbe Schranke, aber gegen eine GENANNTE Lektion statt gegen den
+# persönlichen Buchstand.
+#
+# »Bei meinem Lernziel wird wieder der Aorist abgefragt, obwohl er gar
+# nicht für diese Lektionen freigeschaltet wurde.« — Sie hatte recht,
+# und zwar grundsätzlich: wer ein Ziel auf Lektion 2 und 3 schneidet,
+# sagt damit schon, wie weit er ist. Eine zweite Zahl dafür zu
+# verlangen wäre, dieselbe Auskunft zweimal zu fordern — und solange
+# die zweite fehlt, passiert gar nichts. Genau so ist es passiert.
+#
+# Ein `?` für die Lektionsnummer, bis zu der gelernt wird.
+LEKTIONSGRENZE_SQL = """(a.formgruppe IS NULL OR NOT EXISTS (
+    SELECT 1 FROM formgruppe_lektion g
+     WHERE g.sammlung_id = l.sammlung_id
+       AND g.formgruppe = a.formgruppe
+       AND g.ab_lektion > ?))"""
+
+
 def sichtbare_sammlungen(db: sqlite3.Connection, benutzer_id: int) -> list[int]:
     """Eigene Sammlungen und die, die mir freigegeben wurden.
 
@@ -741,7 +759,13 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         bedingungen.append("""(l.lektion_id IS NULL OR EXISTS (
             SELECT 1 FROM lektion k WHERE k.id = l.lektion_id
               AND (k.nr IS NULL OR k.nr <= ?)))""")
-        werte.append(bis_lektion)
+        # Und dieselbe Grenze gilt für die FORMEN. Wer bis Lektion 12
+        # mitlernt, hat den Aorist aus Lektion 39 nicht gehabt — die
+        # Wörter von Lektion 12 bringen ihre Aoristformen aber mit.
+        bedingungen.append(LEKTIONSGRENZE_SQL)
+        # Zweimal: einmal für die Lektionsgrenze der Wörter, einmal für
+        # die der Formen.
+        werte += [bis_lektion, bis_lektion]
     if typen:
         bedingungen.append(f"a.typ IN ({','.join('?' * len(typen))})")
         werte += list(typen)

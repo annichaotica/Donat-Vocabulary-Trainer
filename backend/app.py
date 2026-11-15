@@ -568,6 +568,15 @@ def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
                COALESCE((SELECT w.lernen FROM lernwahl w
                           WHERE w.sammlung_id = s.id AND w.benutzer_id = ?),
                         s.besitzer_id = ?) AS lerne_ich,
+               -- Hier mit, nicht in einem eigenen Aufruf je Karte: die
+               -- Übersicht soll nicht nach Sammlungszahl langsamer
+               -- werden. Dieselbe Entscheidung wie bei den offenen
+               -- Formen eine Zeile weiter unten.
+               (SELECT b.bis_lektion FROM buchstand b
+                 WHERE b.sammlung_id = s.id AND b.benutzer_id = ?)
+                 AS bis_lektion,
+               (SELECT COUNT(*) FROM lektion k WHERE k.sammlung_id = s.id)
+                 AS lektionen,
                (SELECT COUNT(*) FROM lexem l WHERE l.sammlung_id = s.id) AS lexeme,
                -- Hier mit, nicht in einem eigenen Aufruf: die Übersicht
                -- soll nicht je Sammlung einen Rundlauf brauchen, nur um
@@ -586,7 +595,7 @@ def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
          WHERE s.besitzer_id = ?
             OR s.id IN (SELECT sammlung_id FROM freigabe WHERE benutzer_id = ?)
          ORDER BY s.name""", (benutzer_id, benutzer_id, benutzer_id,
-                               benutzer_id, benutzer_id))
+                               benutzer_id, benutzer_id, benutzer_id))
 
 
 @app.post("/api/sammlungen", status_code=201)

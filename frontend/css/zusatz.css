@@ -558,3 +558,17 @@ input[type="file"] { max-width: 100%; }
   .lehrgangszeile { grid-template-columns: 5rem 1fr; }
   .lehrgangszeile > :last-child { grid-column: 2; }
 }
+
+
+/* Ein Hinweis, der ein Satz ist und keine Marke.
+   `.marke` ist eine Pille für ein, zwei Wörter — sie bricht nicht um,
+   und ein ganzer Satz darin lief aus der Karte heraus. */
+.hinweiskasten {
+  background: var(--warnung-grund, #fdf6e3);
+  border-left: 3px solid var(--warnung, #c89000);
+  border-radius: 0 var(--rund-klein) var(--rund-klein) 0;
+  padding: .5rem .7rem;
+  margin: .6rem 0;
+  font-size: .92em;
+  line-height: 1.45;
+}

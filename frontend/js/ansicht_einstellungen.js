@@ -14,8 +14,23 @@ export async function zeichnen(behaelter) {
       'Anleitung — Lernen und Chatprogramm anschließen')));
 
   if (zustand.sammlungId) {
+    // Das Lehrwerk ZUERST. Es stand hinter »Was diese Sammlung abfragt«,
+    // und das sind sechsundzwanzig Ankreuzfelder — die Karte begann bei
+    // Pixel 1942 einer 6600 Pixel hohen Seite. »Jetzt muss ich fragen,
+    // wo ich eine Lektionsnummer eintragen soll«: zu Recht. Das
+    // Alltägliche gehört nach oben, das selten Gebrauchte darunter.
+    const lehrgangskarte = await teilLehrgang(behaelter);
+    el.append(lehrgangskarte);
     el.append(await teilSammlung(behaelter));
-    el.append(await teilLehrgang(behaelter));
+    // #/einstellungen/lehrgang springt gleich hierher — der Weg von der
+    // Sammlungskarte soll nicht durchs Scrollen führen. Mit dem
+    // Element in der Hand, nicht über getElementById: die Karte
+    // entsteht hier, eine Suche danach wäre ein Umweg über das
+    // Dokument und bräuchte eine Kennung, die sonst niemand nutzt.
+    if ((location.hash || '').endsWith('/lehrgang')) {
+      requestAnimationFrame(
+        () => lehrgangskarte.scrollIntoView({ block: 'start' }));
+    }
   } else {
     el.append(h('p', { class: 'leise',
       text: 'Keine Sammlung gewählt — die Einstellungen zu Formgruppen und '
@@ -246,9 +261,22 @@ async function teilLehrgang(behaelter) {
           + 'Zahl bleiben Zeitformen draußen, die das Buch erst später '
           + 'einführt — sie warten, der Lernstand bleibt.' }));
 
+  // Eine Zuordnung ohne eigene Lektion tut nichts — und sagte es
+  // bisher nicht. »Bei meinem Lernziel wird wieder der Aorist
+  // abgefragt«: 21 Zeilen eingetragen, Feld leer, nichts passierte.
+  // Für Lernziele mit Lektionsauswahl greift die Grenze inzwischen von
+  // selbst; hier geht es um die allgemeine Abfrage.
+  if (Object.keys(d.zuordnung).length && d.buchstand === null) {
+    kasten.append(h('p', { class: 'hinweiskasten' },
+      'Die Zuordnung steht, aber oben fehlt deine Lektion — in der '
+      + 'allgemeinen Abfrage kommt deshalb weiterhin alles dran. '
+      + 'Lernziele mit Lektionsauswahl halten sich auch ohne diese Zahl '
+      + 'an ihre Lektionen.'));
+  }
+
   if (d.ausgeblendet.length) {
     const summe = d.ausgeblendet.reduce((n, a) => n + a.aufgaben, 0);
-    kasten.append(h('p', { class: 'marke warnung',
+    kasten.append(h('p', { class: 'hinweiskasten',
       text: `${summe} Aufgaben warten gerade: `
           + d.ausgeblendet.map((a) => `${a.formgruppe} ab ${a.ab_lektion}`)
               .join(', ') }));

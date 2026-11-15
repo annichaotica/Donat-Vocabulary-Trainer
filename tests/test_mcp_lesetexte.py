@@ -133,3 +133,63 @@ def test_ein_fremder_text_ist_nicht_lesbar(gelesen, mcp, klient):
     antwort = werkzeug(zweite, "text_deckung_lesen", text_id=t["id"])
     assert antwort.get("_werkzeugfehler") or antwort.get("_protokollfehler"), \
         antwort
+
+
+# ------------------------------------------- Lehrgang über die Schnittstelle
+
+def test_die_ki_kann_die_lektionszuordnung_lesen_und_setzen(mcp):
+    """»Kann anhand der Vokabelstruktur vielleicht der angeschlossene
+    Chat besser die Zuordnung machen?«
+
+    Die Struktur nicht — nachgemessen erschien jede Formgruppe ab
+    Lektion 1, weil zu fast jedem Wort das volle Paradigma eingetragen
+    ist. Der Chat schon, aber wegen seines Wissens über Lehrwerke, und
+    dafür braucht er diese beiden Werkzeuge.
+    """
+    b, s = _aufbau(mcp)
+    for nr, name in ((1, "Erste Wörter"), (2, "Verben im Präsens"),
+                     (3, "Aorist I")):
+        mcp.klient.post(f"/api/sammlungen/{s['id']}/lektionen",
+                        json={"nr": nr, "name": name})
+
+    d = werkzeug(mcp, "lehrgang_lesen", sammlung_id=s["id"])
+    assert [l["nr"] for l in d["lektionen"]] == [1, 2, 3]
+    kennungen = {g["formgruppe"] for g in d["formgruppen"]}
+    assert {"enestotas", "aoristos"} <= kennungen
+    # Noch nichts eingetragen, aber ein Vorschlag liegt bei.
+    assert all(g["ab_lektion"] is None for g in d["formgruppen"])
+    nach = {g["formgruppe"]: g for g in d["formgruppen"]}
+    assert nach["aoristos"]["namensvorschlag"] == 3
+    # Und der Hinweis sagt, worauf man sich NICHT stützen soll.
+    assert "Paradigma" in d["hinweis"]
+
+    werkzeug(mcp, "lehrgang_zuordnen", sammlung_id=s["id"],
+             zuordnung={"enestotas": 2, "aoristos": 3})
+    wieder = werkzeug(mcp, "lehrgang_lesen", sammlung_id=s["id"])
+    nach = {g["formgruppe"]: g["ab_lektion"] for g in wieder["formgruppen"]}
+    assert nach["enestotas"] == 2 and nach["aoristos"] == 3
+
+
+def test_die_zuordnung_wird_als_ganzes_ersetzt(mcp):
+    """Sonst bliebe eine Gruppe stehen, die die KI bewusst weggelassen
+    hat — »gilt von Anfang an« ließe sich dann nicht ausdrücken."""
+    b, s = _aufbau(mcp)
+    mcp.klient.post(f"/api/sammlungen/{s['id']}/lektionen",
+                    json={"nr": 3, "name": "Aorist I"})
+    werkzeug(mcp, "lehrgang_zuordnen", sammlung_id=s["id"],
+             zuordnung={"enestotas": 2, "aoristos": 3})
+    werkzeug(mcp, "lehrgang_zuordnen", sammlung_id=s["id"],
+             zuordnung={"aoristos": 3})
+    d = werkzeug(mcp, "lehrgang_lesen", sammlung_id=s["id"])
+    nach = {g["formgruppe"]: g["ab_lektion"] for g in d["formgruppen"]}
+    assert nach["enestotas"] is None
+    assert nach["aoristos"] == 3
+
+
+def test_eine_fremde_sammlung_laesst_sich_nicht_zuordnen(gelesen, mcp, klient):
+    b, s, _t = gelesen
+    zweite = person_mit_token(klient, "Zweite")
+    antwort = werkzeug(zweite, "lehrgang_zuordnen", sammlung_id=s["id"],
+                       zuordnung={"aoristos": 3})
+    assert antwort.get("_werkzeugfehler") or antwort.get("_protokollfehler"), \
+        antwort

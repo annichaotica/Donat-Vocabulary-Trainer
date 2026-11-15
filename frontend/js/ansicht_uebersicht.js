@@ -80,6 +80,33 @@ function profilpunkt(p) {
   return punkt;
 }
 
+/** Wo stehe ich im Lehrwerk — als eine Zeile auf der Karte.
+ *
+ * »Jetzt muss ich fragen, wo ich eine Lektionsnummer eintragen soll.«
+ * Die Einstellung lag zweieinhalb Bildschirme tief in den
+ * Sammlungseinstellungen, hinter sechsundzwanzig Ankreuzfeldern. Eine
+ * Einstellung, die man nicht findet, gibt es nicht — also steht hier,
+ * was gilt, und ein Weg direkt dorthin.
+ *
+ * Nur eine Zeile, und nur wenn es Lektionen gibt: wo kein Lehrwerk
+ * ist, gibt es auch keinen Stand darin.
+ */
+function lehrwerkZeile(s) {
+  if (!s.lektionen) return null;
+  const hin = (e) => {
+    e.preventDefault();
+    merken({ sammlungId: s.id });
+    location.hash = '#/einstellungen/lehrgang';
+  };
+  return h('p', { class: 'leise', style: 'margin:.3rem 0 0' },
+    s.bis_lektion
+      ? `Lehrwerk: bei Lektion ${s.bis_lektion} von ${s.lektionen} · `
+      : `Lehrwerk: ${s.lektionen} Lektionen, alle dabei · `,
+    h('a', { href: '#/einstellungen/lehrgang', onclick: hin },
+      s.bis_lektion ? 'ändern' : 'Lektion eintragen'));
+}
+
+
 /** »Gezielt üben« — Verben, Adjektive, eine einzelne Zeitform.
  *
  * »Dann brauchen wir noch ein paar mehr Lernmodi: Verben lernen, Zeiten
@@ -286,6 +313,7 @@ export async function zeichnen(behaelter) {
       // das abstellen ließ. Der Schalter gehört hierher, zur Karte:
       // hier sieht man die fremden Sammlungen ja gerade.
       lernwahlZeile(s),
+      lehrwerkZeile(s),
       // Ungeprüfte Formen werden nicht abgefragt. Wer das nicht weiß, sucht
       // vergeblich nach den Wörtern, die die KI gerade eingetragen hat —
       // darum steht es hier und nicht in einem Untermenü.

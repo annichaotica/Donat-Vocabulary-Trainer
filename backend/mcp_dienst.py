@@ -28,6 +28,7 @@ from typing import Any, Callable
 from fastapi import HTTPException
 
 import datenbank as dbm
+import lehrgang
 import lesetexte
 import zugang
 
@@ -632,6 +633,50 @@ def text_deckung_lesen(db: sqlite3.Connection, person: dict, text_id: int):
     fehlend = sorted({w["wort"] for w in d["woerter"] if not w["lexem_id"]})
     return {"abdeckung": d["abdeckung"], "zahlen": d["zahlen"],
             "urteil": d["urteil"], "fehlende_woerter": fehlend}
+
+
+def lehrgang_lesen(db: sqlite3.Connection, person: dict, sammlung_id: int):
+    """Lektionen, Formgruppen und die bisherige Zuordnung — zum Ordnen."""
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id)
+    lektionen = [{"nr": z["nr"], "name": z["name"], "woerter": z["woerter"]}
+                 for z in dbm.zeilen(db, """
+        SELECT l.nr, l.name,
+               (SELECT COUNT(*) FROM lexem x WHERE x.lektion_id = l.id)
+                 AS woerter
+          FROM lektion l WHERE l.sammlung_id = ? AND l.nr IS NOT NULL
+         ORDER BY l.nr""", (sammlung_id,))]
+    vorhanden = lehrgang.zuordnung(db, sammlung_id)
+    gruppen = []
+    for v in _fehler_wandeln(lehrgang.vorschlag, db, sammlung_id):
+        gruppen.append({
+            "formgruppe": v["formgruppe"], "name": v["name"],
+            "wortart": v["wortart"],
+            "ab_lektion": vorhanden.get(v["formgruppe"]),
+            "namensvorschlag": v["ab_lektion"],
+            "namensvorschlag_eindeutig": v["eindeutig"],
+            "aufgaben": dbm.wert(db, """
+                SELECT COUNT(*) FROM aufgabe a JOIN lexem l ON l.id = a.lexem_id
+                 WHERE l.sammlung_id = ? AND a.formgruppe = ? AND a.aktiv = 1""",
+                (sammlung_id, v["formgruppe"])) or 0,
+        })
+    return {"lektionen": lektionen, "formgruppen": gruppen,
+            "hinweis": "Geh nach den Lektionsnamen und nach dem, was du über "
+                       "den Aufbau dieser Sprache weißt. Die Formen der "
+                       "Vokabeln helfen NICHT: zu den meisten Wörtern steht "
+                       "das volle Paradigma, unabhängig von der Lektion — "
+                       "nachgemessen erschien jede Formgruppe ab Lektion 1."}
+
+
+def lehrgang_zuordnen(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                      zuordnung: dict):
+    """Trägt ein, ab welcher Lektion welche Formgruppe gilt."""
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+    sauber = {k: int(v) for k, v in (zuordnung or {}).items() if v is not None}
+    neu = _fehler_wandeln(lehrgang.zuordnung_setzen, db, sammlung_id, sauber)
+    return {"zuordnung": neu, "anzahl": len(neu),
+            "hinweis": "Wirkt erst, wenn jemand unter Einstellungen seine "
+                       "eigene Lektion einträgt. Der Lernstand bleibt in "
+                       "jedem Fall erhalten."}
 
 
 def _s(typ, beschreibung, **rest):
@@ -1257,6 +1302,42 @@ WERKZEUGE: list[dict] = [
             "required": ["text_id"],
         },
         "funktion": text_deckung_lesen,
+    },
+    {
+        "name": "lehrgang_lesen",
+        "description": "Die Lektionen einer Sammlung und ihre Formgruppen "
+                       "(Zeiten, Fall-Tabellen), um zuzuordnen, ab welcher "
+                       "Lektion das Lehrwerk welche Form einführt. Wer das "
+                       "eingetragen hat, bekommt keine Zeitform abgefragt, "
+                       "die im Buch noch nicht vorkam. Enthält einen "
+                       "groben Namensvorschlag des Trainers — der ist "
+                       "reine Wortsuche und oft daneben, besonders bei "
+                       "Lektionen, die zwei Dinge auf einmal einführen.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sammlung_id": _s("integer", "aus sammlungen_auflisten")},
+            "required": ["sammlung_id"],
+        },
+        "funktion": lehrgang_lesen,
+    },
+    {
+        "name": "lehrgang_zuordnen",
+        "description": "Trägt ein, ab welcher Lektion welche Formgruppe "
+                       "gilt. Die Zuordnung wird als GANZES ersetzt — also "
+                       "vorher lehrgang_lesen und alles mitschicken, was "
+                       "bleiben soll. Eine weggelassene Gruppe heißt »gilt "
+                       "von Anfang an«.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+                "zuordnung": _s("object",
+                                "Formgruppen-Kennung -> Lektionsnummer, "
+                                'z.B. {"aoristos": 39, "enestotas": 14}')},
+            "required": ["sammlung_id", "zuordnung"],
+        },
+        "funktion": lehrgang_zuordnen,
     },
 ]
 

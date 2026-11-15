@@ -114,6 +114,24 @@ def darf_sammlung(db: sqlite3.Connection, benutzer_id: int, sammlung_id: int,
     return recht == "schreiben" if schreiben else True
 
 
+def beschreibbare_sammlungen(db: sqlite3.Connection,
+                             benutzer_id: int) -> list[int]:
+    """Sammlungen, in die diese Person eintragen darf.
+
+    Eigene und fremde mit Schreibrecht. Gebraucht wird das dort, wo es
+    nicht um Sichtbarkeit geht, sondern um die Frage »kann ich das
+    erledigen?« — etwa bei den Wortwünschen: wer in Max' Sammlung
+    schreiben darf, kann auch Max' Wünsche erfüllen, und soll sie
+    darum zu sehen bekommen.
+    """
+    return [z["id"] for z in dbm.zeilen(db, """
+        SELECT s.id FROM sammlung s WHERE s.besitzer_id = ?
+        UNION
+        SELECT f.sammlung_id FROM freigabe f
+         WHERE f.benutzer_id = ? AND f.recht = 'schreiben'""",
+        (benutzer_id, benutzer_id))]
+
+
 def sammlung_pruefen(db: sqlite3.Connection, benutzer_id: int, sammlung_id: int,
                      schreiben: bool = False) -> None:
     if not darf_sammlung(db, benutzer_id, sammlung_id, schreiben):

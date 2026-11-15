@@ -389,19 +389,40 @@ def wort_vergessen(db: sqlite3.Connection, benutzer_id: int, text_id: int,
 
 def wortwuensche(db: sqlite3.Connection, benutzer_id: int,
                  sammlung_id: int | None = None,
-                 offen: bool = True) -> list[dict]:
-    """Die Liste, die die KI über den MCP abholt."""
-    bedingungen = ["w.benutzer_id = ?"]
+                 offen: bool = True,
+                 auch_aus_sammlungen: list[int] | None = None) -> list[dict]:
+    """Die Liste, die die KI über den MCP abholt.
+
+    `auch_aus_sammlungen` nimmt die Wünsche ANDERER Leute aus diesen
+    Sammlungen mit. Das ist kein Zusatz, sondern der Normalfall in
+    einer Familie: der Konnektor hängt an einem Profil, die Wünsche
+    entstehen aber an allen. Max markiert Wörter in seinem
+    mittelhochdeutschen Text, und die KI, die über ihr Zugang
+    spricht, sah sie nicht — obwohl Annuschka in Max' Sammlung
+    schreiben darf und die Wünsche also erfüllen KANN.
+
+    Die Regel ist genau diese: was ich erfüllen darf, soll ich auch
+    sehen. Dafür steht `zugang.beschreibbare_sammlungen`.
+    """
+    wer = ["w.benutzer_id = ?"]
     werte: list = [benutzer_id]
+    if auch_aus_sammlungen:
+        platz = ",".join("?" * len(auch_aus_sammlungen))
+        wer.append(f"w.sammlung_id IN ({platz})")
+        werte += list(auch_aus_sammlungen)
+    bedingungen = ["(" + " OR ".join(wer) + ")"]
     if sammlung_id:
         bedingungen.append("w.sammlung_id = ?")
         werte.append(sammlung_id)
     if offen:
         bedingungen.append("w.erledigt = 0")
     return dbm.zeilen(db, f"""
-        SELECT w.*, s.name AS sammlung, s.sprache, t.titel AS text
+        SELECT w.*, s.name AS sammlung, s.sprache, t.titel AS text,
+               b.name AS wunsch_von, (w.benutzer_id = {int(benutzer_id)})
+                   AS von_mir
           FROM wortwunsch w
           JOIN sammlung s ON s.id = w.sammlung_id
+          JOIN benutzer b ON b.id = w.benutzer_id
           LEFT JOIN text t ON t.id = w.text_id
          WHERE {' AND '.join(bedingungen)}
          -- Häufigstes zuerst: wer eine Liste von achthundert Wörtern

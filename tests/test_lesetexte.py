@@ -529,3 +529,90 @@ def test_eine_grosse_liste_verdeckt_keine_kleine(klient):
     assert d["offen_nach_sammlung"]["Griechisch"] == 45
     assert "Mittelhochdeutsch (3)" in d["hinweis"]
     assert "sammlung_id" in d["hinweis"]
+
+
+def test_wuensche_anderer_aus_eigener_schreibsammlung(klient):
+    """»Der Konnektor im ChatGPT war für Max gedacht, der nutzt den
+    gleichen Zugang. Das heißt, der müsste dann auch Anforderungen von
+    Max abholen.«
+
+    In einer Familie hängt der Zugang an EINEM Profil, die Wünsche
+    entstehen aber an allen. Die Regel ist deshalb nicht »meine
+    Wünsche«, sondern: **was ich erfüllen darf, soll ich auch sehen.**
+    Wer in Max' Sammlung schreiben darf, kann Max' Wünsche erfüllen.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+    import mcp_dienst
+
+    anni = klient.post("/api/benutzer", json={"name": "Annuschka"}).json()
+    max_ = klient.post("/api/benutzer", json={"name": "Max"}).json()
+    seine = klient.post("/api/sammlungen", json={
+        "besitzer_id": max_["id"], "name": "Mittelhochdeutsch",
+        "sprache": "gmh"}).json()
+    fremd = klient.post("/api/sammlungen", json={
+        "besitzer_id": max_["id"], "name": "Nur zum Lesen",
+        "sprache": "en"}).json()
+    klient.put(f"/api/sammlungen/{seine['id']}/zugriff", json={
+        "benutzer_id": anni["id"], "recht": "schreiben"})
+    klient.put(f"/api/sammlungen/{fremd['id']}/zugriff", json={
+        "benutzer_id": anni["id"], "recht": "lesen"})
+
+    db = dbm.verbindung()
+    try:
+        for sid, wort in ((seine["id"], "ouwê"), (fremd["id"], "yonder")):
+            db.execute("""INSERT INTO wortwunsch
+                            (benutzer_id, sammlung_id, wort, vergleichsform,
+                             vorkommen)
+                          VALUES (?, ?, ?, ?, 1)""",
+                       (max_["id"], sid, wort, wort))
+        db.commit()
+        person = dict(dbm.zeile(db, "SELECT * FROM benutzer WHERE id = ?",
+                                (anni["id"],)))
+        d = mcp_dienst.offene_woerter_lesen(db, person)
+        woerter = {w["wort"]: w for w in d["woerter"]}
+    finally:
+        db.close()
+
+    # Aus der Schreibsammlung: ja — und mit dem Namen dessen, der ihn
+    # gestellt hat, denn das ist nicht die Person am Zugang.
+    assert "ouwê" in woerter
+    assert woerter["ouwê"]["angefordert_von"] == "Max"
+    assert woerter["ouwê"]["von_mir"] is False
+    # Aus der Nur-Lese-Sammlung: nein. Sehen, was man nicht erfüllen
+    # kann, wäre eine Liste, die nie kürzer wird.
+    assert "yonder" not in woerter
+
+
+def test_fremden_wunsch_darf_man_auch_abhaken(klient):
+    """Sonst sähe man ihn bei jedem Abruf wieder — eine Liste, die sich
+    nicht abarbeiten lässt, ist schlimmer als keine."""
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+    import mcp_dienst
+
+    anni = klient.post("/api/benutzer", json={"name": "Annuschka"}).json()
+    max_ = klient.post("/api/benutzer", json={"name": "Max"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": max_["id"], "name": "Mhd", "sprache": "gmh"}).json()
+    klient.put(f"/api/sammlungen/{s['id']}/zugriff", json={
+        "benutzer_id": anni["id"], "recht": "schreiben"})
+
+    db = dbm.verbindung()
+    try:
+        cur = db.execute("""INSERT INTO wortwunsch
+                              (benutzer_id, sammlung_id, wort, vergleichsform,
+                               vorkommen)
+                            VALUES (?, ?, 'ouwê', 'ouwê', 1)""",
+                         (max_["id"], s["id"]))
+        db.commit()
+        person = dict(dbm.zeile(db, "SELECT * FROM benutzer WHERE id = ?",
+                                (anni["id"],)))
+        mcp_dienst.offenes_wort_erledigen(db, person, cur.lastrowid)
+        db.commit()
+        assert dbm.wert(db, "SELECT erledigt FROM wortwunsch WHERE id = ?",
+                        (cur.lastrowid,)) == 1
+    finally:
+        db.close()

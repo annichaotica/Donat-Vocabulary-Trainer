@@ -16,6 +16,30 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Die KI sieht jetzt auch die Wünsche der anderen
+
+»Der Konnektor im ChatGPT war für Max gedacht, der nutzt den gleichen
+Zugang. Das heißt, der müsste dann auch Anforderungen von Max
+abholen.«
+
+Bisher zeigte die Wunschliste nur die eigenen. In einer Familie hängt
+der Zugang aber an **einem** Profil, während die Wünsche an **allen**
+entstehen: Max markiert Wörter in seinem mittelhochdeutschen Text,
+und die KI, die über ihr Zugang spricht, sah davon nichts —
+obwohl Annuschka in Max' Sammlung schreiben darf und die Wünsche also
+erfüllen *kann*.
+
+Die Regel heißt deshalb jetzt nicht mehr »meine Wünsche«, sondern:
+**was ich erfüllen darf, soll ich auch sehen.** Mitgenommen werden
+Wünsche anderer aus Sammlungen mit Schreibrecht — bei bloßem
+Leserecht nicht, denn eine Liste, die man nicht abarbeiten kann, wird
+nie kürzer.
+
+Bei jedem Eintrag steht, wer ihn gestellt hat (`angefordert_von`),
+damit die KI weiß, für wen sie arbeitet. Und abhaken darf man fremde
+Wünsche ebenfalls — sonst kämen sie bei jedem Abruf wieder.
+
+
 ### Eine große Wunschliste verdeckte eine kleine
 
 »Die 89 neuen mittelhochdeutschen Wörter werden mir noch nicht

@@ -626,7 +626,13 @@ def offene_woerter_lesen(db: sqlite3.Connection, person: dict,
     """
     if sammlung_id:
         zugang.sammlung_pruefen(db, person["id"], sammlung_id)
-    offen = lesetexte.wortwuensche(db, person["id"], sammlung_id, offen=True)
+    # Auch die Wünsche ANDERER aus Sammlungen, in die ich schreiben
+    # darf: der Konnektor hängt an einem Profil, die Wünsche entstehen
+    # an allen. Wer in Max' Sammlung eintragen darf, kann Max' Wünsche
+    # erfüllen — und soll sie darum sehen.
+    meine = zugang.beschreibbare_sammlungen(db, person["id"])
+    offen = lesetexte.wortwuensche(db, person["id"], sammlung_id, offen=True,
+                                   auch_aus_sammlungen=meine)
     grenze = max(1, min(int(anzahl), 200))
     gezeigt = offen[:grenze]
 
@@ -639,7 +645,8 @@ def offene_woerter_lesen(db: sqlite3.Connection, person: dict,
     # einziges mittelhochdeutsches Wort und schloss daraus, es gebe
     # keines. Genau so ist es passiert.
     alle = (offen if not sammlung_id
-            else lesetexte.wortwuensche(db, person["id"], None, offen=True))
+            else lesetexte.wortwuensche(db, person["id"], None, offen=True,
+                                        auch_aus_sammlungen=meine))
     nach_sammlung: dict[str, int] = {}
     for w in alle:
         name = w["sammlung"] or "ohne Sammlung"
@@ -669,7 +676,13 @@ def offene_woerter_lesen(db: sqlite3.Connection, person: dict,
                      "sammlung_id": w["sammlung_id"],
                      "sammlung": w["sammlung"], "sprache": w["sprache"],
                      "zusammenhang": w["zusammenhang"],
-                     "aus_text": w["text"]}
+                     "aus_text": w["text"],
+                     # Wer es angefordert hat. Wichtig, weil es nicht
+                     # immer die Person ist, über deren Zugang
+                     # gesprochen wird — und weil die Antwort an den
+                     # Menschen dann anders ausfällt.
+                     "angefordert_von": w["wunsch_von"],
+                     "von_mir": bool(w["von_mir"])}
                     for w in gezeigt],
     }
 
@@ -680,8 +693,13 @@ def offenes_wort_erledigen(db: sqlite3.Connection, person: dict,
     w = dbm.zeile(db, "SELECT * FROM wortwunsch WHERE id = ?", (wunsch_id,))
     if w is None:
         raise KeyError(f"Wortwunsch {wunsch_id} gibt es nicht")
+    # Fremde Wünsche darf erledigen, wer in die betroffene Sammlung
+    # schreiben darf — sonst bekäme man sie zwar zu sehen (siehe
+    # offene_woerter_lesen), könnte sie aber nicht abhaken, und sie
+    # kämen bei jedem Abruf wieder.
     if w["benutzer_id"] != person["id"]:
-        raise PermissionError("Dieser Wortwunsch gehört dir nicht.")
+        zugang.sammlung_pruefen(db, person["id"], w["sammlung_id"],
+                                schreiben=True)
     return dict(_fehler_wandeln(lesetexte.wortwunsch_erledigen, db,
                                 wunsch_id, lexem_id))
 
@@ -1354,6 +1372,12 @@ WERKZEUGE: list[dict] = [
                        "ist. Nach dem Anlegen offenes_wort_erledigen "
                        "aufrufen, sonst steht das Wort weiter auf der "
                        "Liste.\n\n"
+                       "Enthält auch Wünsche ANDERER Personen aus "
+                       "Sammlungen, in die du schreiben darfst — in einer "
+                       "Familie hängt der Zugang an einem Profil, die "
+                       "Wünsche entstehen aber an allen. Wer es angefordert "
+                       "hat, steht bei jedem Eintrag unter "
+                       "»angefordert_von«.\n\n"
                        "Geordnet nach Häufigkeit im Text. Bei einem ganzen "
                        "Artikel stehen schnell hunderte darauf, und dann "
                        "ist die Reihenfolge das Wichtigste: oben anfangen "

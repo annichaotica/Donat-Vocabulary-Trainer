@@ -518,6 +518,16 @@ CREATE TABLE IF NOT EXISTS lernziel (
                   CHECK (ziel IN ('reif', 'einmal_richtig')),
     aktiv         INTEGER NOT NULL DEFAULT 1,
     notiz         TEXT,
+    -- »Neu würfeln« bei »Was käme dran?«. Der Zähler steht HIER und
+    -- nicht in der Ansicht, weil Vorschau und Sitzung durch dieselbe
+    -- Funktion gehen: ein Würfel, der nur die Vorschau änderte, zeigte
+    -- einen Block, den die Abfrage danach nicht liefert.
+    --
+    -- 0 heißt: unverändert die beste Zusammenstellung. Jeder Wurf
+    -- erhöht um eins und streut innerhalb der Gruppen neu — die
+    -- Gruppen selbst (wie viel fällig, wacklig, neu) bleiben, sonst
+    -- würfelte man den Terminplan weg.
+    wurf          INTEGER NOT NULL DEFAULT 0,
     angelegt      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_lernziel_benutzer ON lernziel(benutzer_id, aktiv);

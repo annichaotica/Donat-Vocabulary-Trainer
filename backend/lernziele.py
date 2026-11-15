@@ -362,6 +362,70 @@ def verschraenken(reihe: list[dict]) -> list[dict]:
     return ergebnis
 
 
+def _gleichstand_streuen(reihe: list[dict], schluessel, saat: int) -> list[dict]:
+    """Mischt nur, was gleich dringend ist — sonst nichts.
+
+    »Neu würfeln« darf den Terminplan nicht verwürfeln. Ein Wort, das
+    länger überfällig ist als ein anderes, bleibt vorn; wo zwei
+    gleichauf liegen, entscheidet jetzt der Wurf statt der Zufall der
+    Zeilenreihenfolge. Damit ändert sich die Auswahl spürbar — in einem
+    Bestand sind sehr viele Einträge gleichauf —, ohne dass die
+    Rangfolge verletzt wird.
+    """
+    if not saat:
+        return reihe
+    import random
+    gemischt: list[dict] = []
+    gruppe: list[dict] = []
+    letzter = object()
+    for r in reihe:
+        k = schluessel(r)
+        if k != letzter and gruppe:
+            random.Random(f"{saat}:{letzter}").shuffle(gruppe)
+            gemischt.extend(gruppe)
+            gruppe = []
+        letzter = k
+        gruppe.append(r)
+    if gruppe:
+        random.Random(f"{saat}:{letzter}").shuffle(gruppe)
+        gemischt.extend(gruppe)
+    return gemischt
+
+
+# Wie groß das Fenster beim Blättern höchstens ist. Eine FESTE Zahl,
+# ausdrücklich nicht die angeforderte Blockgröße: die Vorschau fragt
+# zwanzig Aufgaben, die Abfrage rechnet mit `max(anzahl, 20)`, und ein
+# Versatz, der daran hinge, blätterte in beiden verschieden weit. Dann
+# zeigte »Was käme dran?« einen Block, den »Los« nicht liefert —
+# dieselbe Falle, derentwegen der Würfel überhaupt am Ziel gespeichert
+# wird und nicht in der Ansicht.
+FENSTER_BEIM_BLAETTERN = 20
+
+
+def _fenster_schieben(reihe: list[dict], saat: int) -> list[dict]:
+    """Beim Neuen wird NICHT gemischt, sondern weitergeblättert.
+
+    Neues wird in der Lernreihenfolge eingeführt — das steht so im
+    Schema und ist eine Entscheidung, keine Nebensache. Ein Wurf soll
+    deshalb andere neue Wörter zeigen, nicht dieselben in anderer
+    Folge.
+
+    Der Ansatzpunkt wird gewürfelt und ist KEIN Vielfaches einer
+    Schrittweite. Mit festem Schritt wäre ein Teil des Bestands
+    unerreichbar: bei vierzig Wörtern und Schritt zwanzig bekäme man
+    ewig die Wörter 0–9 und 20–29 und nie die dazwischen.
+
+    Angesetzt wird so, dass das Fenster nicht über das Ende hinausragt
+    — sonst stünde das letzte Wort der Lektion neben dem ersten.
+    """
+    if not saat or len(reihe) <= FENSTER_BEIM_BLAETTERN:
+        return reihe
+    import random
+    ab = random.Random(f"fenster:{saat}").randrange(
+        len(reihe) - FENSTER_BEIM_BLAETTERN + 1)
+    return reihe[ab:] + reihe[:ab]
+
+
 def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
           anzahl: int = 20) -> dict:
     """Stellt den nächsten Lernblock zusammen und begründet den Zuschnitt.
@@ -383,6 +447,7 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
     kann nur ordnen, was hier ausgewählt wurde.
     """
     ziel = lesen(db, lernziel_id)
+    wurf = int(ziel.get("wurf") or 0)
     reihe = aufgaben_im_umfang(db, benutzer_id, ziel["umfang"])
     heute = _heute().isoformat()
     import lernen as lernmodul
@@ -406,8 +471,15 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
             nicht_faellig.append(r)
 
     faellig.sort(key=lambda r: _dringlichkeit(r, heute))
+    faellig = _gleichstand_streuen(faellig, lambda r: _dringlichkeit(r, heute),
+                                   wurf)
     wacklig = [r for r in sorted(nicht_faellig, key=_wackligkeit, reverse=True)
                if _wackligkeit(r) > 0.5]
+    # Beim Wackligen auf zwei Nachkommastellen gerundet gruppiert: die
+    # Werte liegen dicht beieinander, und ein Unterschied in der
+    # fünften Stelle ist keine Rangordnung, sondern Rauschen.
+    wacklig = _gleichstand_streuen(wacklig, lambda r: round(_wackligkeit(r), 2),
+                                   wurf)
     # Von jedem Wort erst die erste Aufgabe, dann von jedem die zweite.
     #
     # Vorher stand hier eine Sortierung nach Lexem — damit kamen alle
@@ -415,7 +487,7 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
     # einem halben Verb leer, und das anschließende Verschränken hatte
     # nichts mehr zu mischen, weil alles aus demselben Wort stammte.
     # Ein Verbstamm ist EIN Wort, auch wenn viel daran hängt.
-    neu = _wortweise(neu)
+    neu = _fenster_schieben(_wortweise(neu), wurf)
 
     tagesbedarf = stand["neu_taeglich_noetig"]
 
@@ -472,6 +544,7 @@ def block(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
     return {
         "lernziel_id": lernziel_id,
         "name": ziel["name"],
+        "wurf": wurf,
         "aufgaben": [{"aufgabe_id": r["aufgabe_id"], "typ": r["typ"],
                       "lexem_id": r["lexem_id"], "lemma": r["lemma"],
                       "zustand": r["zustand"] or "neu",

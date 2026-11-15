@@ -1690,6 +1690,28 @@ def lernziel_fortschritt(lernziel_id: int, benutzer_id: int,
         raise HTTPException(404, str(fehler))
 
 
+@app.post("/api/lernziele/{lernziel_id}/wuerfeln")
+def lernziel_wuerfeln(lernziel_id: int, benutzer_id: int,
+                      anzahl: int = Query(default=20, ge=1, le=100),
+                      request: Request = None,
+                      db: sqlite3.Connection = DB):
+    """Noch einmal zusammenstellen — andere Wörter, gleicher Zuschnitt.
+
+    Der Wurf wird AM ZIEL vermerkt, nicht nur in der Ansicht. Vorschau
+    und Abfrage rechnen durch dieselbe Funktion; bliebe der Wurf in der
+    Ansicht, zeigte »Was käme dran?« etwas anderes, als »Los« danach
+    liefert.
+    """
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _holen(db, "benutzer", benutzer_id)
+    z = _holen(db, "lernziel", lernziel_id)
+    if z["benutzer_id"] != benutzer_id:
+        raise HTTPException(403, "Dieses Lernziel gehört dir nicht.")
+    db.execute("UPDATE lernziel SET wurf = wurf + 1 WHERE id = ?",
+               (lernziel_id,))
+    return lernziele.block(db, benutzer_id, lernziel_id, anzahl)
+
+
 @app.get("/api/lernziele/{lernziel_id}/block")
 def lernziel_block(lernziel_id: int, benutzer_id: int,
                    anzahl: int = Query(default=20, ge=1, le=100),

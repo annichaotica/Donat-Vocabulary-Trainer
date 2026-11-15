@@ -139,6 +139,9 @@ export const api = {
     ruf(`/lernziele/${id}/fortschritt`, { frage: { benutzer_id: benutzerId } }),
   lernblock: (id, benutzerId, anzahl) =>
     ruf(`/lernziele/${id}/block`, { frage: { benutzer_id: benutzerId, anzahl } }),
+  lernblockWuerfeln: (id, benutzerId, anzahl) =>
+    ruf(`/lernziele/${id}/wuerfeln`,
+        { methode: 'POST', frage: { benutzer_id: benutzerId, anzahl } }),
 
   texte: (sammlungId) => ruf(`/sammlungen/${sammlungId}/texte`),
   textAnlegen: (sammlungId, daten) =>

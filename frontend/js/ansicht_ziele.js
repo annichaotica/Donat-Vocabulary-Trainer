@@ -175,16 +175,23 @@ function zahl(wert, beschriftung, art) {
 }
 
 /** Zeigt den errechneten Block samt Begründung des Zuschnitts. */
-async function zeigeBlock(behaelter, z) {
-  let block;
-  try {
-    block = await api.lernblock(z.id, zustand.benutzerId, 20);
-  } catch (fehler) { meldung(fehler.message); return; }
+async function zeigeBlock(behaelter, z, block = null) {
+  if (!block) {
+    try {
+      block = await api.lernblock(z.id, zustand.benutzerId, 20);
+    } catch (fehler) { meldung(fehler.message); return; }
+  }
 
   const el = leeren(behaelter);
   el.append(h('h1', { text: z.name }));
   el.append(h('div', { class: 'karte' },
-    h('p', { style: 'margin:0', text: block.begruendung })));
+    h('p', { style: 'margin:0', text: block.begruendung }),
+    block.wurf
+      ? h('p', { class: 'leise', style: 'margin:.4rem 0 0',
+                 text: `${block.wurf}× gewürfelt. Der Zuschnitt bleibt `
+                     + 'derselbe — gewürfelt wird nur, welche Wörter es '
+                     + 'innerhalb jeder Gruppe werden.' })
+      : null));
 
   if (block.anzahl) {
     const liste = h('div', { class: 'liste' });
@@ -198,11 +205,33 @@ async function zeigeBlock(behaelter, z) {
     }
     el.append(liste);
   }
+  const wuerfel = h('button', {
+    onclick: async () => {
+      wuerfel.disabled = true;
+      try {
+        // Der Wurf wird AM ZIEL vermerkt; die Abfrage rechnet durch
+        // dieselbe Funktion und liefert danach genau diesen Block.
+        const neuer = await api.lernblockWuerfeln(z.id, zustand.benutzerId, 20);
+        zeigeBlock(behaelter, z, neuer);
+      } catch (fehler) {
+        meldung(fehler.message, 'fehler');
+        wuerfel.disabled = false;
+      }
+    },
+  }, '🎲 Neu würfeln');
+
   el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
     block.anzahl ? h('button', {
       class: 'wichtig',
       onclick: () => { merken({ lernzielId: z.id }); location.hash = `#/lernen/ziel/${z.id}`; },
     }, 'Los') : null,
+    block.anzahl ? wuerfel : null,
+    // »Beim Block kann ich immer noch nichts ändern, also z.B. ein
+    // Lernziel ohne Datum nicht mit Datum versehen.« — Bearbeiten gab
+    // es, aber eine Ansicht weiter oben. Wer hier steht, will von
+    // hier aus ändern und nicht erst zurückgehen und suchen.
+    h('button', { class: 'schlicht', onclick: () => bearbeiten(behaelter, z) },
+      'Bearbeiten'),
     h('button', { onclick: () => zeichnen(behaelter) }, 'Zurück')));
 }
 

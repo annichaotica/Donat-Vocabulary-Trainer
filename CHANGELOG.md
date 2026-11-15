@@ -16,6 +16,31 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Die Einwilligungsseite nannte das Falsche
+
+Vor dem ersten echten Durchlauf habe ich die Seite probeweise geladen.
+Dort stand:
+
+```
+Dein Profil        ChatGPT Max      ← das ist der Konnektor, nicht sie
+```
+
+An der Aufrufstelle standen zwei Wörterbücher mit je einem Feld
+`name` in der falschen Reihenfolge. Auf der einen Seite, deren
+ganzer Zweck es ist zu zeigen, **wer** auf **wessen** Daten zugreifen
+darf, ist das der schlimmstmögliche Fehler: eine Einwilligung, die
+das Falsche nennt, ist keine.
+
+Berichtigt, und die Argumente lassen sich jetzt nur noch **benannt**
+übergeben — damit dieselbe Verwechslung nicht wiederkommt. Ein Test
+hält fest, dass das Profil den Menschen nennt und der Name den
+Konnektor; mit vertauschten Argumenten fällt er.
+
+Nebenbei zeigte das Protokoll, dass die Berichtigung am Kennblatt
+gewirkt hat: ChatGPT läuft die Suche nicht mehr in der Schleife,
+sondern einmal durch und bleibt dann stehen.
+
+
 ### Warum ChatGPT das Kennblatt holte und trotzdem weitersuchte
 
 Im Serverprotokoll stand die Antwort, zweimal dieselbe Schleife im

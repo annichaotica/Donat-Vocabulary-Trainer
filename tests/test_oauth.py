@@ -334,6 +334,24 @@ def test_fremde_anmeldung_kann_den_vorgang_nicht_abschliessen(klient,
     assert antwort.status_code == 400
 
 
+def test_die_seite_nennt_wer_auf_wessen_daten_zugreift(klient, eingerichtet):
+    """Der einzige Zweck dieser Seite.
+
+    Beim ersten Lauf standen die beiden Angaben vertauscht da — »Dein
+    Profil: ChatGPT« —, weil an der Aufrufstelle zwei Wörterbücher mit
+    je einem Feld `name` in der falschen Reihenfolge standen. Eine
+    Einwilligung, die das Falsche nennt, ist keine.
+    """
+    _profil(klient, name="Lernende 2")
+    c = _client(klient, name="ChatGPT")
+    seite = _autorisieren(klient, c).text
+    # Das Profil gehört zum Menschen, der Name zum Konnektor.
+    assert "<dd>Lernende 2</dd>" in seite, seite[:400]
+    assert "<b>ChatGPT</b>" in seite
+    assert f"<dd>{MAIL}</dd>" in seite
+    assert RUECK in seite
+
+
 def test_abbrechen_gibt_keinen_code(klient, eingerichtet):
     _profil(klient)
     c = _client(klient)

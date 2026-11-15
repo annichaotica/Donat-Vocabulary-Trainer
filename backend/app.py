@@ -2546,8 +2546,18 @@ def oauth_ressource():
             "scopes_supported": ["vokabeln"]}
 
 
-def _einwilligungsseite(vorgang: dict, handgriff: str, person: dict,
+def _einwilligungsseite(*, vorgang: dict, handgriff: str, person: dict,
                         client: dict) -> HTMLResponse:
+    """Die Seite, auf der ein Mensch zustimmt.
+
+    Die Argumente sind mit Absicht NUR benannt übergebbar. Beim ersten
+    Lauf standen `person` und `client` an der Aufrufstelle vertauscht,
+    und die Seite meldete »Dein Profil: ChatGPT Max«. Zwei Wörterbücher
+    mit je einem Feld `name` — der Übersetzer merkt davon nichts, und
+    auf der einen Seite, die sagen soll, WER auf WESSEN Daten zugreift,
+    ist die Verwechslung das Schlimmste, was passieren kann. Eine
+    Einwilligung, die das Falsche nennt, ist keine.
+    """
     from html import escape as _e
     return HTMLResponse(f"""<!doctype html>
 <html lang="de"><head><meta charset="utf-8">
@@ -2658,9 +2668,9 @@ def oauth_autorisieren(request: Request,
         # nicht weitergeleitet: an eine unbestätigte Adresse darf nichts
         # geschickt werden, auch keine Fehlermeldung.
         raise HTTPException(400, f"{fehler.code}: {fehler.beschreibung}")
-    return _einwilligungsseite(vorgang, handgriff,
-                               oauth.client_lesen(db, client_id) or {},
-                               person)
+    return _einwilligungsseite(
+        vorgang=vorgang, handgriff=handgriff, person=person,
+        client=oauth.client_lesen(db, client_id) or {})
 
 
 @app.post("/oauth/authorize")

@@ -415,10 +415,40 @@ export function zeichenleiste(sprache, feldHolen, beiAenderung) {
       },
     });
     tafel.append(bild);
+
+    /* Die Merkhinweise klappen HIER auf, sie führen nicht mehr fort.
+     *
+     * Hier stand ein Verweis auf #/tastatur/<code>. Der sah harmlos aus,
+     * lag aber mitten unter dem Antwortfeld — und die Tastaturhilfe hat
+     * keinen Weg zurück in die laufende Abfrage. Wer auf dem Handy
+     * danebentippte, landete auf einer Hilfeseite, kam über die
+     * Reiterleiste nur zur Übersicht, fing neu an und tippte wieder
+     * daneben. »Immer wieder nur auf einer Hilfeseite.«
+     *
+     * Derselbe Fehler wie bei »Wort ansehen« und »Übung ansehen«: ein
+     * Verweis, der eine Sitzung beendet. Der Kommentar zehn Zeilen
+     * weiter oben sagt es selbst — der Umweg über eine eigene Seite
+     * kostet die halbe Sitzung.
+     */
+    const hinweise = h('div', { hidden: true, class: 'merktafel-hinweise' });
+    for (const [titel, ...rest] of (b.hinweise || [])) {
+      hinweise.append(h('p', {}, h('b', { text: titel + ': ' }), ...rest.map(
+        (t) => (Array.isArray(t) ? h(t[0], { text: t[1] }) : t))));
+    }
+    const mehr = h('button', {
+      type: 'button', class: 'schlicht',
+      onmousedown: (e) => e.preventDefault(),
+      onclick: () => {
+        hinweise.hidden = !hinweise.hidden;
+        mehr.textContent = hinweise.hidden ? 'Mehr dazu' : 'Weniger';
+        const feld = feldHolen();
+        if (feld) feld.focus();
+      },
+    }, 'Mehr dazu');
     tafel.append(h('p', { class: 'leise merktafel-fuss' },
       'Betonung: erst ', h('kbd', { text: 'Ö' }), ', dann den Vokal. ',
-      'Wortende-ς liegt auf ', h('kbd', { text: 'W' }), '. ',
-      h('a', { href: `#/tastatur/${sprache.code}`, text: 'Ganze Tafel' })));
+      'Wortende-ς liegt auf ', h('kbd', { text: 'W' }), '. ', mehr));
+    tafel.append(hinweise);
     kasten.append(h('div', { class: 'merktafel' }, knopf, tafel));
   }
 
@@ -516,6 +546,23 @@ export function zeichnen(behaelter, sprache = null) {
   const hier = geraet();
   const el = behaelter;
   el.append(h('h1', { text: 'Tastatur' }));
+
+  /* Ein Weg zurück, und zwar ganz oben.
+   *
+   * Diese Seite hatte keinen. Wer aus einer laufenden Abfrage
+   * hierherkam, konnte über die Reiterleiste nur zur Übersicht — die
+   * Sitzung war weg. Auf dem Handy, wo die Leiste unten liegt und die
+   * Merktafel die halbe Seite füllt, passierte das wieder und wieder:
+   * »bin aber immer wieder nur auf einer Hilfeseite gelandet«.
+   *
+   * `history.back()` statt eines festen Ziels: dann führt es dorthin
+   * zurück, wo man wirklich herkam.
+   */
+  if (history.length > 1) {
+    el.append(h('p', {},
+      h('button', { class: 'schlicht', onclick: () => history.back() },
+        '← Zurück')));
+  }
 
   // Die Belegung zuerst: wer hierherkommt, hat das Layout meist schon und
   // sucht nur noch die Buchstaben.

@@ -391,3 +391,51 @@ def test_die_umschrift_laesst_die_zielschrift_in_ruhe():
     davon merken — sonst käme die Umsetzung ein zweites Mal."""
     quelle = (WURZEL / "frontend" / "js" / "tastatur.js").read_text()
     assert "b.schrift.test(e.key)" in quelle
+
+
+def test_aus_der_abfrage_fuehrt_kein_verweis_heraus():
+    """»Bin immer wieder nur auf einer Hilfeseite gelandet.«
+
+    Unter dem Antwortfeld lag ein Verweis auf die Tastaturhilfe, und
+    die hatte keinen Weg zurück: Sitzung weg, über die Reiterleiste nur
+    zur Übersicht, neu anfangen, wieder danebentippen. Derselbe Fehler
+    wie bei »Wort ansehen« und »Übung ansehen«.
+
+    Die Merktafel klappt ihre Hinweise jetzt an Ort und Stelle auf.
+    """
+    quelle = (WURZEL / "frontend" / "js" / "tastatur.js").read_text()
+    leiste = quelle[quelle.index("export function zeichenleiste"):
+                    quelle.index("export function zeichnen(behaelter")]
+    # Genau EIN Verweis darf bleiben: der für Sprachen OHNE hinterlegte
+    # Belegung, wo es wirklich nichts einzublenden gibt.
+    assert leiste.count("href: `#/tastatur/") == 1, leiste.count("href: `#/")
+    assert "merktafel-hinweise" in leiste
+    # Und die Hilfeseite führt zurück.
+    hilfe = quelle[quelle.index("export function zeichnen(behaelter"):]
+    assert "history.back()" in hilfe
+
+
+def test_jede_js_datei_ist_ein_gueltiges_modul():
+    """`node --check datei.js` ist WERTLOS für dieses Projekt.
+
+    Es parst .js als CommonJS-Skript und meldet bei einem kaputten
+    ES-Modul trotzdem exit 0. Am 15.11.2026 ist genau so eine Datei mit
+    einem Syntaxfehler ausgeliefert worden: die Oberfläche blieb leer,
+    und der Prüfer hatte vorher grünes Licht gegeben. Mit der Endung
+    .mjs parst node als Modul und findet den Fehler.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    if not shutil.which("node"):
+        pytest.skip("node ist hier nicht da")
+    for datei in JS:
+        with tempfile.NamedTemporaryFile(suffix=".mjs", delete=False) as ziel:
+            ziel.write(datei.read_bytes())
+            pfad = ziel.name
+        lauf = subprocess.run(["node", "--check", pfad],
+                              capture_output=True, text=True)
+        pathlib.Path(pfad).unlink()
+        assert lauf.returncode == 0, (
+            f"{datei.name} ist kein gültiges Modul:\n"
+            + lauf.stderr.replace(pfad, datei.name)[:400])

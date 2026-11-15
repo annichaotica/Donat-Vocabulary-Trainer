@@ -529,3 +529,7 @@ input[type="file"] { max-width: 100%; }
         background: var(--sanft, #f3f1ec); }
 .tipp-maske { font-size: 1.4em; letter-spacing: .12em; margin: 0 0 .2rem;
               font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.merktafel-hinweise { font-size: .9em; color: var(--leise);
+                      margin: .2rem 0 .4rem; }
+.merktafel-hinweise p { margin: .25rem 0; }

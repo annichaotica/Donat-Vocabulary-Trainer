@@ -404,18 +404,18 @@ async function tabelle(karte, sammlungId, text) {
       h('button', {
         class: 'wichtig',
         onclick: () => tun(async () => {
-            if (!window.confirm(`${v.brauchbar} Zeilen wirklich eintragen?`)) return;
-            const bericht = await api.importUebernehmen(sammlungId, {
-              text, zuordnung, hat_kopfzeile: hatKopfzeile,
-              doppelte: doppelte.value,
-            });
-            meldung(`${bericht.angelegt ?? bericht.eingetragen ?? 0} eingetragen.`);
-            leeren(ausgabe).append(
-              h('p', { text: 'Eingetragen.' }),
-              h('button', {
-                onclick: () => { merken({ sammlungId }); location.hash = '#/wortschatz'; },
-            }), 'Zum Wortschatz'));
-        },
+          if (!window.confirm(`${v.brauchbar} Zeilen wirklich eintragen?`)) return;
+          const bericht = await api.importUebernehmen(sammlungId, {
+            text, zuordnung, hat_kopfzeile: hatKopfzeile,
+            doppelte: doppelte.value,
+          });
+          meldung(`${bericht.angelegt ?? bericht.eingetragen ?? 0} eingetragen.`);
+          leeren(ausgabe).append(
+            h('p', { text: 'Eingetragen.' }),
+            h('button', {
+              onclick: () => { merken({ sammlungId }); location.hash = '#/wortschatz'; },
+            }, 'Zum Wortschatz'));
+        }),
       }, 'Eintragen')));
   };
 

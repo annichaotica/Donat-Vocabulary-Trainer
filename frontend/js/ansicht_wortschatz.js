@@ -202,8 +202,11 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
           f.geprueft ? null : h('button', {
             class: 'schlicht',
             title: 'Als geprüft markieren — erst dann wird sie abgefragt',
-            onclick: () => tun(async () => {   await api.formBestaetigen(f.id); zeichnenEinzeln(behaelter, lexemId); },
-          }), '✓ Bestätigen'),
+            onclick: () => tun(async () => {
+              await api.formBestaetigen(f.id);
+              zeichnenEinzeln(behaelter, lexemId);
+            }),
+          }, '✓ Bestätigen'),
           h('button', {
             class: 'schlicht gefahr',
             onclick: () => tun(async () => {

@@ -540,3 +540,21 @@ input[type="file"] { max-width: 100%; }
 .merktafel-hinweise { font-size: .9em; color: var(--leise);
                       margin: .2rem 0 .4rem; }
 .merktafel-hinweise p { margin: .25rem 0; }
+
+
+/* Eine Zeile der Lehrgangszuordnung: Zahl, Name, Begründung.
+   Die Begründung steht MIT in der Zeile und nicht in einem Hinweis
+   darunter — sie ist der Grund, dem Vorschlag zu trauen oder nicht,
+   und muss neben der Zahl stehen, die man gleich übernimmt. */
+.lehrgangszeile {
+  display: grid;
+  grid-template-columns: 5rem minmax(10rem, 14rem) 1fr;
+  gap: .6rem;
+  align-items: baseline;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--rand);
+}
+@media (max-width: 40rem) {
+  .lehrgangszeile { grid-template-columns: 5rem 1fr; }
+  .lehrgangszeile > :last-child { grid-column: 2; }
+}

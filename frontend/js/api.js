@@ -71,6 +71,16 @@ export const api = {
   sammlungLoeschen: (id) => ruf(`/sammlungen/${id}`, { methode: 'DELETE' }),
   zugriff: (id) => ruf(`/sammlungen/${id}/zugriff`),
   zugriffSetzen: (id, daten) => ruf(`/sammlungen/${id}/zugriff`, { methode: 'PUT', daten }),
+  lehrgang: (sammlungId, benutzerId) =>
+    ruf(`/sammlungen/${sammlungId}/lehrgang`,
+        { frage: { benutzer_id: benutzerId } }),
+  lehrgangSetzen: (sammlungId, zuordnung) =>
+    ruf(`/sammlungen/${sammlungId}/lehrgang`,
+        { methode: 'PUT', daten: { zuordnung } }),
+  buchstandSetzen: (sammlungId, benutzerId, bisLektion) =>
+    ruf(`/sammlungen/${sammlungId}/buchstand`,
+        { methode: 'PUT',
+          daten: { benutzer_id: benutzerId, bis_lektion: bisLektion } }),
   lernwahlSetzen: (id, benutzerId, lernen) => ruf(`/sammlungen/${id}/lernwahl`,
     { methode: 'PUT', daten: { benutzer_id: benutzerId, lernen } }),
   besitzUebertragen: (id, daten) =>

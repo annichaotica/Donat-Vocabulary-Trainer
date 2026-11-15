@@ -94,21 +94,26 @@ def aufgaben_im_umfang(db: sqlite3.Connection, benutzer_id: int,
                        umfang: dict) -> list[dict]:
     """Alle aktiven Aufgaben, die in den Ausschnitt fallen, mit Lernstand.
 
-    Die Formgruppe wird nachträglich in Python geprüft, nicht in SQL: sie
-    ergibt sich aus dem Merkmalsbündel der Form und dem Sprachprofil, und das
-    lässt sich nicht als Spaltenvergleich ausdrücken. Bei Familienmengen ist
-    das ohne Belang.
+    Die Formgruppe stand hier einmal als Nachfilter in Python, weil sie
+    sich aus Merkmalsbündel und Sprachprofil errechnet und »sich nicht
+    als Spaltenvergleich ausdrücken lässt«. Sie lässt sich: seit
+    `aufgabe.formgruppe` die Gruppe mitführt, ist sie eine Spalte. Der
+    Nachfilter ist damit weg — und mit ihm die Gefahr, dass die Auswahl
+    leer zurückkommt, weil die Ordnung genau das nach vorn gestellt hat,
+    was er wegwirft.
     """
     sammlungen = umfang.get("sammlungen") or _zugaenglich(db, benutzer_id)
     if not sammlungen:
         return []
+    import lernen as lernmodul
     bedingungen = [f"l.sammlung_id IN ({','.join('?' * len(sammlungen))})",
-                   "a.aktiv = 1"]
-    werte: list = [benutzer_id, *sammlungen]
+                   "a.aktiv = 1", lernmodul.LEKTIONSSCHRANKE_SQL]
+    werte: list = [benutzer_id, *sammlungen, benutzer_id]
 
     for feld, spalte in (("lektionen", "l.lektion_id"),
                          ("wortarten", "l.wortart"),
                          ("typen", "a.typ"),
+                         ("formgruppen", "a.formgruppe"),
                          ("lexeme", "l.id")):
         auswahl = umfang.get(feld)
         if auswahl:
@@ -128,22 +133,7 @@ def aufgaben_im_umfang(db: sqlite3.Connection, benutzer_id: int,
                  ON z.aufgabe_id = a.id AND z.benutzer_id = ?
          WHERE {' AND '.join(bedingungen)}""", werte)
 
-    gewuenschte_gruppen = set(umfang.get("formgruppen") or [])
-    if not gewuenschte_gruppen:
-        return reihe
-
-    gefiltert = []
-    for r in reihe:
-        if r["ziel_art"] != "form" or not r["ziel_id"]:
-            continue
-        f = dbm.zeile(db, "SELECT merkmale FROM form WHERE id = ?", (r["ziel_id"],))
-        if f is None:
-            continue
-        gruppe = aufgaben._gruppe_der_form(r["sprache"], r["wortart"],
-                                           dbm.j_lesen(f["merkmale"]))
-        if gruppe and gruppe["kennung"] in gewuenschte_gruppen:
-            gefiltert.append(r)
-    return gefiltert
+    return reihe
 
 
 def umfang_beschreiben(db: sqlite3.Connection, umfang: dict) -> str:

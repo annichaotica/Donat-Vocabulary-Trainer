@@ -226,10 +226,58 @@ CREATE TABLE IF NOT EXISTS aufgabe (
     ziel_art    TEXT,                   -- 'bedeutung' | 'form' | 'lexem'
     ziel_id     INTEGER,
     schluessel  TEXT NOT NULL UNIQUE,
+    -- Zu welcher Formgruppe (Zeit, Fall-Tabelle) gehört diese Aufgabe?
+    -- NULL bei allem, was keine Form abfragt: Bedeutung, Genus.
+    --
+    -- Steht hier MIT, obwohl sie sich aus Merkmalsbündel und
+    -- Sprachprofil errechnen ließe — und genau deshalb: errechnen geht
+    -- nur in Python, und dann müsste die Abfrage hinterher aussieben,
+    -- was sie gerade erst in einem Fenster zusammengesucht hat. Das ist
+    -- die Fehlerfamilie, die hier schon mehrfach zugeschlagen hat. Die
+    -- Bedingung gehört in die Abfrage.
+    formgruppe  TEXT,
     aktiv       INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_aufgabe_lexem ON aufgabe(lexem_id);
 CREATE INDEX IF NOT EXISTS idx_aufgabe_typ   ON aufgabe(typ);
+
+-- Ab welcher Lektion ist eine Formgruppe im Lehrwerk eingeführt?
+--
+-- »Bei den Anfängerkapiteln, die ich mir gerade ansehe, habe ich noch
+-- gar nicht alle Zeitformen gelernt.« — Gemessen: von 6971
+-- Formaufgaben im griechischen Bestand waren 832 Präsens und rund 2900
+-- Aorist, Futur und Passiv. Alles lag im selben Topf, aus dem die
+-- Tagesdosis zieht.
+--
+-- Die Lektionsnamen sagen es selbst — »39 Aorist I«, »40 Konjunktiv
+-- und Futur«, »45 Passiv Präsens«. Damit lässt sich die Schranke an
+-- den Lehrgang binden, statt sie von Hand nachzuziehen: wer bei
+-- Lektion 20 steht, bekommt keinen Aorist, und wenn er bei 39 ankommt,
+-- kommt der Aorist von selbst.
+--
+-- Je Sammlung, nicht je Person: wann das Buch etwas einführt, ist eine
+-- Eigenschaft des Lehrwerks. Wo die einzelne Person steht, steht in
+-- `buchstand`.
+CREATE TABLE IF NOT EXISTS formgruppe_lektion (
+    sammlung_id INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
+    formgruppe  TEXT NOT NULL,
+    ab_lektion  INTEGER NOT NULL,
+    PRIMARY KEY (sammlung_id, formgruppe)
+);
+
+-- Wo stehe ich in diesem Lehrwerk?
+--
+-- Eine einzige Zahl, und sie gehört der Person: zwei Leute lernen
+-- dasselbe Buch verschieden schnell. Ohne Eintrag gilt keine Schranke
+-- — wer nichts einstellt, bekommt alles wie bisher. Das ist Absicht:
+-- eine Schranke, die ungefragt zuschlägt, nimmt Stoff weg, den jemand
+-- vielleicht gerade üben will.
+CREATE TABLE IF NOT EXISTS buchstand (
+    benutzer_id  INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    sammlung_id  INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
+    bis_lektion  INTEGER NOT NULL,
+    PRIMARY KEY (benutzer_id, sammlung_id)
+);
 
 -- ---------------------------------------------------------------- Lernstand
 

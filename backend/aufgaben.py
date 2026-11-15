@@ -129,7 +129,7 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
         for b in bedeutungen)
     if hat_uebersetzung and "bedeutung_fremd_deutsch" in e["typen"]:
         gewuenscht[_schluessel("bedeutung_fremd_deutsch", lexem_id, "lexem", "")] = \
-            ("bedeutung_fremd_deutsch", "lexem", None)
+            ("bedeutung_fremd_deutsch", "lexem", None, None)
 
     # Wort bilden: je Bedeutung, denn die Richtung Deutsch -> Fremdsprache
     # braucht die Bedeutung zur Unterscheidung.
@@ -140,7 +140,8 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
                         (b["id"], e["grundsprache"])):
                 sch = _schluessel("bedeutung_deutsch_fremd", lexem_id,
                                   "bedeutung", str(b["id"]))
-                gewuenscht[sch] = ("bedeutung_deutsch_fremd", "bedeutung", b["id"])
+                gewuenscht[sch] = ("bedeutung_deutsch_fremd", "bedeutung",
+                                   b["id"], None)
 
     # Formaufgaben. Der Schlüssel nennt das Merkmalsbündel, nicht die Form-ID.
     for f in formen:
@@ -166,7 +167,8 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
         for typ in ("form_bilden", "form_bestimmen"):
             if typ in e["typen"]:
                 gewuenscht[_schluessel(typ, lexem_id, "merkmale", kennzeichen)] = \
-                    (typ, "form", f["id"])
+                    (typ, "form", f["id"],
+                     gruppe["kennung"] if gruppe else None)
 
     # Ganze Reihe: eine Aufgabe je FORMGRUPPE, nicht je Form. Das ist die
     # Art, wie man Konjugationen wirklich lernt — ich gehe, du gehst, er
@@ -203,7 +205,7 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
                 continue
             gewuenscht[_schluessel("formenreihe", lexem_id, "gruppe",
                                    gruppe["kennung"])] = \
-                ("formenreihe", "gruppe", None)
+                ("formenreihe", "gruppe", None, gruppe["kennung"])
 
     # Artikel: nur wo die Sprache überhaupt Artikel nach Geschlecht hat.
     artikel = sprachen.profil(code).get("artikel", {}).get("genus_artikel", {})
@@ -213,26 +215,32 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
             and (lex_merkmale.get("genus") in artikel
                  or (lex_merkmale.get("genus") == "mf" and artikel))):
         gewuenscht[_schluessel("genus", lexem_id, "lexem", "")] = \
-            ("genus", "lexem", None)
+            ("genus", "lexem", None, None)
 
     vorhanden = {a["schluessel"]: a for a in
                  dbm.zeilen(db, "SELECT * FROM aufgabe WHERE lexem_id = ?", (lexem_id,))}
 
     angelegt = reaktiviert = abgeschaltet = 0
-    for sch, (typ, ziel_art, ziel_id) in gewuenscht.items():
+    for sch, (typ, ziel_art, ziel_id, formgruppe) in gewuenscht.items():
         alt = vorhanden.get(sch)
         if alt is None:
             db.execute("""INSERT INTO aufgabe
-                            (lexem_id, typ, ziel_art, ziel_id, schluessel, aktiv)
-                          VALUES (?, ?, ?, ?, ?, 1)""",
-                       (lexem_id, typ, ziel_art, ziel_id, sch))
+                            (lexem_id, typ, ziel_art, ziel_id, schluessel,
+                             formgruppe, aktiv)
+                          VALUES (?, ?, ?, ?, ?, ?, 1)""",
+                       (lexem_id, typ, ziel_art, ziel_id, sch, formgruppe))
             angelegt += 1
         else:
             if not alt["aktiv"]:
                 reaktiviert += 1
-            # ziel_id nachziehen: die Form kann neu angelegt worden sein
-            db.execute("UPDATE aufgabe SET aktiv = 1, ziel_id = ? WHERE id = ?",
-                       (ziel_id, alt["id"]))
+            # ziel_id und Formgruppe nachziehen: die Form kann neu angelegt
+            # worden sein, und die Gruppe wird hier mitgeführt, damit die
+            # Abfrage danach in SQL aussieben kann statt hinterher in
+            # Python. Ein Fenster nachzusortieren ist hier schon mehrfach
+            # schiefgegangen.
+            db.execute("""UPDATE aufgabe SET aktiv = 1, ziel_id = ?,
+                                             formgruppe = ?
+                           WHERE id = ?""", (ziel_id, formgruppe, alt["id"]))
     for sch, alt in vorhanden.items():
         if sch not in gewuenscht and alt["aktiv"]:
             db.execute("UPDATE aufgabe SET aktiv = 0 WHERE id = ?", (alt["id"],))

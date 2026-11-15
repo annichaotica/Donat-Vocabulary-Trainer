@@ -16,6 +16,35 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Keine Zeitform, die das Lehrwerk noch nicht eingeführt hat
+
+Zu merken war: »bei den Anfängerkapiteln, die ich mir gerade ansehe,
+habe ich noch gar nicht alle Zeitformen gelernt«. Die Abfrage bot
+Aorist an, obwohl das Lernziel auf Lektion 2 stand.
+
+Nachgemessen im griechischen Bestand: von 10751 Aufgaben waren 6971
+Formenbilden, davon nur 832 Präsens — rund 2900 lagen in Aorist, Futur
+und den Passiven. Alles im selben Topf, aus dem die Tagesdosis zieht.
+
+Unter **Einstellungen** einer Sammlung steht jetzt »Wo stehst du im
+Lehrwerk?«. Dort trägt man ein, ab welcher Lektion eine Zeitform gilt —
+vorgeschlagen aus den Lektionsnamen, denn die sagen es selbst (»39
+Aorist I«, »45 Passiv Präsens«) — und darunter die eigene Lektion. Was
+später kommt, bleibt draußen, bis man dort ankommt; dann kommt es von
+selbst, ohne dass man etwas umstellt.
+
+Drei Dinge dabei mit Absicht:
+
+- Der Vorschlag wird **nicht** von selbst angewandt. Namensraten darf
+  keinen Stoff wegnehmen; wo ein Teil des Namens in keiner Lektion
+  vorkommt, steht das daneben.
+- Ohne eigene Lektionsangabe ändert sich **nichts**. Wer nichts
+  einstellt, bekommt alles wie bisher.
+- Bedeutungs- und Genusaufgaben trifft die Schranke nie — eine Vokabel
+  kann man lernen, bevor man ihre Zeiten kennt.
+
+Der Lernstand bleibt in jedem Fall erhalten; Ausblenden heißt warten.
+
 ### Lernziel bearbeiten: jetzt auch Lektionen, Zeiten und Abfragearten
 
 Zu merken war: »bei den Lernzielen sollte man auch einstellen können,

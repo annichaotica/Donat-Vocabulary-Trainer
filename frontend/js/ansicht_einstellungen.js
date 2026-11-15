@@ -15,6 +15,7 @@ export async function zeichnen(behaelter) {
 
   if (zustand.sammlungId) {
     el.append(await teilSammlung(behaelter));
+    el.append(await teilLehrgang(behaelter));
   } else {
     el.append(h('p', { class: 'leise',
       text: 'Keine Sammlung gewählt — die Einstellungen zu Formgruppen und '
@@ -202,6 +203,113 @@ async function teilZugriff(behaelter) {
       text: 'Es gibt noch kein weiteres Profil. Über den Profilknopf oben '
           + 'rechts lässt sich eines anlegen.' }));
   }
+  return kasten;
+}
+
+
+/* -------------------------------------------- Wo stehe ich im Lehrwerk? */
+
+/** Die Lektionsschranke: keine Zeitform, die das Buch noch nicht hatte.
+ *
+ * »Bei den Anfängerkapiteln, die ich mir gerade ansehe, habe ich noch
+ * gar nicht alle Zeitformen gelernt.« — Gemessen waren rund 2900 von
+ * 10751 griechischen Aufgaben Formen in Zeiten, die im Anfängerkapitel
+ * nicht vorkommen, und alle lagen im Topf der Tagesdosis.
+ *
+ * Zwei Dinge auf einer Karte, weil eines ohne das andere nichts tut:
+ * die Zuordnung (wann führt das Buch was ein — gilt für alle) und der
+ * eigene Stand (wo bin ich — gilt nur für mich).
+ */
+async function teilLehrgang(behaelter) {
+  const d = await api.lehrgang(zustand.sammlungId, zustand.benutzerId);
+  const kasten = h('div', { class: 'karte' });
+  kasten.append(h('h2', { style: 'margin-top:0',
+                          text: 'Wo stehst du im Lehrwerk?' }));
+
+  if (!d.vorschlag.length) {
+    kasten.append(h('p', { class: 'leise',
+      text: 'Diese Sprache kennt keine Formgruppen — hier gibt es nichts '
+          + 'einzustellen.' }));
+    return kasten;
+  }
+
+  // --- Der eigene Stand
+  const stand = h('input', {
+    type: 'number', min: '1', style: 'width:6rem',
+    value: d.buchstand === null ? '' : String(d.buchstand),
+    placeholder: 'alle',
+  });
+  kasten.append(
+    h('label', { class: 'feldname', text: 'Ich bin bei Lektion' }), stand,
+    h('p', { class: 'leise', style: 'margin:.2rem 0 .8rem',
+      text: 'Leer heißt: keine Schranke, es kommt alles dran. Mit einer '
+          + 'Zahl bleiben Zeitformen draußen, die das Buch erst später '
+          + 'einführt — sie warten, der Lernstand bleibt.' }));
+
+  if (d.ausgeblendet.length) {
+    const summe = d.ausgeblendet.reduce((n, a) => n + a.aufgaben, 0);
+    kasten.append(h('p', { class: 'marke warnung',
+      text: `${summe} Aufgaben warten gerade: `
+          + d.ausgeblendet.map((a) => `${a.formgruppe} ab ${a.ab_lektion}`)
+              .join(', ') }));
+  }
+
+  // --- Die Zuordnung
+  kasten.append(h('h3', { text: 'Ab welcher Lektion gilt was?' }));
+  kasten.append(h('p', { class: 'leise', style: 'margin:.2rem 0 .6rem',
+    text: 'Aus den Lektionsnamen vorgeschlagen. Der Vorschlag wird nicht '
+        + 'von selbst angewandt — Namensraten darf keinen Stoff '
+        + 'wegnehmen. Leer heißt: von Anfang an dabei.' }));
+
+  const felder = new Map();
+  for (const v of d.vorschlag) {
+    const gesetzt = d.zuordnung[v.formgruppe];
+    const feld = h('input', {
+      type: 'number', min: '1', style: 'width:5rem',
+      value: gesetzt !== undefined ? String(gesetzt) : '',
+      // Der Vorschlag steht als Platzhalter da, nicht als Wert: so
+      // sieht man, was geraten wäre, ohne dass es schon gilt.
+      placeholder: v.ab_lektion === null ? '—' : String(v.ab_lektion),
+    });
+    felder.set(v.formgruppe, feld);
+    kasten.append(h('div', { class: 'lehrgangszeile' },
+      feld,
+      h('span', {}, h('b', { text: v.name }),
+        h('span', { class: 'leise', text: ` · ${wortartName(v.wortart)}` })),
+      h('span', { class: 'leise' + (v.eindeutig ? '' : ' warnung'),
+                  text: v.begruendung })));
+  }
+
+  kasten.append(h('div', { class: 'frage-werkzeuge', style: 'margin-top:.8rem' },
+    h('button', {
+      class: 'wichtig',
+      onclick: async () => {
+        const zuordnung = {};
+        for (const [gruppe, feld] of felder) {
+          if (feld.value.trim()) zuordnung[gruppe] = Number(feld.value);
+        }
+        try {
+          await api.lehrgangSetzen(zustand.sammlungId, zuordnung);
+          await api.buchstandSetzen(zustand.sammlungId, zustand.benutzerId,
+                                    stand.value.trim()
+                                      ? Number(stand.value) : null);
+          meldung('Gespeichert.');
+          zeichnen(behaelter);
+        } catch (fehler) { meldung(fehler.message, 'fehler'); }
+      },
+    }, 'Speichern'),
+    h('button', {
+      onclick: () => {
+        // Den Vorschlag in die Felder schreiben — nicht speichern. Wer
+        // ihn will, sieht ihn dann vollständig vor sich und drückt
+        // selbst auf Speichern.
+        for (const v of d.vorschlag) {
+          const feld = felder.get(v.formgruppe);
+          if (feld) feld.value = v.ab_lektion === null ? '' : String(v.ab_lektion);
+        }
+        meldung('Vorschlag eingetragen — noch nicht gespeichert.');
+      },
+    }, 'Vorschlag übernehmen')));
   return kasten;
 }
 

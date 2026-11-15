@@ -32,6 +32,7 @@ import freigabe as freigabemodul
 import datenbank as dbm
 import legasthenie
 import lernen as lernmodul
+import lehrgang
 import lesetexte
 import lernziele
 import identitaet
@@ -49,7 +50,8 @@ from modelle import (RegelEingabe, RegelAendern,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
-                     FassungSichern, ImportEingabe, LernwahlSetzen,
+                     BuchstandSetzen, FassungSichern,
+                     ImportEingabe, LehrgangSetzen, LernwahlSetzen,
                      LesetextAnlegen, WortMerken,
                      LernzielAendern, LernzielAnlegen,
                      SammelimportEingabe,
@@ -760,6 +762,53 @@ def sammlung_einstellungen_setzen(sammlung_id: int, eingabe: SammlungEinstellung
     bilanz = aufgaben.erzeugen_fuer_sammlung(db, sammlung_id)
     return {"einstellungen": sammlung_einstellungen_lesen(sammlung_id, db),
             "aufgaben": bilanz}
+
+
+@app.get("/api/sammlungen/{sammlung_id}/lehrgang")
+def lehrgang_lesen(sammlung_id: int, benutzer_id: int | None = None,
+                   request: Request = None, db: sqlite3.Connection = DB):
+    """Ab welcher Lektion gilt welche Formgruppe — und wo stehe ich?"""
+    _wache_rumpf(db, request, sammlung_id=sammlung_id,
+                 benutzer_id=benutzer_id)
+    _holen(db, "sammlung", sammlung_id)
+    try:
+        return {
+            "zuordnung": lehrgang.zuordnung(db, sammlung_id),
+            "vorschlag": lehrgang.vorschlag(db, sammlung_id),
+            "buchstand": (lehrgang.buchstand(db, benutzer_id, sammlung_id)
+                          .get(sammlung_id) if benutzer_id else None),
+            "ausgeblendet": (lehrgang.ausgeblendet(db, benutzer_id, sammlung_id)
+                             if benutzer_id else []),
+        }
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
+@app.put("/api/sammlungen/{sammlung_id}/lehrgang")
+def lehrgang_setzen(sammlung_id: int, eingabe: LehrgangSetzen,
+                    request: Request = None, db: sqlite3.Connection = DB):
+    """Die Zuordnung als Ganzes ersetzen."""
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    try:
+        return {"zuordnung": lehrgang.zuordnung_setzen(db, sammlung_id,
+                                                       eingabe.zuordnung)}
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
+@app.put("/api/sammlungen/{sammlung_id}/buchstand")
+def buchstand_setzen(sammlung_id: int, eingabe: BuchstandSetzen,
+                     request: Request = None, db: sqlite3.Connection = DB):
+    """»Ich bin bei Lektion N.« — null hebt die Schranke auf."""
+    _wache_rumpf(db, request, sammlung_id=sammlung_id,
+                 benutzer_id=eingabe.benutzer_id)
+    _holen(db, "sammlung", sammlung_id)
+    _holen(db, "benutzer", eingabe.benutzer_id)
+    lehrgang.buchstand_setzen(db, eingabe.benutzer_id, sammlung_id,
+                              eingabe.bis_lektion)
+    return {"sammlung_id": sammlung_id, "bis_lektion": eingabe.bis_lektion,
+            "ausgeblendet": lehrgang.ausgeblendet(db, eingabe.benutzer_id,
+                                                  sammlung_id)}
 
 
 @app.get("/api/sammlungen/{sammlung_id}/lektionen")

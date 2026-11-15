@@ -565,3 +565,19 @@ class WortMerken(BaseModel):
     benutzer_id: int
     wort: str
     zusammenhang: str | None = None
+
+
+class LehrgangSetzen(BaseModel):
+    """Formgruppe -> ab welcher Lektionsnummer sie eingeführt ist.
+
+    Als Ganzes, nicht Feld für Feld: die Oberfläche zeigt die Zuordnung
+    vollständig, also ist eine fehlende Gruppe eine Aussage (»gilt von
+    Anfang an«) und kein Versehen.
+    """
+    zuordnung: dict[str, int]
+
+
+class BuchstandSetzen(BaseModel):
+    """Wo stehe ich in diesem Lehrwerk? `null` hebt die Schranke auf."""
+    benutzer_id: int
+    bis_lektion: int | None = None

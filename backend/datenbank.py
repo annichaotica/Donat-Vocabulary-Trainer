@@ -69,6 +69,9 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
     "lernziel": {
         "wurf": "INTEGER NOT NULL DEFAULT 0",
     },
+    "aufgabe": {
+        "formgruppe": "TEXT",
+    },
     "lektion": {
         "nr": "INTEGER",
         "beschreibung": "TEXT",
@@ -150,7 +153,16 @@ def wandern(db: sqlite3.Connection, von: int) -> None:
                     ON text(sammlung_id, kennung) WHERE kennung IS NOT NULL""")
     db.execute("""CREATE INDEX IF NOT EXISTS idx_text_folge
                     ON text(sammlung_id, lektion_id, reihenfolge)""")
+    # Liegt auf einer nachgerüsteten Spalte und gehört deshalb HIERHER,
+    # nicht ins Schemaskript: dort liefe er vor dem ALTER TABLE und
+    # scheiterte an einem bestehenden Bestand mit »no such column«. Der
+    # Kommentar über `wandern` sagt das; ich habe ihn erst überlesen und
+    # es dann an einem Abzug der echten Datenbank gemerkt — eine frische
+    # Testdatenbank hat die Spalte von Anfang an und hätte geschwiegen.
+    db.execute("""CREATE INDEX IF NOT EXISTS idx_aufgabe_gruppe
+                    ON aufgabe(formgruppe)""")
     _aufgabenschluessel_normieren(db)
+    _formgruppen_nachtragen(db)
     # Gibt es noch keinen Verwalter, wird es die erste angelegte Person.
     # Ohne das stünde ein bestehender Bestand nach der Aktualisierung ohne
     # jemanden da, der Sprachprofile pflegen darf.
@@ -159,6 +171,56 @@ def wandern(db: sqlite3.Connection, von: int) -> None:
                        WHERE id = (SELECT MIN(id) FROM benutzer)""")
     if von != SCHEMA_VERSION:
         db.execute("UPDATE schema_stand SET version = ?", (SCHEMA_VERSION,))
+
+
+def _formgruppen_nachtragen(db: sqlite3.Connection) -> None:
+    """Trägt `aufgabe.formgruppe` für den Bestand nach.
+
+    Die Spalte kam später dazu. Neue Aufgaben bekommen sie beim Anlegen;
+    die bestehenden hätten für immer NULL, und NULL heißt »gehört zu
+    keiner Formgruppe« — damit wären alle alten Formaufgaben von der
+    Lektionsschranke ausgenommen und kämen weiter dran. Eine Schranke,
+    die den Bestand nicht erfasst, ist keine.
+
+    Läuft nur über Aufgaben, die noch keine Gruppe haben, und ist damit
+    nach dem ersten Mal fast kostenlos. Die Berechnung braucht das
+    Sprachprofil, kann also nicht in SQL stehen — hier ist das in
+    Ordnung: es ist eine einmalige Wanderung, keine Abfrage im Betrieb.
+    """
+    if "formgruppe" not in spalten(db, "aufgabe"):
+        return
+    offen = db.execute("""
+        SELECT a.id, a.typ, a.ziel_art, a.ziel_id, l.wortart, s.sprache,
+               f.merkmale
+          FROM aufgabe a
+          JOIN lexem l ON l.id = a.lexem_id
+          JOIN sammlung s ON s.id = l.sammlung_id
+          LEFT JOIN form f ON f.id = a.ziel_id AND a.ziel_art = 'form'
+         WHERE a.formgruppe IS NULL
+           AND a.ziel_art IN ('form', 'gruppe')""").fetchall()
+    if not offen:
+        return
+    import aufgaben as aufgabenmodul
+
+    nachgetragen = 0
+    for z in offen:
+        kennung = None
+        if z["ziel_art"] == "form" and z["merkmale"]:
+            g = aufgabenmodul._gruppe_der_form(z["sprache"], z["wortart"],
+                                               j_lesen(z["merkmale"]))
+            kennung = g["kennung"] if g else None
+        elif z["ziel_art"] == "gruppe":
+            # Die Formenreihe trägt die Gruppe im Schlüssel:
+            # "formenreihe:<lexem>:gruppe:<kennung>".
+            teile = db.execute("SELECT schluessel FROM aufgabe WHERE id = ?",
+                               (z["id"],)).fetchone()[0].split(":")
+            kennung = teile[-1] if len(teile) >= 4 else None
+        if kennung:
+            db.execute("UPDATE aufgabe SET formgruppe = ? WHERE id = ?",
+                       (kennung, z["id"]))
+            nachgetragen += 1
+    if nachgetragen:
+        print(f"Formgruppen nachgetragen: {nachgetragen}")
 
 
 def _aufgabenschluessel_normieren(db: sqlite3.Connection) -> None:

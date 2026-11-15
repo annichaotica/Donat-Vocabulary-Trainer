@@ -154,6 +154,32 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
     }
 
 
+# Die Lektionsschranke: keine Formgruppe, die das Lehrwerk noch nicht
+# eingeführt hat.
+#
+# Steht als SQL-Baustein da und nicht als Nachfilter in Python, weil das
+# hier die wiederkehrende Fehlerquelle ist: die Abfrage holt ein Fenster
+# der dringendsten Zeilen, und wer danach aussiebt, bekommt ein leeres
+# Ergebnis, sobald die Ordnung genau das nach vorn stellt, was der
+# Filter wegwirft. Die Bedingung gehört in die Abfrage.
+#
+# Dreimal durchlässig, und zwar mit Absicht:
+#   - `a.formgruppe IS NULL`  — Bedeutungen und Genus haben keine Zeit
+#   - keine Zuordnung         — über eine Gruppe, zu der niemand gesagt
+#                               hat, wann sie drankommt, wird nicht
+#                               stillschweigend entschieden
+#   - kein Buchstand          — wer nichts eingestellt hat, bekommt alles
+#
+# Ein `?` für die benutzer_id.
+LEKTIONSSCHRANKE_SQL = """(a.formgruppe IS NULL OR NOT EXISTS (
+    SELECT 1 FROM formgruppe_lektion g
+      JOIN buchstand b ON b.sammlung_id = g.sammlung_id
+                      AND b.benutzer_id = ?
+     WHERE g.sammlung_id = l.sammlung_id
+       AND g.formgruppe = a.formgruppe
+       AND g.ab_lektion > b.bis_lektion))"""
+
+
 def sichtbare_sammlungen(db: sqlite3.Connection, benutzer_id: int) -> list[int]:
     """Eigene Sammlungen und die, die mir freigegeben wurden.
 
@@ -232,13 +258,18 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
                 "tagesdosis": 0, "rueckstand": 0, "neue_woerter_frei": 0}
     platzhalter = ",".join("?" * len(sammlungen))
     heute_text = heute().isoformat()
+    # Die Schranke zählt hier MIT. Liefe sie nur in der Abfrage, stünde
+    # auf der Übersicht eine Zahl, die das Lernen nie einlöst — derselbe
+    # Fehler wie damals »dein Tagespensum ist erledigt« über einem
+    # Block, mit dem noch gar nichts gelernt war.
     grund = f"""
         FROM aufgabe a
         JOIN lexem l ON l.id = a.lexem_id
         LEFT JOIN lernzustand z
                ON z.aufgabe_id = a.id AND z.benutzer_id = ?
-        WHERE a.aktiv = 1 AND l.sammlung_id IN ({platzhalter})"""
-    werte = (benutzer_id, *sammlungen)
+        WHERE a.aktiv = 1 AND l.sammlung_id IN ({platzhalter})
+          AND {LEKTIONSSCHRANKE_SQL}"""
+    werte = (benutzer_id, *sammlungen, benutzer_id)
     zahl = lambda bedingung, zusatz=(): dbm.wert(
         db, f"SELECT COUNT(*) {grund} AND {bedingung}", (*werte, *zusatz)) or 0
     e = benutzer_einstellungen(db, benutzer_id)
@@ -684,8 +715,8 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         rest_neu = max(0, e["neu_je_sitzung"] - len(heute_begonnen))
 
     bedingungen = [f"l.sammlung_id IN ({','.join('?' * len(sammlungen))})",
-                   "a.aktiv = 1"]
-    werte: list = [benutzer_id, *sammlungen]
+                   "a.aktiv = 1", LEKTIONSSCHRANKE_SQL]
+    werte: list = [benutzer_id, *sammlungen, benutzer_id]
     if lektion_id is not None:
         bedingungen.append("l.lektion_id = ?")
         werte.append(lektion_id)

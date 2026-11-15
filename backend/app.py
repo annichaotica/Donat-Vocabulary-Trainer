@@ -544,6 +544,29 @@ def benutzer_einstellungen(benutzer_id: int, db: sqlite3.Connection = DB):
 
 # ============================================================ Sammlungen
 
+# Die Farben, die eine Sammlung ohne eigene Wahl bekommt.
+#
+# Sie sind Information, keine Verzierung: dieselbe Farbe steht an der
+# Kartenkante, in den Einstellungen und überall, wo die Sammlung
+# vorkommt. Wer drei Sprachen lernt, erkennt am Rand, worin er steckt.
+#
+# Gewählt nach zwei Bedingungen: untereinander gut zu unterscheiden,
+# und auf hellem wie dunklem Grund lesbar. Darum mittlere Sättigung —
+# ein reines Rot wäre im Dunkelmodus eine Lampe.
+PALETTE = ["#35558a", "#2a6a4a", "#8a4a2a", "#5a3a7a",
+           "#1f6f78", "#8a3a5a", "#6a5a1f", "#3a5a8a"]
+
+
+def _farbe(sammlung: dict) -> str:
+    """Die wirksame Farbe: die gewählte, sonst eine aus der Kennung.
+
+    Abgeleitet statt beim Anlegen gewürfelt: so hat auch jede
+    bestehende Sammlung sofort eine, ohne Wanderung, und dieselbe
+    Sammlung bekommt überall dieselbe.
+    """
+    return sammlung.get("farbe") or PALETTE[(sammlung["id"] or 0) % len(PALETTE)]
+
+
 @app.get("/api/sammlungen")
 def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
                      db: sqlite3.Connection = DB):
@@ -561,7 +584,7 @@ def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
             benutzer_id = person["id"]
         else:
             return dbm.zeilen(db, "SELECT * FROM sammlung ORDER BY name")
-    return dbm.zeilen(db, """
+    reihen = dbm.zeilen(db, """
         SELECT s.*, (s.besitzer_id = ?) AS eigen,
                -- Sichtbar heißt nicht gelernt: eine Freigabe zum
                -- Mitpflegen soll die fremden Wörter nicht in die
@@ -577,6 +600,15 @@ def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
                (SELECT b.bis_lektion FROM buchstand b
                  WHERE b.sammlung_id = s.id AND b.benutzer_id = ?)
                  AS bis_lektion,
+               -- Wann zuletzt etwas aus dieser Sammlung beantwortet
+               -- wurde. Nur zum Sortieren der Übersicht; eine Zahl,
+               -- die sonst nirgends vorkommt, kann auch nirgends
+               -- widersprechen.
+               (SELECT MAX(w.zeitpunkt) FROM wiederholung w
+                  JOIN aufgabe a ON a.id = w.aufgabe_id
+                  JOIN lexem l2 ON l2.id = a.lexem_id
+                 WHERE l2.sammlung_id = s.id AND w.benutzer_id = ?)
+                 AS zuletzt_gelernt,
                (SELECT COUNT(*) FROM lektion k WHERE k.sammlung_id = s.id)
                  AS lektionen,
                (SELECT COUNT(*) FROM lexem l WHERE l.sammlung_id = s.id) AS lexeme,
@@ -597,7 +629,11 @@ def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
          WHERE s.besitzer_id = ?
             OR s.id IN (SELECT sammlung_id FROM freigabe WHERE benutzer_id = ?)
          ORDER BY s.name""", (benutzer_id, benutzer_id, benutzer_id,
-                               benutzer_id, benutzer_id, benutzer_id))
+                               benutzer_id, benutzer_id, benutzer_id,
+                               benutzer_id))
+    for z in reihen:
+        z["farbe_wirksam"] = _farbe(z)
+    return reihen
 
 
 @app.post("/api/sammlungen", status_code=201)

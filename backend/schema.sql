@@ -68,6 +68,15 @@ CREATE TABLE IF NOT EXISTS sammlung (
     -- überhaupt abgefragt werden. Ohne diese Auswahl entstünden pro
     -- französischem Verb an die zweihundert Aufgaben.
     einstellungen TEXT NOT NULL DEFAULT '{}',
+    -- Die Farbe der Sammlung. NULL heißt nicht »keine«, sondern »noch
+    -- nicht gewählt« — dann wird eine aus der Kennung abgeleitet. So
+    -- hat jede Sammlung von Anfang an eine, ohne dass jemand eine
+    -- Wanderung schreiben oder sich etwas aussuchen muss.
+    --
+    -- Sie ist Information, keine Verzierung: dieselbe Farbe erscheint
+    -- an der Kartenkante, im Kopf der Abfrage und im Fortschritt. Wer
+    -- drei Sprachen lernt, sieht am Rand, worin er gerade steckt.
+    farbe         TEXT,
     angelegt      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_sammlung_besitzer ON sammlung(besitzer_id);

@@ -24,6 +24,10 @@
  */
 
 import { h } from './hilfen.js';
+import { api } from './api.js';
+// `merken` heißt hier schon etwas anderes (die Merkliste der
+// gesehenen Rundgänge), darum unter anderem Namen.
+import { zustand, merken as zustandMerken } from './zustand.js';
 
 const GESEHEN = 'vokabeltrainer.fuehrungen';
 
@@ -97,6 +101,7 @@ export const RUNDGAENGE = [
   },
   {
     kennung: 'planen',
+    braucht_sammlung: true,
     name: 'Planen: Ziele und Lehrwerk',
     dauer: '3 Minuten',
     beschreibung: 'Einen Block bis Freitag, und nichts aus Kapiteln, '
@@ -134,6 +139,7 @@ export const RUNDGAENGE = [
   },
   {
     kennung: 'texte',
+    braucht_sammlung: true,
     name: 'Texte lesen und übersetzen',
     dauer: '2 Minuten',
     beschreibung: 'Einen Text einwerfen und sehen, ob du ihn schon '
@@ -206,11 +212,28 @@ export function alleGesehen() {
 
 let laeuft = null;
 
-export function starten(kennung) {
+export async function starten(kennung) {
   const rundgang = RUNDGAENGE.find((r) => r.kennung === kennung);
   if (!rundgang) return;
   beenden();
-  laeuft = { rundgang, nr: 0, versuche: 0, teile: aufbauen() };
+  // Manche Seiten gibt es nur MIT Sammlung — »Texte« sagt sonst nur
+  // »erst eine Sammlung wählen«, und der Rundgang zeigt auf einen
+  // Satz statt auf das, wovon er spricht. Also hier eine wählen und
+  // am Ende zurückgeben: ein Rundgang soll nichts hinterlassen.
+  let vorher;
+  if (rundgang.braucht_sammlung && !zustand.sammlungId) {
+    vorher = zustand.sammlungId ?? null;
+    try {
+      const alle = await api.sammlungen(zustand.benutzerId);
+      // Den Übungskurs bevorzugen: an ihm ist alles vorführbar, und
+      // er gehört niemandem im Ernst.
+      const wahl = alle.find((x) => x.name.includes('Übungskurs'))
+                || alle.find((x) => x.lerne_ich) || alle[0];
+      if (wahl) zustandMerken({ sammlungId: wahl.id, lektionId: null });
+    } catch { /* dann eben ohne — der Rundgang läuft trotzdem */ }
+  }
+  laeuft = { rundgang, nr: 0, versuche: 0, teile: aufbauen(),
+             sammlungZurueck: vorher };
   window.addEventListener('hashchange', neuAnsetzen);
   zeigen();
 }
@@ -220,6 +243,11 @@ export function beenden() {
   window.removeEventListener('hashchange', neuAnsetzen);
   hervorhebungWeg();
   laeuft.teile.huelle.remove();
+  // Die geliehene Sammlung zurückgeben. `undefined` heißt »nichts
+  // geliehen«; `null` heißt »es war vorher keine gewählt«.
+  if (laeuft.sammlungZurueck !== undefined) {
+    zustandMerken({ sammlungId: laeuft.sammlungZurueck });
+  }
   laeuft = null;
 }
 
@@ -304,13 +332,21 @@ function zeigen(nurAnsetzen = false) {
   if (ziel) {
     ziel.classList.add('fuehrung-ziel');
     laeuft.hervorgehoben = ziel;
-    ziel.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    setzen(teile.blase, ziel);
-    // Nachmessen statt rechnen: die Höhe steht erst fest, wenn der
-    // Text drin ist. Was draußen liegt, wird hereingezogen — eine
-    // Blase, deren Knöpfe außerhalb des Bildschirms liegen, sperrt
-    // den Rundgang zu.
-    hereinziehen(teile.blase);
+    // SOFORT rollen, nicht sanft. Beim sanften Rollen stand die Blase
+    // an der Stelle, an der das Ziel VOR dem Rollen war — und lag
+    // danach mitten darauf. Genau so war »Wo stehst du im Lehrwerk?«
+    // zu sehen: das richtige Feld hervorgehoben, die Erklärung
+    // darüber.
+    ziel.scrollIntoView({ block: 'center', behavior: 'instant' });
+    // Und erst im nächsten Bild messen: vorher steht weder die Höhe
+    // der Blase noch die endgültige Lage des Ziels fest.
+    requestAnimationFrame(() => {
+      if (!laeuft || laeuft.hervorgehoben !== ziel) return;
+      setzen(teile.blase, ziel);
+      // Was draußen liegt, wird hereingezogen — eine Blase, deren
+      // Knöpfe außerhalb des Bildschirms liegen, sperrt den Rundgang zu.
+      hereinziehen(teile.blase);
+    });
   } else {
     // Kein Ziel oder nicht gefunden: die Blase in die Mitte. Der Text
     // steht trotzdem, und der Rundgang läuft weiter.

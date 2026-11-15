@@ -82,6 +82,11 @@ class SammlungAnlegen(BaseModel):
 class SammlungAendern(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     beschreibung: str | None = None
+    # Leerer String heißt »zurück auf die abgeleitete Farbe«; null
+    # heißt »nicht genannt«. Dieselbe Unterscheidung wie beim Termin
+    # eines Lernziels, aus demselben Grund: ohne sie ließe sich eine
+    # einmal gewählte Farbe nie wieder loswerden.
+    farbe: str | None = Field(default=None, pattern=r"^(#[0-9a-fA-F]{6})?$")
 
 
 class SammlungEinstellungen(BaseModel):

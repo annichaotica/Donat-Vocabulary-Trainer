@@ -81,6 +81,100 @@ function profilpunkt(p) {
   return punkt;
 }
 
+const SORTIERUNG = 'vokabeltrainer.sammlungen.sortierung';
+const EINGEKLAPPT = 'vokabeltrainer.sammlungen.eingeklappt';
+
+const ORDNUNGEN = [
+  ['name', 'Name'],
+  ['faellig', 'Fälliges zuerst'],
+  ['zuletzt', 'zuletzt gelernt'],
+];
+
+function gelesen(schluessel, standard) {
+  try { return JSON.parse(localStorage.getItem(schluessel)) ?? standard; }
+  catch { return standard; }
+}
+
+function geschrieben(schluessel, wert) {
+  try { localStorage.setItem(schluessel, JSON.stringify(wert)); }
+  catch { /* privates Fenster */ }
+}
+
+const eingeklappt = () => gelesen(EINGEKLAPPT, []);
+
+function einklappen(id, zu) {
+  const alle = new Set(eingeklappt());
+  if (zu) alle.add(id); else alle.delete(id);
+  geschrieben(EINGEKLAPPT, [...alle]);
+}
+
+/** Sortiert die Sammlungen nach der gemerkten Ordnung.
+ *
+ * Die Reihenfolge ist eine Ansichtssache und bleibt deshalb im
+ * Browser — sie gehört zum Gerät, nicht zum Bestand. Wer am Telefon
+ * nach Fälligem ordnet, will das am Rechner nicht unbedingt auch.
+ */
+function geordnet(sammlungen, staende) {
+  const wie = gelesen(SORTIERUNG, 'name');
+  const kopie = [...sammlungen];
+  if (wie === 'faellig') {
+    // Die Fälligkeiten stehen in den Ständen, die die Übersicht
+    // ohnehin holt — nicht in der Sammlungsliste. Sie dort noch
+    // einmal zu zählen hieße, dieselbe Zahl an zwei Orten zu rechnen.
+    const faellig = (x) => staende[sammlungen.indexOf(x)]?.faellig || 0;
+    // Stabil: bei gleich vielen Fälligen bleibt die Namensfolge.
+    return kopie.sort((a, b) => faellig(b) - faellig(a)
+                              || a.name.localeCompare(b.name, 'de'));
+  }
+  if (wie === 'zuletzt') {
+    return kopie.sort((a, b) => String(b.zuletzt_gelernt || '')
+                                  .localeCompare(String(a.zuletzt_gelernt || ''))
+                              || a.name.localeCompare(b.name, 'de'));
+  }
+  return kopie.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+function teilSortierung(behaelter) {
+  const wahl = h('select', {},
+    ORDNUNGEN.map(([wert, text]) => h('option', { value: wert, text })));
+  wahl.value = gelesen(SORTIERUNG, 'name');
+  wahl.addEventListener('change', () => {
+    geschrieben(SORTIERUNG, wahl.value);
+    zeichnen(behaelter);
+  });
+  const zu = eingeklappt().length;
+  return h('p', { class: 'leise sortierzeile' },
+    'Sortiert nach ', wahl,
+    zu
+      ? h('button', {
+          class: 'schlicht',
+          onclick: () => { geschrieben(EINGEKLAPPT, []); zeichnen(behaelter); },
+        }, `${zu} eingeklappt — alle zeigen`)
+      : null);
+}
+
+/** Eine eingeklappte Sammlung: Name, Farbe, das Nötigste. */
+function teilEingeklappt(behaelter, s, stand) {
+  return h('div', {
+    class: 'karte sammlungskarte eingeklappt',
+    style: `--sammlungsfarbe:${s.farbe_wirksam || 'var(--rand)'}`,
+  },
+    h('div', { style: 'display:flex;justify-content:space-between;gap:.5rem;align-items:baseline' },
+      h('strong', { text: s.name }),
+      h('span', { class: 'leise',
+                  text: (stand?.faellig || 0) + ' fällig' })),
+    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:.4rem' },
+      h('button', {
+        onclick: () => { merken({ sammlungId: s.id, lektionId: null });
+                         location.hash = '#/lernen'; },
+      }, 'Lernen'),
+      h('button', {
+        class: 'schlicht',
+        onclick: () => { einklappen(s.id, false); zeichnen(behaelter); },
+      }, 'Ausklappen')));
+}
+
+
 /** Die Karte für den Anfang: Rundgänge und der Übungskurs.
  *
  * Sie verschwindet, sobald alle Rundgänge einmal gesehen sind — ein
@@ -379,15 +473,25 @@ export async function zeichnen(behaelter) {
   // Die Reihe trägt einen eigenen Namen: `.karte-reihe` steht auf dieser
   // Seite dreimal — Profile, Lernziele, Sammlungen. Der Rundgang griff
   // damit die Lernzielkarte und erklärte dazu die Sammlungsknöpfe.
+  anfuegen(el, sammlungen.length > 1 ? teilSortierung(behaelter) : null);
   const reihe = h('div', { class: 'karte-reihe sammlungen' });
   // Alle Zählungen auf einmal statt ein Rundlauf je Sammlung — das ist der
   // Startbildschirm, der soll nicht nach Sammlungszahl langsamer werden.
   const staende = await Promise.all(
     sammlungen.map((s) => api.stand(zustand.benutzerId, s.id).catch(() => ({}))));
-  for (const [i, s] of sammlungen.entries()) {
-    const stand = staende[i];
+  for (const [i, s] of geordnet(sammlungen, staende).entries()) {
+    const stand = staende[sammlungen.indexOf(s)];
     const sprache = sprachen.find((x) => x.code === s.sprache);
-    reihe.append(h('div', { class: 'karte' },
+    if (eingeklappt().includes(s.id)) {
+      reihe.append(teilEingeklappt(behaelter, s, stand));
+      continue;
+    }
+    reihe.append(h('div', {
+      class: 'karte sammlungskarte',
+      // Die Farbe als Kante, nicht als Fläche: sie soll zuordnen,
+      // nicht schreien. Auf dunklem Grund trägt dieselbe Farbe.
+      style: `--sammlungsfarbe:${s.farbe_wirksam || 'var(--rand)'}`,
+    },
       h('div', { style: 'display:flex;justify-content:space-between;gap:.5rem' },
         h('strong', { text: s.name }),
         h('span', { class: 'marke', text: sprache ? sprache.name : s.sprache })),
@@ -445,7 +549,11 @@ export async function zeichnen(behaelter) {
         h('button', {
           class: 'schlicht',
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/einstellungen'; },
-        }, 'Einstellungen'))));
+        }, 'Einstellungen'),
+        h('button', {
+          class: 'schlicht', title: 'Diese Karte einklappen',
+          onclick: () => { einklappen(s.id, true); zeichnen(behaelter); },
+        }, 'Einklappen'))));
   }
   el.append(reihe);
   el.append(await teilNeueSammlung(behaelter, sprachen));

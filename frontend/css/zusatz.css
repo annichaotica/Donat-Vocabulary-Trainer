@@ -754,3 +754,20 @@ input[type="file"] { max-width: 100%; }
   padding-top: .8rem;
   margin-top: 1.2rem !important;
 }
+
+
+/* Die Sammlungsfarbe als Kante.
+   Als Kante und nicht als Fläche: sie soll zuordnen, nicht schreien,
+   und dieselbe Farbe muss auf hellem wie dunklem Grund tragen. */
+.sammlungskarte {
+  border-left: 4px solid var(--sammlungsfarbe, var(--rand));
+}
+.sammlungskarte.eingeklappt {
+  padding-top: .7rem;
+  padding-bottom: .7rem;
+}
+.sortierzeile {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  margin: .2rem 0 .6rem;
+}
+.sortierzeile select { width: auto; }

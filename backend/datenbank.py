@@ -65,6 +65,7 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
     },
     "sammlung": {
         "einstellungen": "TEXT NOT NULL DEFAULT '{}'",
+        "farbe": "TEXT",
     },
     "lernziel": {
         "wurf": "INTEGER NOT NULL DEFAULT 0",

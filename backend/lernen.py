@@ -154,13 +154,64 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
     }
 
 
-def _zugaengliche_sammlungen(db: sqlite3.Connection, benutzer_id: int) -> list[int]:
-    """Eigene Sammlungen und die, die mir freigegeben wurden."""
+def sichtbare_sammlungen(db: sqlite3.Connection, benutzer_id: int) -> list[int]:
+    """Eigene Sammlungen und die, die mir freigegeben wurden.
+
+    Das ist die SICHTBARKEIT — wer darf hineinsehen und mitpflegen. Was
+    abgefragt wird, sagt `lernsammlungen`; die beiden fallen
+    auseinander, sobald jemand eine fremde Sammlung nur berichtigt.
+    """
     return [z["id"] for z in dbm.zeilen(db, """
         SELECT s.id FROM sammlung s WHERE s.besitzer_id = ?
         UNION
         SELECT f.sammlung_id FROM freigabe f WHERE f.benutzer_id = ?""",
         (benutzer_id, benutzer_id))]
+
+
+def lernsammlungen(db: sqlite3.Connection, benutzer_id: int) -> list[int]:
+    """Woraus wird abgefragt, wenn keine Sammlung gewählt ist?
+
+    »Wenn ich schon die Sammlungen von Max und Katharina sehe, würde ich
+    gerne einstellen können, dass ich diese nicht aktiv lerne.« — Sie
+    hatte recht: die Freigabe auf Lernende 2s Französisch trägt das Recht
+    `schreiben`, also zum Mitpflegen, und trotzdem lagen die 36
+    französischen Wörter im allgemeinen Lernen zwischen den
+    griechischen.
+
+    Vorgabe ist der Besitz, Abweichungen stehen in `lernwahl`. Die
+    Bedingung gehört in die Abfrage und nicht hinterher davor — sonst
+    wäre es wieder der Fehler, ein Fenster nachzusortieren.
+    """
+    return [z["id"] for z in dbm.zeilen(db, """
+        SELECT s.id
+          FROM sammlung s
+          LEFT JOIN lernwahl w
+                 ON w.sammlung_id = s.id AND w.benutzer_id = ?
+         WHERE (s.besitzer_id = ?
+                OR s.id IN (SELECT sammlung_id FROM freigabe
+                             WHERE benutzer_id = ?))
+           AND COALESCE(w.lernen, s.besitzer_id = ?) = 1""",
+        (benutzer_id,) * 4)]
+
+
+def lernwahl_setzen(db: sqlite3.Connection, benutzer_id: int,
+                    sammlung_id: int, lernen: bool) -> None:
+    """Trägt eine Abweichung ein — oder räumt sie weg, wenn sie der
+    Vorgabe entspricht. So bleibt die Tabelle leer, solange niemand
+    etwas umgestellt hat, und ein Besitzerwechsel zieht die Vorgabe
+    einfach mit."""
+    eigen = bool(dbm.wert(db, """SELECT besitzer_id = ? FROM sammlung
+                                  WHERE id = ?""", (benutzer_id, sammlung_id)))
+    if bool(lernen) == eigen:
+        db.execute("""DELETE FROM lernwahl
+                       WHERE benutzer_id = ? AND sammlung_id = ?""",
+                   (benutzer_id, sammlung_id))
+    else:
+        db.execute("""INSERT INTO lernwahl (benutzer_id, sammlung_id, lernen)
+                      VALUES (?, ?, ?)
+                      ON CONFLICT (benutzer_id, sammlung_id)
+                      DO UPDATE SET lernen = excluded.lernen""",
+                   (benutzer_id, sammlung_id, int(bool(lernen))))
 
 
 def _zustand_sichern(db: sqlite3.Connection, aufgabe_id: int,
@@ -174,7 +225,7 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
           sammlung_id: int | None = None) -> dict:
     """Was liegt an? Zahlen für die Übersicht."""
     sammlungen = ([sammlung_id] if sammlung_id
-                  else _zugaengliche_sammlungen(db, benutzer_id))
+                  else lernsammlungen(db, benutzer_id))
     if not sammlungen:
         return {"faellig": 0, "neu": 0, "verlernt": 0, "reif": 0, "gesamt": 0,
                 "heute_erledigt": 0, "heute_offen": 0, "heute_gesamt": 0,
@@ -596,7 +647,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
         return ergebnis
 
     sammlungen = ([sammlung_id] if sammlung_id
-                  else _zugaengliche_sammlungen(db, benutzer_id))
+                  else lernsammlungen(db, benutzer_id))
     if not sammlungen:
         return []
     e = benutzer_einstellungen(db, benutzer_id)

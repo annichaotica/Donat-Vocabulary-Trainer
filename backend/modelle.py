@@ -120,11 +120,25 @@ class SammelimportEingabe(BaseModel):
 class ZugriffSetzen(BaseModel):
     """Wer darf eine Sammlung mitbenutzen?
 
-    "lesen" heißt mitlernen — mit eigenem Lernstand, denn der hängt an der
-    Person. "schreiben" heißt auch pflegen. null nimmt den Zugriff zurück.
+    "lesen" heißt hineinsehen, "schreiben" auch pflegen. null nimmt den
+    Zugriff zurück.
+
+    Ob jemand die Sammlung auch LERNT, sagt das Recht nicht — das sagt
+    `LernwahlSetzen`. Hier stand früher »lesen heißt mitlernen«, und so
+    war es auch gebaut; dadurch mischten sich fremde Sammlungen, die
+    man nur mitpflegt, in die allgemeine Abfrage.
     """
     benutzer_id: int
     recht: Literal["lesen", "schreiben"] | None = None
+
+
+class LernwahlSetzen(BaseModel):
+    """Lerne ich diese Sammlung aktiv?
+
+    Vorgabe ohne Eintrag: die eigenen ja, die fremden nein.
+    """
+    benutzer_id: int
+    lernen: bool
 
 
 class BesitzUebertragen(BaseModel):

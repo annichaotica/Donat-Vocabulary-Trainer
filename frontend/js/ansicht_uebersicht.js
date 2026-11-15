@@ -80,6 +80,51 @@ function profilpunkt(p) {
   return punkt;
 }
 
+/** Schalter »lerne ich diese Sammlung aktiv« — samt Erklärung daneben.
+ *
+ * Die Vorgabe steckt im Rücken: eigene Sammlungen ja, fremde nein. Hier
+ * steht nur, was gerade gilt, und wie man es umdreht.
+ */
+function lernwahlZeile(s) {
+  const schalter = h('input', { type: 'checkbox' });
+  schalter.checked = Boolean(s.lerne_ich);
+  const text = h('span', {});
+  const beschriften = () => {
+    text.textContent = schalter.checked
+      ? 'Wird allgemein mitgelernt'
+      : 'Nur ansehen und pflegen';
+  };
+  beschriften();
+  schalter.addEventListener('change', async () => {
+    schalter.disabled = true;
+    const gewollt = schalter.checked;
+    try {
+      await api.lernwahlSetzen(s.id, zustand.benutzerId, gewollt);
+      beschriften();
+      meldung(gewollt
+        ? `»${s.name}« wird jetzt mitgelernt.`
+        : `»${s.name}« kommt in der allgemeinen Abfrage nicht mehr vor. `
+          + 'Über den Knopf »Lernen« auf dieser Karte geht es weiterhin.');
+      // Die Zahlen auf der Karte und oben zählen denselben Topf — sie
+      // müssen mit. Sonst stünde dort gleich ein Wert, den die Abfrage
+      // nicht einlöst.
+      zeichnen(document.getElementById('inhalt'));
+    } catch (fehler) {
+      schalter.checked = !gewollt;
+      beschriften();
+      meldung(fehler.message, 'fehler');
+    } finally {
+      schalter.disabled = false;
+    }
+  });
+  return h('label', {
+    class: 'leise',
+    style: 'display:flex;align-items:center;gap:.4rem;margin:.4rem 0 0;'
+         + 'cursor:pointer',
+  }, schalter, text);
+}
+
+
 export async function zeichnen(behaelter) {
   const el = leeren(behaelter);
   const [sammlungen, sprachen] = await Promise.all([
@@ -155,6 +200,12 @@ export async function zeichnen(behaelter) {
         h('span', { class: 'marke', text: sprache ? sprache.name : s.sprache })),
       h('p', { class: 'leise', style: 'margin:.2rem 0 0',
                text: `${s.lexeme ?? 0} Wörter${s.eigen ? '' : ' · freigegeben'}` }),
+      // Freigegeben heißt nicht gelernt. Wer Lernende 2s Französisch
+      // mitpflegt, bekam es bisher in der allgemeinen Abfrage zwischen
+      // die griechischen Wörter gemischt, ohne eine Stelle, wo sich
+      // das abstellen ließ. Der Schalter gehört hierher, zur Karte:
+      // hier sieht man die fremden Sammlungen ja gerade.
+      lernwahlZeile(s),
       // Ungeprüfte Formen werden nicht abgefragt. Wer das nicht weiß, sucht
       // vergeblich nach den Wörtern, die die KI gerade eingetragen hat —
       // darum steht es hier und nicht in einem Untermenü.

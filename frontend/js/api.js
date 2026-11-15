@@ -71,6 +71,8 @@ export const api = {
   sammlungLoeschen: (id) => ruf(`/sammlungen/${id}`, { methode: 'DELETE' }),
   zugriff: (id) => ruf(`/sammlungen/${id}/zugriff`),
   zugriffSetzen: (id, daten) => ruf(`/sammlungen/${id}/zugriff`, { methode: 'PUT', daten }),
+  lernwahlSetzen: (id, benutzerId, lernen) => ruf(`/sammlungen/${id}/lernwahl`,
+    { methode: 'PUT', daten: { benutzer_id: benutzerId, lernen } }),
   besitzUebertragen: (id, daten) =>
     ruf(`/sammlungen/${id}/besitz`, { methode: 'POST', daten }),
 

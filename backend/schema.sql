@@ -81,6 +81,25 @@ CREATE TABLE IF NOT EXISTS freigabe (
     PRIMARY KEY (sammlung_id, benutzer_id)
 );
 
+-- Lerne ich diese Sammlung, oder sehe ich sie nur?
+--
+-- Das waren bisher dieselbe Sache, und das war falsch: eine Freigabe
+-- heißt »du darfst hineinsehen und mitpflegen«, nicht »das lernst du«.
+-- Wer Lernende 2s Französisch berichtigt, bekam es in der allgemeinen
+-- Abfrage zwischen die griechischen Wörter gemischt.
+--
+-- Hier stehen nur die ABWEICHUNGEN von der Vorgabe. Die Vorgabe
+-- ergibt sich aus dem Besitz: die eigenen Sammlungen lernt man, die
+-- fremden nicht. Eine Zeile hier dreht das für ein Profil um. Dadurch
+-- braucht keine neue Sammlung und keine neue Freigabe einen
+-- Begleiteintrag, und es gibt keinen Zustand, der nachlaufen kann.
+CREATE TABLE IF NOT EXISTS lernwahl (
+    benutzer_id  INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    sammlung_id  INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
+    lernen       INTEGER NOT NULL CHECK (lernen IN (0, 1)),
+    PRIMARY KEY (benutzer_id, sammlung_id)
+);
+
 CREATE TABLE IF NOT EXISTS lektion (
     id           INTEGER PRIMARY KEY,
     sammlung_id  INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,

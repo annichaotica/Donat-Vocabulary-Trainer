@@ -48,7 +48,8 @@ from modelle import (RegelEingabe, RegelAendern,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
-                     ImportEingabe, LernzielAendern, LernzielAnlegen,
+                     ImportEingabe, LernwahlSetzen,
+                     LernzielAendern, LernzielAnlegen,
                      SammelimportEingabe,
                      McpTokenAnlegen,
                      FormAendern, FreigabeEingabe,
@@ -556,6 +557,13 @@ def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
             return dbm.zeilen(db, "SELECT * FROM sammlung ORDER BY name")
     return dbm.zeilen(db, """
         SELECT s.*, (s.besitzer_id = ?) AS eigen,
+               -- Sichtbar heißt nicht gelernt: eine Freigabe zum
+               -- Mitpflegen soll die fremden Wörter nicht in die
+               -- allgemeine Abfrage mischen. Vorgabe ist der Besitz,
+               -- `lernwahl` trägt nur die Abweichungen.
+               COALESCE((SELECT w.lernen FROM lernwahl w
+                          WHERE w.sammlung_id = s.id AND w.benutzer_id = ?),
+                        s.besitzer_id = ?) AS lerne_ich,
                (SELECT COUNT(*) FROM lexem l WHERE l.sammlung_id = s.id) AS lexeme,
                -- Hier mit, nicht in einem eigenen Aufruf: die Übersicht
                -- soll nicht je Sammlung einen Rundlauf brauchen, nur um
@@ -573,7 +581,8 @@ def sammlungen_liste(request: Request = None, benutzer_id: int | None = None,
           FROM sammlung s
          WHERE s.besitzer_id = ?
             OR s.id IN (SELECT sammlung_id FROM freigabe WHERE benutzer_id = ?)
-         ORDER BY s.name""", (benutzer_id, benutzer_id, benutzer_id))
+         ORDER BY s.name""", (benutzer_id, benutzer_id, benutzer_id,
+                               benutzer_id, benutzer_id))
 
 
 @app.post("/api/sammlungen", status_code=201)
@@ -639,8 +648,14 @@ def zugriff_setzen(sammlung_id: int, eingabe: ZugriffSetzen,
                    request: Request = None, db: sqlite3.Connection = DB):
     """Gibt einer Person Zugriff oder nimmt ihn zurück.
 
-    `recht`: "lesen" (mitlernen), "schreiben" (auch pflegen) oder null
+    `recht`: "lesen" (hineinsehen), "schreiben" (auch pflegen) oder null
     (Zugriff entziehen).
+
+    Zugriff heißt NICHT, dass die Sammlung mitgelernt wird — das sagt
+    die Lernwahl (`PUT …/lernwahl`), und die steht voreingestellt auf
+    »nein« für fremde Sammlungen. Hier stand einmal »lesen
+    (mitlernen)«, und genau daran lag es, dass Lernende 2s Französisch
+    zwischen den griechischen Wörtern auftauchte.
     """
     _wache_rumpf(db, request, sammlung_id=sammlung_id)
     s = _holen(db, "sammlung", sammlung_id)
@@ -659,6 +674,28 @@ def zugriff_setzen(sammlung_id: int, eingabe: ZugriffSetzen,
                       DO UPDATE SET recht = excluded.recht""",
                    (sammlung_id, eingabe.benutzer_id, eingabe.recht))
     return zugriff_lesen(sammlung_id, db)
+
+
+@app.put("/api/sammlungen/{sammlung_id}/lernwahl")
+def lernwahl_setzen(sammlung_id: int, eingabe: LernwahlSetzen,
+                    request: Request = None, db: sqlite3.Connection = DB):
+    """Lerne ich diese Sammlung aktiv, oder sehe ich sie nur?
+
+    Betrifft nur die Abfrage OHNE gewählte Sammlung und ohne Lernziel —
+    wer eine Sammlung ausdrücklich aufruft, bekommt sie weiterhin. Der
+    Lernstand bleibt unangetastet: wer wieder einschaltet, macht da
+    weiter, wo er aufgehört hat.
+    """
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 sammlung_id=sammlung_id)
+    _holen(db, "sammlung", sammlung_id)
+    _holen(db, "benutzer", eingabe.benutzer_id)
+    sichtbar = lernmodul.sichtbare_sammlungen(db, eingabe.benutzer_id)
+    if sammlung_id not in sichtbar:
+        raise HTTPException(403, "Diese Sammlung ist für dich nicht sichtbar.")
+    lernmodul.lernwahl_setzen(db, eingabe.benutzer_id, sammlung_id,
+                              eingabe.lernen)
+    return {"sammlung_id": sammlung_id, "lernen": bool(eingabe.lernen)}
 
 
 @app.post("/api/sammlungen/{sammlung_id}/besitz")

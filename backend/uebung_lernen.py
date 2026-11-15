@@ -85,7 +85,7 @@ def stand(db: sqlite3.Connection, benutzer_id: int,
           sammlung_id: int | None = None) -> dict:
     """Was liegt an Übungen an?"""
     sammlungen = ([sammlung_id] if sammlung_id
-                  else lernmodul._zugaengliche_sammlungen(db, benutzer_id))
+                  else lernmodul.lernsammlungen(db, benutzer_id))
     if not sammlungen:
         return {"faellig": 0, "neu": 0, "verlernt": 0, "reif": 0, "gesamt": 0,
                 "ungeprueft": 0}
@@ -162,7 +162,7 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
     """
     e = lernmodul.benutzer_einstellungen(db, benutzer_id)
     sammlungen = ([sammlung_id] if sammlung_id
-                  else lernmodul._zugaengliche_sammlungen(db, benutzer_id))
+                  else lernmodul.lernsammlungen(db, benutzer_id))
     if not sammlungen:
         return []
     heute_text = lernmodul.heute().isoformat()

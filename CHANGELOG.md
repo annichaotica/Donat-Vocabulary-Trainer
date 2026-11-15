@@ -16,6 +16,24 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Die Rundgänge überarbeitet: sechs statt vier, und nur noch Orientierung
+
+Ein Rundgang sagt jetzt nur noch, **wo** etwas liegt. Das Warum steht
+im Lehrgang, und jeder Rundgang endet mit dem Verweis auf sein
+Kapitel. Vorher stand beides in den Sprechblasen — »fast richtig
+kostet nichts«, »der Tipp macht die Aufgabe schwer« —, und eine Blase
+ist dafür der falsche Ort: drei Sätze, vorbei, nichts zum
+Nachschlagen.
+
+Zwei kamen dazu, für die Orte, an denen man beim Pflegen wirklich
+steht: **Ein Wort eintragen** und **Freigeben, was wartet**. Dazu neu
+in den bestehenden: Sortieren und Einklappen, »Schluss für heute«,
+»Fortschritt«, und die Farbe der Sammlung in der Kopfzeile.
+
+Ein Rundgang, der eine Sammlung braucht, sucht sich jetzt eine
+passende — die Freigabe eine mit wirklich Wartendem — und gibt die
+vorherige am Ende zurück.
+
 ### Farbe, Sortieren, Einklappen — und Beispielsätze wie im Wörterbuch
 
 Jede Sammlung hat jetzt eine Farbe. Sie steht als Kante an der Karte

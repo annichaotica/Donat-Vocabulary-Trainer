@@ -6,8 +6,14 @@
  * Führungen zu machen?«
  *
  * Mehrere, ja. Eine Tour über fünfzehn Funktionen hat niemand zu Ende
- * gesehen. Vier kurze, die man einzeln nehmen kann, und jede hört an
- * einer Stelle auf, an der man etwas tun will.
+ * gesehen.
+ *
+ * Nach dem ersten Durchlauf überarbeitet, mit einer klaren Aufteilung:
+ * ein Rundgang sagt nur noch, WO etwas liegt. Das WARUM steht im
+ * Lehrgang. Vorher stand beides in den Blasen — »fast richtig kostet
+ * nichts«, »der Tipp macht die Aufgabe schwer« —, und eine Blase ist
+ * dafür der falsche Ort: drei Sätze, vorbei, nichts zum Nachschlagen.
+ * Jeder Rundgang endet darum mit dem Verweis auf sein Kapitel.
  *
  * Zwei Entscheidungen, die den Rest erklären:
  *
@@ -36,135 +42,167 @@ const VERSUCHE = 8;
 
 export const RUNDGAENGE = [
   {
-    kennung: 'erste-schritte',
-    name: 'Erste Schritte',
+    kennung: 'wo-ist-was',
+    name: 'Wo ist was',
     dauer: '2 Minuten',
-    beschreibung: 'Was wo steht und womit man anfängt.',
+    beschreibung: 'Der Rundgang für den ersten Tag.',
+    kapitel: ['lernen', 0],
     schritte: [
-      { seite: '#/uebersicht',
-        titel: 'Das ist deine Übersicht',
-        text: 'Oben steht, was heute ansteht: fällig, verlernt, neu. '
-            + 'Darunter deine Sammlungen — eine Sammlung ist ein '
-            + 'Wortschatz, meist ein Lehrbuch.' },
+      { seite: '#/uebersicht', ziel: '#kopf',
+        titel: 'Oben steht, wo du bist',
+        text: 'Links der Name der Ansicht, darunter die Sammlung, in der '
+            + 'du gerade steckst — mit ihrer Farbe. Rechts die Reiter, '
+            + 'ganz rechts dein Profil.' },
       { seite: '#/uebersicht', ziel: '.karte .zahlen',
-        titel: 'Die vier Zahlen',
-        text: '»Fällig« heißt: heute planmäßig dran. »Verlernt« ist '
-            + 'danebengegangen und kommt bald wieder. »Neu« war noch '
-            + 'nie dran. »Sitzt« kannst du dauerhaft.' },
-      { seite: '#/uebersicht', ziel: 'button.wichtig',
-        titel: 'Hier geht es los',
-        text: '»Lernen« fragt nach dem Plan ab — der Trainer sucht aus, '
-            + 'was dran ist. Daneben »Frei üben« ohne Plan und '
-            + '»Fehler wiederholen« für das, was zuletzt schiefging.' },
+        titel: 'Was heute ansteht',
+        text: 'Fällig, verlernt, neu, sitzt. Darunter die Knöpfe, mit '
+            + 'denen du loslegst — »Lernen« folgt dem Plan, »Frei üben« '
+            + 'ignoriert ihn.' },
       { seite: '#/uebersicht', ziel: '.sammlungen > .karte',
-        titel: 'Eine Sammlungskarte',
-        text: 'Jede Sammlung hat ihre eigenen Knöpfe: Lernen, '
-            + 'Wortschatz ansehen, Sätze üben, Texte lesen, Vokabeln '
-            + 'einlesen, gezielt üben. Alles, was zu dieser Sprache '
-            + 'gehört, hängt an dieser Karte.' },
-      { seite: '#/uebersicht', ziel: '.sammlungen input[type=checkbox]',
-        titel: 'Lerne ich das mit?',
-        text: 'Eigene Sammlungen sind angehakt. Was dir jemand nur zum '
-            + 'Mitpflegen freigegeben hat, ist es nicht — sonst lägen '
-            + 'fremde Vokabeln zwischen deinen.' },
+        titel: 'Eine Sammlung',
+        text: 'Ein Wortschatz, meist ein Lehrbuch. Alles, was dazugehört, '
+            + 'hängt an dieser Karte: lernen, nachschlagen, Sätze, Texte, '
+            + 'einlesen, einstellen.' },
+      { seite: '#/uebersicht', ziel: '.sortierzeile',
+        titel: 'Wenn es zu viele werden',
+        text: 'Hier sortierst du die Sammlungen und klappst ein, was '
+            + 'du gerade nicht brauchst.' },
+      { seite: '#/uebersicht', ziel: () => knopfMit('Fortschritt')(),
+        titel: 'Und wie läuft es?',
+        text: '»Fortschritt« zeigt, was du getan hast und was in den '
+            + 'nächsten Wochen auf dich zukommt.' },
     ],
   },
   {
     kennung: 'abfrage',
-    name: 'Eine Abfrage von innen',
+    name: 'In der Abfrage',
     dauer: '2 Minuten',
-    beschreibung: 'Was passiert, wenn du antwortest.',
+    beschreibung: 'Die Knöpfe unter der Frage.',
+    sammlung: 'beliebig',
+    kapitel: ['lernen', 0],
     schritte: [
       { seite: '#/lernen', ziel: '.frage',
         titel: 'Die Frage',
         text: 'Oben die Aufgabenart, darunter das Gefragte. Bei Formen '
-            + 'steht die Formangabe dabei, mit einem deutschen '
-            + 'Beispiel — damit klar ist, was gemeint ist.' },
+            + 'steht die Formangabe dabei, mit einem deutschen Beispiel.' },
       { seite: '#/lernen', ziel: '.antwortfeld input, .antwortfeld textarea',
-        titel: 'Antworten',
-        text: 'Tippen und Enter. Fast richtig kostet nichts: liegt nur '
-            + 'ein Zeichen daneben, darfst du noch einmal. Bei '
-            + 'Griechisch brauchst du nichts umzuschalten — tippe '
-            + 'einfach lateinisch.' },
+        titel: 'Hier tippst du',
+        text: 'Enter prüft. Bei Griechisch tippst du lateinisch — es '
+            + 'erscheint griechisch, ohne dass du etwas umschaltest.' },
       { seite: '#/lernen', ziel: '.frage-werkzeuge',
-        titel: 'Wenn du nicht weiterweißt',
-        text: '»Tipp« deckt Stück für Stück auf und bleibt in der '
-            + 'Abfrage. »Weiß ich nicht« ist die ehrliche Auskunft — '
-            + 'das Wort kommt bald wieder. »Aussetzen« legt es ganz '
-            + 'beiseite.' },
+        titel: 'Wenn es klemmt',
+        text: '»Tipp« deckt Stück für Stück auf. »Weiß ich nicht« sagt '
+            + 'die Wahrheit. »Aussetzen« legt die Aufgabe beiseite. Und '
+            + '»Schluss für heute« bringt dich zurück zur Übersicht.' },
       { seite: '#/lernen', ziel: 'details',
         titel: 'Warum kommt das jetzt?',
-        text: 'Aufklappen, und der Trainer sagt, warum gerade diese '
-            + 'Frage dran ist und wann das Wort wiederkommt. Nichts '
-            + 'davon ist geheim.' },
+        text: 'Aufklappen, und der Trainer legt seine Rechnung offen.' },
+    ],
+  },
+  {
+    kennung: 'eintragen',
+    name: 'Ein Wort eintragen',
+    dauer: '2 Minuten',
+    beschreibung: 'Die Maske für Vokabeln mit Formen.',
+    sammlung: 'beliebig',
+    kapitel: ['pflegen', 1],
+    schritte: [
+      { seite: '#/neu', ziel: '#inhalt input',
+        titel: 'Die Grundform',
+        text: 'Das Wort, wie es im Wörterbuch steht. Bei griechischen '
+            + 'Substantiven mit Artikel: »το μήλο«.' },
+      { seite: '#/neu', ziel: '#inhalt select',
+        titel: 'Die Wortart entscheidet alles Weitere',
+        text: 'Aus ihr ergibt sich, welche Formfelder du unten bekommst. '
+            + 'Ein Verb bringt Zeiten mit, ein Substantiv Fälle.' },
+      { seite: '#/neu', ziel: '#inhalt details',
+        titel: 'Die Formen',
+        text: 'Je Zeit oder Tabelle ein Block zum Aufklappen. Leer lassen '
+            + 'ist erlaubt — nur was dasteht, wird abgefragt.' },
+      { seite: '#/neu', ziel: () => knopfMit('Anlegen')(),
+        titel: 'Anlegen',
+        text: 'Danach entstehen die Aufgaben von selbst. Was du von Hand '
+            + 'einträgst, ist sofort abfragbar; was die KI einträgt, '
+            + 'wartet auf deine Freigabe.' },
+    ],
+  },
+  {
+    kennung: 'freigabe',
+    name: 'Freigeben, was wartet',
+    dauer: '2 Minuten',
+    beschreibung: 'Die Prüfansicht für Einträge der KI.',
+    sammlung: 'mit_offenem',
+    kapitel: ['pflegen', 2],
+    schritte: [
+      { seite: '#/freigabe',
+        titel: 'Was hier liegt, wird nicht abgefragt',
+        text: 'Alles, was die KI oder ein Import eingetragen hat, wartet '
+            + 'hier, bis ein Mensch es angesehen hat. Geordnet nach '
+            + 'Lektionen.' },
+      // Eine Liste, keine Kartenreihe: die Lektionsübersicht der
+      // Freigabe benutzt .liste/.eintrag. Ich hatte .karte geraten,
+      // und der Schritt zeigte ins Leere.
+      { seite: '#/freigabe', ziel: '#inhalt .liste .eintrag',
+        titel: 'Eine Lektion aufschlagen',
+        text: 'Darin steht Wort für Wort, welche Formen warten — und '
+            + 'woher sie stammen.' },
+      { seite: '#/freigabe',
+        titel: 'Einzeln oder im Ganzen',
+        text: 'Je Wort gibt es »Alles in Ordnung«, »Später ansehen« und '
+            + '»Bearbeiten«. Unten gibst du die ganze Lektion frei. Sieh '
+            + 'vorher wirklich hin: die KI irrt besonders bei '
+            + 'unregelmäßigen Formen.' },
     ],
   },
   {
     kennung: 'planen',
-    braucht_sammlung: true,
     name: 'Planen: Ziele und Lehrwerk',
-    dauer: '3 Minuten',
-    beschreibung: 'Einen Block bis Freitag, und nichts aus Kapiteln, '
-                + 'die ihr noch nicht hattet.',
+    dauer: '2 Minuten',
+    beschreibung: 'Ein Block bis Freitag — und nichts aus Kapiteln, die '
+                + 'ihr noch nicht hattet.',
+    sammlung: 'beliebig',
+    kapitel: ['pflegen', 5],
     schritte: [
       { seite: '#/ziele',
         titel: 'Lernziele',
-        text: 'Ein Lernziel ist ein Ausschnitt mit einem Ziel davor: '
-            + '»Lektion 3 bis Freitag«. Trägst du einen Termin ein, '
-            + 'rechnet der Trainer aus, wie viel täglich nötig wäre.' },
+        text: 'Ein Ausschnitt mit einem Ziel davor: »Lektion 3 bis '
+            + 'Freitag«. Hier legst du eines an oder änderst es.' },
       { seite: '#/ziele',
-        // Mit Ziel der Knopf, ohne Ziel der Ausklapper zum Anlegen —
-        // auf der Seite steht sonst nichts, worauf man zeigen könnte.
         ziel: () => knopfMit('Was käme dran')()
                  || document.querySelector('details.karte'),
         titel: 'Was käme dran?',
-        text: 'Hast du ein Ziel, zeigt dieser Knopf den nächsten Block, '
-            + 'bevor du anfängst, und begründet ihn. Gefällt er dir '
-            + 'nicht, würfelst du neu — der Zuschnitt bleibt, nur die '
-            + 'Wörter wechseln. Noch kein Ziel? Dann legst du hier '
-            + 'eines an.' },
-      // Das FELD, nicht die ganze Karte: die ist höher als der
-      // Bildschirm, und ein Ziel, das nirgends hinpasst, drängt die
-      // Blase an den Rand — im Betrieb waren ihre Knöpfe nicht mehr
-      // zu sehen, und man kam aus dem Rundgang nicht heraus.
+        text: 'Zeigt den nächsten Block, bevor du anfängst. Gefällt er '
+            + 'dir nicht, würfelst du neu.' },
       { seite: '#/einstellungen/lehrgang',
         ziel: '#inhalt input[type=number]',
         titel: 'Wo stehst du im Lehrwerk?',
-        text: 'Hier trägst du ein, bei welcher Lektion du bist. '
-            + 'Darunter steht, ab welcher Lektion das Buch welche '
-            + 'Zeitform einführt — vorgeschlagen aus den '
-            + 'Lektionsnamen. Was später kommt, bleibt draußen, bis '
-            + 'du dort ankommst. Nichts geht dabei verloren.' },
+        text: 'Hier trägst du deine Lektion ein. Darunter steht, ab '
+            + 'welcher Lektion das Buch welche Zeitform einführt.' },
     ],
   },
   {
     kennung: 'texte',
-    braucht_sammlung: true,
     name: 'Texte lesen und übersetzen',
     dauer: '2 Minuten',
-    beschreibung: 'Einen Text einwerfen und sehen, ob du ihn schon '
-                + 'könntest.',
+    beschreibung: 'Einen Text einwerfen und sehen, ob du ihn könntest.',
+    sammlung: 'beliebig',
+    kapitel: ['lernen', 2],
     schritte: [
       { seite: '#/texte',
         titel: 'Deine Texte',
-        text: 'Hier kannst du einen Text einfügen oder hochladen — aus '
-            + 'dem Buch, aus der Zeitung, was du willst. Leerzeilen '
+        text: 'Aus dem Buch, aus der Zeitung, was du willst. Leerzeilen '
             + 'trennen die Absätze, in denen du übersetzt.' },
       { seite: '#/texte', ziel: 'details',
         titel: 'Text einwerfen',
-        text: 'Aufklappen, einfügen, speichern. Im Übungskurs liegt '
-            + 'schon einer bereit.' },
+        text: 'Aufklappen, einfügen oder eine Datei wählen, speichern.' },
       { seite: '#/texte',
-        titel: 'Was dich dort erwartet',
-        text: 'Über dem Text steht, ob du ihn schon übersetzen '
-            + 'könntest. Jedes Wort ist anklickbar und zeigt deinen '
-            + 'eigenen Eintrag. Rot unterlegte kennst du noch nicht — '
-            + 'die kannst du antippen und für dein Chatprogramm '
-            + 'merken, das trägt sie dir dann ein.' },
+        titel: 'Und dann?',
+        text: 'Über dem Text steht, ob du ihn schon übersetzen könntest. '
+            + 'Jedes Wort ist anklickbar, rot unterlegte kennst du noch '
+            + 'nicht — die kannst du für dein Chatprogramm merken.' },
     ],
   },
 ];
-
 
 // ------------------------------------------------------------ Gedächtnis
 
@@ -221,22 +259,42 @@ export async function starten(kennung) {
   // Satz statt auf das, wovon er spricht. Also hier eine wählen und
   // am Ende zurückgeben: ein Rundgang soll nichts hinterlassen.
   let vorher;
-  if (rundgang.braucht_sammlung && !zustand.sammlungId) {
+  if (rundgang.sammlung) {
     vorher = zustand.sammlungId ?? null;
-    try {
-      const alle = await api.sammlungen(zustand.benutzerId);
-      // Den Übungskurs bevorzugen: an ihm ist alles vorführbar, und
-      // er gehört niemandem im Ernst.
-      const wahl = alle.find((x) => x.name.includes('Übungskurs'))
-                || alle.find((x) => x.lerne_ich) || alle[0];
-      if (wahl) zustandMerken({ sammlungId: wahl.id, lektionId: null });
-    } catch { /* dann eben ohne — der Rundgang läuft trotzdem */ }
+    const wahl = await sammlungFinden(rundgang.sammlung);
+    if (wahl) zustandMerken({ sammlungId: wahl, lektionId: null });
   }
   laeuft = { rundgang, nr: 0, versuche: 0, teile: aufbauen(),
              sammlungZurueck: vorher };
   window.addEventListener('hashchange', neuAnsetzen);
   zeigen();
 }
+
+/** Eine Sammlung, an der sich der Rundgang vorführen lässt.
+ *
+ * »mit_offenem« für die Freigabe: eine Prüfansicht ohne Wartendes
+ * zeigt nur den Satz »es wartet nichts« — der Rundgang zeigte dann
+ * auf eine leere Seite statt auf das, wovon er spricht. Die Zahl der
+ * offenen Formen steht schon in der Sammlungsliste.
+ *
+ * Die gerade gewählte Sammlung wird BEHALTEN, wenn sie passt: wer
+ * schon in seinem Griechisch steht, soll den Rundgang dort sehen und
+ * nicht in einem Beispielkurs.
+ */
+async function sammlungFinden(bedarf) {
+  let alle = [];
+  try { alle = await api.sammlungen(zustand.benutzerId); }
+  catch { return null; }
+  const taugt = (x) => (bedarf === 'mit_offenem'
+    ? (x.offene_formen || 0) + (x.offene_uebungen || 0) > 0 : true);
+  const jetzige = alle.find((x) => x.id === zustand.sammlungId);
+  if (jetzige && taugt(jetzige)) return jetzige.id;
+  const wahl = alle.find((x) => taugt(x) && x.name.includes('Übungskurs'))
+            || alle.find((x) => taugt(x) && x.lerne_ich)
+            || alle.find(taugt);
+  return wahl ? wahl.id : (jetzige ? jetzige.id : (alle[0]?.id ?? null));
+}
+
 
 export function beenden() {
   if (!laeuft) return;
@@ -260,11 +318,22 @@ function aufbauen() {
                    'Weiter');
   const schluss = h('button', { class: 'schlicht', onclick: abbrechen },
                     'Beenden');
-  const blase = h('div', { class: 'fuehrung-blase' }, titel, text,
+  const weiterlesen = h('p', { class: 'leise fuehrung-mehr', hidden: true },
+    h('a', {
+      href: '#/lehrgang',
+      onclick: (e) => {
+        e.preventDefault();
+        const [spur, kapitel] = laeuft?.rundgang.kapitel || [];
+        abbrechen();
+        if (spur !== undefined) location.hash = `#/lehrgang/${spur}/${kapitel}`;
+      },
+    }, 'Warum das so ist, steht im Lehrgang →'));
+  const blase = h('div', { class: 'fuehrung-blase' }, titel, text, weiterlesen,
     h('div', { class: 'fuehrung-knoepfe' }, zaehler, zurueck, weiter, schluss));
   const huelle = h('div', { class: 'fuehrung' }, blase);
   document.body.append(huelle);
-  return { huelle, blase, titel, text, zaehler, zurueck, weiter };
+  return { huelle, blase, titel, text, zaehler, zurueck, weiter,
+           weiterlesen };
 }
 
 function abbrechen() {
@@ -312,6 +381,11 @@ function zeigen(nurAnsetzen = false) {
 
   teile.titel.textContent = schritt.titel;
   teile.text.textContent = schritt.text;
+  // Beim letzten Schritt der Verweis auf das Kapitel, das erklärt,
+  // WARUM das alles so ist. Ein Rundgang sagt nur, wo etwas liegt;
+  // alles Weitere gehört an einen Ort, den man wiederfindet.
+  teile.weiterlesen.hidden = !(rundgang.kapitel
+                               && nr === rundgang.schritte.length - 1);
   teile.zaehler.textContent = `${nr + 1} von ${rundgang.schritte.length}`;
   teile.zurueck.disabled = nr === 0;
   teile.weiter.textContent = nr === rundgang.schritte.length - 1

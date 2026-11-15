@@ -35,9 +35,38 @@ unter **Zero Trust → Access → Anwendungen**.
 
 Die **MCP-Schnittstelle** ist anders geschützt: sie wird von einem Programm
 gerufen, nicht von einem Menschen, und kann keine Anmeldeseite bedienen.
-Davor steht ein **Access-Diensttoken** (zwei feste Kopfzeilen), dazu im
-Trainer selbst noch ein eigenes Geheimnis. Zwei Schlösser, beide ohne
-Mensch bedienbar.
+
+Hier stand bis zum 15.11.2026, davor stehe zusätzlich ein
+**Access-Diensttoken** mit zwei festen Kopfzeilen — »zwei Schlösser«.
+**Das stimmt nicht mehr.** Nachgemessen an der öffentlichen Adresse:
+
+```
+POST https://mcp.<deine-domain>/mcp     ohne jede Kopfzeile
+→ 401 »Kein gültiges Zugangsmerkmal …«
+```
+
+Das ist die Antwort des Trainers, nicht die von Cloudflare — die Anfrage
+kommt also durch. Der Grund ist bekannt und nicht versehentlich: die
+Konnektoren von claude.ai und ChatGPT lassen keine beliebigen Kopfzeilen
+zu, und ohne die beiden Access-Kopfzeilen kommt kein Konnektor durch. Das
+Diensttoken musste weichen, damit die Anbindung überhaupt geht.
+
+**Es bleibt also ein Schloss, nicht zwei**, und das sollte dastehen statt
+einer beruhigenden Angabe, die niemand nachgeprüft hat. Dieses eine
+Schloss ist gut: 256 Bit aus `secrets.token_urlsafe(32)`, nur als
+Streuwert gespeichert, dazu eine Sperre nach acht Fehlversuchen in fünf
+Minuten für eine Viertelstunde. Erraten lässt sich das nicht. Aber wer
+das Merkmal hat, ist drin — es gibt nichts dahinter.
+
+Daraus folgt für den Umgang damit:
+
+* Das Merkmal gehört **nicht in eine Adresse** (auch nicht in einen
+  Pfad wie `/mcp/<merkmal>`): Adressen landen in Protokollen, bei
+  Cloudflare wie auf dem Server, und im Verlauf jedes Programms, das
+  sie einmal gesehen hat. In einer Kopfzeile tut es das nicht.
+* Wird ein Konnektor abgeschafft oder weitergegeben, gehört das
+  zugehörige Merkmal in den Einstellungen gelöscht. Dafür hat jedes
+  einen Namen.
 
 ## Wartung
 

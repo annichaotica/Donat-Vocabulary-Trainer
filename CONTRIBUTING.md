@@ -39,5 +39,10 @@ Netz gilt das nicht.
 - Tests dazu. `python -m pytest tests/ -q` muss durchlaufen.
 - Keine neuen Abhängigkeiten ohne vorherige Absprache. Das Frontend hat
   bewusst keinen Bauschritt und soll keinen bekommen.
+- Was man als Benutzerin merkt, gehört ins `CHANGELOG.md` — in
+  Alltagssprache und nicht als Liste von Commits. Bei einem behobenen
+  Fehler gehört dazu, woran man ihn gemerkt hat: das ist der Anker, an
+  dem man den Eintrag später wiederfindet. Rein inneres Aufräumen
+  braucht keinen Eintrag, die Commit-Nachricht genügt.
 
 Mit dem Einreichen stellst du deinen Beitrag unter dieselbe Lizenz.

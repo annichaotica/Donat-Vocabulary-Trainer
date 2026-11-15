@@ -52,6 +52,15 @@ export async function zeichnen(behaelter) {
         h('span', { class: 'leise', text: ` · ${r.dauer}` })),
       h('span', { class: 'leise', text: r.beschreibung })));
   }
+  rundgaenge.append(h('p', { class: 'leise', style: 'margin:.8rem 0 0' },
+    'Auf der Übersicht steht dafür eine Karte, bis du sie ausblendest. ',
+    h('button', {
+      class: 'schlicht',
+      onclick: () => {
+        fuehrung.wiederZeigen();
+        meldung('Die Karte erscheint wieder auf der Übersicht.');
+      },
+    }, 'Karte wieder einblenden')));
   el.append(rundgaenge);
 
   el.append(h('h2', { text: 'Lernen' }));

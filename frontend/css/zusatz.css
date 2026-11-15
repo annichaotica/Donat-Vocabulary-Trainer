@@ -582,7 +582,10 @@ input[type="file"] { max-width: 100%; }
 .fuehrung {
   position: fixed;
   inset: 0;
-  z-index: 55;
+  /* ÜBER dem hervorgehobenen Ziel. Hier stand 55 und beim Ziel 56 —
+     das Element lag damit über seiner eigenen Erklärung, und die
+     Werkzeugleiste der Abfrage war quer durch den Text zu lesen. */
+  z-index: 52;
   pointer-events: none;
 }
 .fuehrung-blase {
@@ -611,7 +614,9 @@ input[type="file"] { max-width: 100%; }
    ständig daneben. */
 .fuehrung-ziel {
   position: relative;
-  z-index: 56;
+  /* Über dem Seiteninhalt, aber unter der Blase (52) und unter der
+     Leiste am Telefon (40 im Hauptblatt). */
+  z-index: 39;
   outline: 3px solid var(--akzent);
   outline-offset: 3px;
   border-radius: var(--rund-klein);

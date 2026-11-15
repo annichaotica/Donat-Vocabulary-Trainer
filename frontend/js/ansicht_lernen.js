@@ -877,7 +877,20 @@ export class Sitzung {
         class: 'schlicht',
         title: 'Dieses Wort ansehen, ohne die Abfrage zu verlassen',
         onclick: () => this.wortZeigen(),
-      }, 'Wort ansehen'));
+      }, 'Wort ansehen'),
+      // »Ebenfalls ein Knopf, wenn man eine Abfragerunde beenden
+      // möchte, dass man zur Hauptseite gehen kann, damit man nicht im
+      // Menü suchen muss — das versteht nicht jeder.«
+      //
+      // Der Weg hinaus führte bisher über den Pfeil in der Kopfzeile
+      // oder über »Übersicht« im Menü. Beides ist ein Umweg über etwas,
+      // das nicht nach Ausgang aussieht. Nichts geht dabei verloren:
+      // jede Antwort ist längst gespeichert.
+      h('button', {
+        class: 'schlicht',
+        title: 'Abfrage beenden und zurück zur Übersicht',
+        onclick: () => { location.hash = '#/uebersicht'; },
+      }, 'Schluss für heute'));
     return reihe;
   }
 

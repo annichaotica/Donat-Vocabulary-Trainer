@@ -52,13 +52,13 @@ export const RUNDGAENGE = [
         text: '»Lernen« fragt nach dem Plan ab — der Trainer sucht aus, '
             + 'was dran ist. Daneben »Frei üben« ohne Plan und '
             + '»Fehler wiederholen« für das, was zuletzt schiefging.' },
-      { seite: '#/uebersicht', ziel: '.karte-reihe .karte',
+      { seite: '#/uebersicht', ziel: '.sammlungen > .karte',
         titel: 'Eine Sammlungskarte',
         text: 'Jede Sammlung hat ihre eigenen Knöpfe: Lernen, '
             + 'Wortschatz ansehen, Sätze üben, Texte lesen, Vokabeln '
             + 'einlesen, gezielt üben. Alles, was zu dieser Sprache '
             + 'gehört, hängt an dieser Karte.' },
-      { seite: '#/uebersicht', ziel: '.karte input[type=checkbox]',
+      { seite: '#/uebersicht', ziel: '.sammlungen input[type=checkbox]',
         titel: 'Lerne ich das mit?',
         text: 'Eigene Sammlungen sind angehakt. Was dir jemand nur zum '
             + 'Mitpflegen freigegeben hat, ist es nicht — sonst lägen '
@@ -118,12 +118,18 @@ export const RUNDGAENGE = [
             + 'nicht, würfelst du neu — der Zuschnitt bleibt, nur die '
             + 'Wörter wechseln. Noch kein Ziel? Dann legst du hier '
             + 'eines an.' },
-      { seite: '#/einstellungen/lehrgang', ziel: '.karte',
+      // Das FELD, nicht die ganze Karte: die ist höher als der
+      // Bildschirm, und ein Ziel, das nirgends hinpasst, drängt die
+      // Blase an den Rand — im Betrieb waren ihre Knöpfe nicht mehr
+      // zu sehen, und man kam aus dem Rundgang nicht heraus.
+      { seite: '#/einstellungen/lehrgang',
+        ziel: '#inhalt input[type=number]',
         titel: 'Wo stehst du im Lehrwerk?',
-        text: 'Hier sagst du, ab welcher Lektion eine Zeitform im Buch '
-            + 'vorkommt, und bei welcher Lektion du bist. Was später '
-            + 'kommt, bleibt draußen, bis du dort ankommst. Nichts '
-            + 'geht dabei verloren.' },
+        text: 'Hier trägst du ein, bei welcher Lektion du bist. '
+            + 'Darunter steht, ab welcher Lektion das Buch welche '
+            + 'Zeitform einführt — vorgeschlagen aus den '
+            + 'Lektionsnamen. Was später kommt, bleibt draußen, bis '
+            + 'du dort ankommst. Nichts geht dabei verloren.' },
     ],
   },
   {
@@ -173,6 +179,24 @@ export function schonGesehen(kennung) {
   return gesehen().includes(kennung);
 }
 
+/** »Die Tutorials soll man natürlich auch ausblenden können.«
+ *
+ * Kein eigener Schalter, sondern dieselbe Merkliste: alle als gesehen
+ * eintragen. Dadurch gibt es nur EINEN Zustand und keine zweite
+ * Einstellung, die dem ersten widersprechen könnte — und über die
+ * Anleitung bleiben sie erreichbar.
+ */
+export function alleAusblenden() {
+  for (const r of RUNDGAENGE) merken(r.kennung);
+}
+
+
+/** Die Merkliste leeren — für »von vorn«. */
+export function wiederZeigen() {
+  try { localStorage.removeItem(GESEHEN); } catch { /* egal */ }
+}
+
+
 export function alleGesehen() {
   return RUNDGAENGE.every((r) => schonGesehen(r.kennung));
 }
@@ -216,8 +240,19 @@ function aufbauen() {
 }
 
 function abbrechen() {
-  if (laeuft) merken(laeuft.rundgang.kennung);
+  if (!laeuft) return;
+  merken(laeuft.rundgang.kennung);
+  // Ein Rundgang endet oft in einer Ecke der Anwendung — in den
+  // Einstellungen, in einer laufenden Abfrage. Wer dort stehen
+  // bleibt, muss sich erst wieder zurechtfinden. Also immer zurück an
+  // den Anfang, von dem aus alles erreichbar ist.
+  //
+  // Hier stand erst ein Vergleich mit der Startseite des Rundgangs —
+  // der war verdreht: endete man dort, wo man angefangen hatte, blieb
+  // man stehen. Es gibt nichts zu vergleichen, das Ziel ist immer
+  // dasselbe.
   beenden();
+  location.hash = '#/uebersicht';
 }
 
 function springen(richtung) {
@@ -271,6 +306,11 @@ function zeigen(nurAnsetzen = false) {
     laeuft.hervorgehoben = ziel;
     ziel.scrollIntoView({ block: 'center', behavior: 'smooth' });
     setzen(teile.blase, ziel);
+    // Nachmessen statt rechnen: die Höhe steht erst fest, wenn der
+    // Text drin ist. Was draußen liegt, wird hereingezogen — eine
+    // Blase, deren Knöpfe außerhalb des Bildschirms liegen, sperrt
+    // den Rundgang zu.
+    hereinziehen(teile.blase);
   } else {
     // Kein Ziel oder nicht gefunden: die Blase in die Mitte. Der Text
     // steht trotzdem, und der Rundgang läuft weiter.
@@ -301,6 +341,21 @@ export function knopfMit(...texte) {
 }
 
 
+/** Zieht die Blase vollständig in den Bildschirm. */
+function hereinziehen(blase) {
+  const luft = 8;
+  const r = blase.getBoundingClientRect();
+  let { top, left } = r;
+  top = Math.max(luft, Math.min(top, window.innerHeight - r.height - luft));
+  left = Math.max(luft, Math.min(left, window.innerWidth - r.width - luft));
+  if (Math.round(top) !== Math.round(r.top)
+      || Math.round(left) !== Math.round(r.left)) {
+    blase.style.top = `${top}px`;
+    blase.style.left = `${left}px`;
+  }
+}
+
+
 function hervorhebungWeg() {
   if (laeuft?.hervorgehoben) {
     laeuft.hervorgehoben.classList.remove('fuehrung-ziel');
@@ -308,13 +363,42 @@ function hervorhebungWeg() {
   }
 }
 
-/** Die Blase unter das Ziel, oder darüber, wenn unten kein Platz ist. */
+/** Die Blase neben das Ziel — und niemals darüber.
+ *
+ * Erst unter das Ziel, dann darüber, und wenn beides nicht reicht,
+ * daneben. Vorher wurde bei zu wenig Platz oben einfach `top - 190`
+ * gesetzt: die Blase lag dann MITTEN auf dem Element, das sie
+ * erklärt. Genau so war es bei einer hohen Lernzielkarte zu sehen.
+ */
 function setzen(blase, ziel) {
   blase.classList.remove('fuehrung-mitte');
+  blase.style.cssText = '';
   const r = ziel.getBoundingClientRect();
-  const hoehe = 190;
-  const unten = window.innerHeight - r.bottom > hoehe;
-  blase.style.cssText =
-    `top:${unten ? r.bottom + 12 : Math.max(12, r.top - hoehe)}px;`
-    + `left:${Math.max(12, Math.min(r.left, window.innerWidth - 380))}px;`;
+  const hoehe = blase.offsetHeight || 190;
+  const breite = blase.offsetWidth || 352;
+  const luft = 12;
+
+  let oben;
+  if (window.innerHeight - r.bottom > hoehe + luft) {
+    oben = r.bottom + luft;                       // darunter
+  } else if (r.top > hoehe + luft) {
+    oben = r.top - hoehe - luft;                  // darüber
+  } else {
+    oben = null;                                  // daneben
+  }
+
+  if (oben === null) {
+    // Weder darüber noch darunter Platz — das Ziel ist größer als der
+    // Bildschirm. Dann unten festhalten statt danebenquetschen: so
+    // bleibt die Blase ganz sichtbar, und vor allem bleiben ihre
+    // Knöpfe erreichbar. Ohne das stand sie halb außerhalb, und der
+    // Rundgang ließ sich weder fortsetzen noch beenden.
+    blase.style.cssText =
+      `top:${window.innerHeight - hoehe - luft}px;`
+      + `left:${Math.round((window.innerWidth - breite) / 2)}px;`;
+    return;
+  }
+  const links = Math.max(luft,
+    Math.min(r.left, window.innerWidth - breite - luft));
+  blase.style.cssText = `top:${oben}px;left:${links}px;`;
 }

@@ -132,6 +132,16 @@ function willkommen(behaelter, sammlungen) {
     }, fuehrung.schonGesehen(r.kennung) ? `${r.name} ✓` : r.name));
   }
   karte.append(reihe);
+  karte.append(h('p', { style: 'margin:.7rem 0 0' },
+    h('button', {
+      class: 'schlicht',
+      onclick: () => {
+        fuehrung.alleAusblenden();
+        meldung('Ausgeblendet. Unter Anleitung findest du die Rundgänge '
+              + 'jederzeit wieder.', 4000);
+        zeichnen(behaelter);
+      },
+    }, 'Diese Karte ausblenden')));
   return karte;
 }
 
@@ -354,7 +364,10 @@ export async function zeichnen(behaelter) {
   if (!sammlungen.length) {
     el.append(h('p', { class: 'leise', text: 'Noch keine Sammlung. Unten anlegen.' }));
   }
-  const reihe = h('div', { class: 'karte-reihe' });
+  // Die Reihe trägt einen eigenen Namen: `.karte-reihe` steht auf dieser
+  // Seite dreimal — Profile, Lernziele, Sammlungen. Der Rundgang griff
+  // damit die Lernzielkarte und erklärte dazu die Sammlungsknöpfe.
+  const reihe = h('div', { class: 'karte-reihe sammlungen' });
   // Alle Zählungen auf einmal statt ein Rundlauf je Sammlung — das ist der
   // Startbildschirm, der soll nicht nach Sammlungszahl langsamer werden.
   const staende = await Promise.all(

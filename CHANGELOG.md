@@ -16,6 +16,22 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Rundgänge: ausblendbar, und mit einem Weg zurück
+
+Drei Dinge aus dem ersten Durchlauf:
+
+Die Karte auf der Übersicht lässt sich **ausblenden** — ein Knopf
+darunter. Über die Anleitung holt man sie zurück.
+
+Ein Rundgang **endet auf der Übersicht**, nicht dort, wo er gerade
+war. Er führt ja in die Einstellungen oder in eine laufende Abfrage,
+und von dort muss man sich sonst erst wieder zurechtfinden.
+
+Und in der laufenden Abfrage steht jetzt **»Schluss für heute«**. Der
+Weg hinaus führte bisher über den Pfeil in der Kopfzeile oder über das
+Menü — beides sieht nicht nach Ausgang aus. Es geht dabei nichts
+verloren: jede Antwort ist längst gespeichert.
+
 ### Geführte Rundgänge und ein englischer Übungskurs
 
 Beim ersten Öffnen steht oben eine Karte mit vier kurzen Rundgängen —

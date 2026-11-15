@@ -245,7 +245,8 @@ export async function zeichnen(behaelter) {
     + 'eintragen — ganze Lektionen mit allen Formen. Das spart das '
     + 'Abtippen. Alles, was dabei entsteht, läuft ',
     h('b', { text: 'in deinem Namen' }), ' und bleibt ungeprüft, bis du '
-    + 'es freigibst.'));
+    + 'es freigibst — es sei denn, du bittest ausdrücklich um das '
+    + 'Gegenteil.'));
 
   if (!adresse) {
     el.append(h('div', { class: 'befund hinweis' },
@@ -326,11 +327,17 @@ export async function zeichnen(behaelter) {
     h('p', {}, 'Es kann eintragen, berichtigen und löschen — Löschen aber '
       + 'nur, wenn es das Wort richtig benennt, und es sagt dir dabei, wie '
       + 'viel Lernstand dabei verlorengeht.'),
-    h('p', {}, h('b', { text: 'Freigeben kann es nicht. ' }),
-      'Alles, was es einträgt, bleibt ungeprüft und wird nicht abgefragt, '
-      + 'bis ein Mensch es angesehen hat. Das ist Absicht: ein Programm, '
-      + 'das seine eigenen Einträge freigibt, hätte die Prüfung '
-      + 'abgeschafft, nicht erledigt.'),
+    h('p', {}, h('b', { text: 'Freigeben soll es nicht — es kann aber. ' }),
+      'Normalerweise bleibt alles, was es einträgt, ungeprüft und wird '
+      + 'nicht abgefragt, bis du es angesehen hast. Bittest du es '
+      + 'ausdrücklich darum, darf es seine Einträge aber gleich '
+      + 'freigeben.'),
+    h('p', { class: 'leise' },
+      'Diese Abkürzung ist bequem und sie hat einen Preis: dann prüft '
+      + 'niemand mehr nach, und eine erfundene Form wird unbemerkt '
+      + 'gepaukt. Wer sie nutzt, sollte hinterher über die Freigabe '
+      + 'sehen, was entstanden ist. Für fremde Sprachen, die du selbst '
+      + 'nicht beurteilen kannst, lieber gar nicht.'),
     h('p', {}, h('b', { text: 'Es sieht auch, was dir fehlt. ' }),
       'Die Wörter, die du beim Lesen angefordert hast, kann es abrufen — '
       + 'mit dem Satz, in dem sie standen, damit es die richtige Bedeutung '

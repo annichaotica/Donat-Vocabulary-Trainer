@@ -16,6 +16,20 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Berichtigt: die KI kann ihre Einträge doch freigeben
+
+In der Anleitung stand »Freigeben kann es nicht. Alles, was es
+einträgt, bleibt ungeprüft, bis ein Mensch es angesehen hat.« Das
+stimmte nicht. Über `als_geprueft` kann ein Chatprogramm seine eigenen
+Einträge sofort abfragbar machen, und bei Übungssätzen ging es
+undokumentiert über ein Feld im Eintrag.
+
+Die Abkürzung bleibt — sie ist bequem, wenn man den Eintrag ohnehin
+beurteilen kann. Aber die Texte sagen das jetzt: normalerweise
+ungeprüft, auf ausdrückliche Bitte gleich freigegeben, und mit dem
+Hinweis, was das kostet. Bei Sprachen, die man selbst nicht beurteilen
+kann, lieber nicht.
+
 ### Neu: Dein Fortschritt
 
 Auf der Übersicht neben »Fehler wiederholen« ein Knopf **Fortschritt**.

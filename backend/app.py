@@ -937,6 +937,11 @@ def freigabe_setzen(sammlung_id: int, eingabe: FreigabeEingabe,
     Bewusst nur über die Oberfläche: es gibt dafür kein MCP-Werkzeug. Ein
     Agent, der seine eigenen Einträge im Stapel freigibt, hätte die
     Prüfung abgeschafft, nicht erledigt.
+
+    Das gilt für den STAPEL. Einzeln kann ein Agent sehr wohl gleich
+    freigeben — `als_geprueft` an vokabel_anlegen und formen_ergaenzen.
+    Das ist so entschieden; hier steht es, damit niemand aus diesem
+    Docstring schließt, die Prüfung sei erzwungen.
     """
     _wache_rumpf(db, request, sammlung_id=sammlung_id)
     _holen(db, "sammlung", sammlung_id)

@@ -522,12 +522,19 @@ def formen_ergaenzen(db: sqlite3.Connection, person: dict, lexem_id: int,
             "pruefung": _bericht_kurz(_fehler_wandeln(a.lexem_pruefen, lexem_id, db))}
 
 
-# Ein Werkzeug zum Freigeben gibt es hier absichtlich NICHT. Es hieß
-# formen_bestaetigen und nahm eine Liste von Kennungen; die Beschreibung bat
-# darum, die eigenen Einträge nicht selbst freizugeben. Eine Bitte ist keine
-# Sperre. Die Freigabe gehört dem Menschen und findet in der Oberfläche
-# statt (Prüfansicht je Lektion) — ein Agent, der seine eigenen Einträge im
-# Stapel freigibt, hätte die Prüfung abgeschafft, nicht erledigt.
+# Ein Werkzeug zum STAPELWEISEN Freigeben gibt es hier absichtlich nicht.
+# Es hieß formen_bestaetigen und nahm eine Liste von Kennungen; die
+# Beschreibung bat darum, die eigenen Einträge nicht selbst freizugeben.
+# Eine Bitte ist keine Sperre, und ein Agent, der im Stapel freigibt,
+# hätte die Prüfung abgeschafft, nicht erledigt.
+#
+# EHRLICHERWEISE ist damit nicht alles zu: `als_geprueft` an
+# vokabel_anlegen und formen_ergaenzen und ein `geprueft` im Eintrag von
+# uebung_anlegen lassen dasselbe im Kleinen zu. Das ist so entschieden
+# worden — die Abkürzung ist bequem, wenn man den Eintrag ohnehin
+# beurteilen kann —, aber es ist eine Entscheidung und keine Sperre, und
+# der Kommentar hat jahrelang das Gegenteil behauptet. Wer das ändern
+# will: den Parameter streichen, dann stimmt die alte Zusage wieder.
 
 
 def eintrag_pruefen(db: sqlite3.Connection, person: dict, lexem_id: int):
@@ -997,7 +1004,11 @@ WERKZEUGE: list[dict] = [
             "ist.\n\n"
             "**Fremde Texte werden verlinkt, nicht abgeschrieben.** Für einen "
             "Zeitungsartikel quelle = {\"art\": \"verweis\", \"titel\": …, "
-            "\"url\": …} und eine eigene Fassung als Übung.",
+            "\"url\": …} und eine eigene Fassung als Übung.\n\n"
+            "Ein Eintrag darf `geprueft: true` tragen und ist dann sofort "
+            "abfragbar, ohne dass ein Mensch ihn angesehen hat. Das war "
+            "bisher undokumentiert und ist damit die unangenehmste Art "
+            "einer Hintertür: nur auf ausdrücklichen Wunsch setzen.",
         "inputSchema": {"type": "object", "properties": {
             "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
             "typ": _s("string", "satz | text | dialog | brief | zeitungsstil",

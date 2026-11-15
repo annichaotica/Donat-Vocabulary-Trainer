@@ -511,6 +511,18 @@ class ImportEingabe(BaseModel):
     doppelte: Literal["ueberspringen", "ergaenzen", "trotzdem"] = "ueberspringen"
 
 
+class OAuthClientAnlegen(BaseModel):
+    """Ein Konnektor, der sich über OAuth anmeldet.
+
+    Die Rückadresse kommt aus dem Dialog des Konnektors (bei ChatGPT
+    »Callback-URL«) und wird zeichengenau übernommen — verglichen wird
+    später ohne jede Nachsicht.
+    """
+
+    name: str
+    rueckadresse: str
+
+
 class McpTokenAnlegen(BaseModel):
     """Ein Zugangsmerkmal für die MCP-Schnittstelle, gebunden an ein Profil.
 

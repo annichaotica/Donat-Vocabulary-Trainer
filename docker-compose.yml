@@ -38,3 +38,9 @@ services:
       # zum Abschreiben zeigen statt eines Platzhalters. Gehört in die
       # .env und nicht hierher: die Adresse ist privat.
       - VOKABEL_MCP_URL=${VOKABEL_MCP_URL:-}
+      # Die Adresse der Oberfläche von außen — die, hinter der Cloudflare
+      # Access steht. Nur für OAuth gebraucht: der Schritt, in dem ein
+      # Mensch einwilligt, muss hinter einer Anmeldung liegen. Ist sie
+      # nicht gesetzt, bietet der Trainer gar kein OAuth an, statt einen
+      # ungeschützten Endpunkt zu nennen.
+      - VOKABEL_WEB_URL=${VOKABEL_WEB_URL:-}

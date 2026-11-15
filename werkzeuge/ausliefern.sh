@@ -54,7 +54,7 @@ ssh "$ZIEL" "cd $ORT && docker compose up -d --build 2>&1 | tail -2"
 echo "→ Nachsehen, ob er steht und die Anlage noch kennt"
 ssh "$ZIEL" "sleep 3
   curl -s -o /dev/null -w 'Zustand: HTTP %{http_code}\n' http://127.0.0.1:8030/api/zustand
-  for v in VOKABEL_ACCESS_TEAM VOKABEL_MCP_URL; do
+  for v in VOKABEL_ACCESS_TEAM VOKABEL_MCP_URL VOKABEL_WEB_URL; do
     wert=\$(docker exec vokabeltrainer printenv \$v || true)
     [ -n \"\$wert\" ] && echo \"\$v: gesetzt\" || echo \"\$v: LEER — Anlage prüfen!\"
   done"

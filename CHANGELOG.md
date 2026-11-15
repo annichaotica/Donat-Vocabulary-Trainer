@@ -16,6 +16,45 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### OAuth — damit auch ChatGPT angebunden werden kann
+
+Der Dialog »Benutzerdefinierten MCP-Server hinzufügen« in ChatGPT
+kennt unter Authentifizierung nur **OAuth**, **keine
+Authentifizierung** oder beides. Kein Feld für einen Schlüssel, und
+auch keines für eine eigene Kopfzeile. Damit ging der Weg, den
+claude.ai nimmt, dort nicht.
+
+Die Alternative wäre gewesen, das Zugangsmerkmal in die Adresse zu
+schreiben. Adressen landen in Protokollen — bei Cloudflare, auf dem
+Server, im Verlauf. Also OAuth.
+
+**Die Anmeldung des Menschen baut der Trainer dabei nicht selbst.** Das
+ist der Kniff, der es klein hält: der Einwilligungsschritt liegt auf
+der Adresse, hinter der Cloudflare Access steht. Access fragt
+Mailadresse und Einmalcode, wie im Browser auch, und sagt dem Trainer,
+wer gekommen ist. Keine Passwörter, keine Sitzungen. Und was am Ende
+herauskommt, ist ein ganz gewöhnliches Zugangsmerkmal — die Prüfung an
+der Schnittstelle blieb unverändert.
+
+Eingerichtet wird es in den Einstellungen unter **Zugang für ChatGPT
+(OAuth)**: Name und Callback-URL aus dem ChatGPT-Dialog eintragen,
+Client-ID und Schlüssel zurückbekommen, beides dort einsetzen. Für
+Claude braucht man das nicht — dort bleibt der einfachere Weg.
+
+Absichtlich eng: PKCE ist Pflicht und nur S256, die Rückadresse muss
+zeichengenau stimmen, der Code gilt zwei Minuten und einmal. Wird er
+ein zweites Mal vorgelegt, hat ihn jemand mitgelesen — dann werden die
+damit ausgegebenen Zugänge zurückgenommen. Sechzehn Tests, die
+meisten davon für Dinge, die **nicht** gehen dürfen.
+
+Dabei kam noch etwas heraus, das nirgends aufgeschrieben war: der
+Tunnel lässt auf dem Namen der Schnittstelle nur den Pfad `/mcp`
+durch, alles andere beantwortet Cloudflare selbst mit einem leeren
+404. Die OAuth-Endpunkte hängen deshalb zusätzlich unter `/mcp` und
+sind damit ohne jede Änderung bei Cloudflare erreichbar. Notiert in
+`deploy/cloudflared/LIESMICH.md`, samt der Messung.
+
+
 ### Fehler von mir: die `.env` auf dem Server gelöscht
 
 Beim Ausliefern habe ich `rsync --delete` von Hand benutzt und dabei

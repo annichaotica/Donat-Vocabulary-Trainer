@@ -22,7 +22,8 @@ from contextlib import asynccontextmanager
 from typing import Iterator
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               RedirectResponse, Response)
 from fastapi.staticfiles import StaticFiles
 
 import aufgaben
@@ -39,6 +40,7 @@ import lernziele
 import identitaet
 import mcp_dienst
 import merkmale as mk
+import oauth
 import qualitaet
 import regeln as regelmodul
 import sammelimport
@@ -58,7 +60,7 @@ from modelle import (RegelEingabe, RegelAendern,
                      LesetextAnlegen, WortMerken,
                      LernzielAendern, LernzielAnlegen,
                      SammelimportEingabe,
-                     McpTokenAnlegen,
+                     McpTokenAnlegen, OAuthClientAnlegen,
                      FormAendern, FreigabeEingabe,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
@@ -2252,6 +2254,13 @@ MCP_KOPFZEILEN = ("authorization", "x-vokabel-token", "x-account-key")
 # aus der Umgebung, weil sie zur Anlage gehört und nicht in den Quelltext.
 MCP_URL = os.environ.get("VOKABEL_MCP_URL", "").strip()
 
+# Die Adresse der Oberfläche von außen — die mit Cloudflare Access davor.
+# Sie wird für OAuth gebraucht und NUR dafür: der Schritt, in dem ein
+# Mensch einwilligt, muss hinter der Anmeldung liegen. Ohne sie bietet
+# der Trainer kein OAuth an, statt einen Endpunkt zu nennen, der
+# ungeschützt wäre.
+WEB_URL = os.environ.get("VOKABEL_WEB_URL", "").strip().rstrip("/")
+
 
 def _mcp_geheimnis(request: Request) -> str:
     kopf = request.headers.get("authorization", "")
@@ -2384,6 +2393,273 @@ def wer_bin_ich(request: Request, db: sqlite3.Connection = DB):
     bisher aus der Liste.
     """
     return identitaet.wer_bin_ich(db, request.headers)
+
+
+# ================================================================ OAuth
+#
+# Nur für Konnektoren ohne eigene Kopfzeile — siehe oauth.py. Die
+# Anmeldung des Menschen macht Cloudflare Access; hier wird sie nur
+# verlangt.
+
+async def _formular(request: Request) -> dict[str, str]:
+    """Den Rumpf lesen, ohne `request.form()`.
+
+    Starlette verlangt dafür `python-multipart`, und dieses Projekt
+    nimmt keine neue Abhängigkeit auf. Gebraucht wird ohnehin nur
+    `application/x-www-form-urlencoded` — das schreibt der
+    OAuth-Standard für den Tokenendpunkt vor, und ein HTML-Formular
+    schickt es von sich aus. JSON wird mitgenommen, weil manche
+    Konnektoren es trotzdem senden.
+    """
+    from urllib.parse import parse_qsl
+    rumpf = (await request.body()).decode("utf-8", "replace")
+    art = request.headers.get("content-type", "")
+    if art.startswith("application/json"):
+        try:
+            daten = dbm.j_lesen(rumpf) or {}
+            return {k: str(v) for k, v in daten.items() if v is not None}
+        except Exception:
+            return {}
+    return dict(parse_qsl(rumpf, keep_blank_values=True))
+
+
+def _oauth_bereit() -> None:
+    if not (WEB_URL and MCP_URL):
+        raise HTTPException(
+            503, "OAuth ist nicht eingerichtet. Dafür müssen "
+                 "VOKABEL_WEB_URL und VOKABEL_MCP_URL gesetzt sein.")
+
+
+def _mcp_wurzel() -> str:
+    """Der Ursprung der MCP-Adresse, ohne Pfad."""
+    ohne = MCP_URL.split("//", 1)
+    if len(ohne) != 2:
+        return MCP_URL.rstrip("/")
+    schema, rest = ohne
+    return f"{schema}//{rest.split('/', 1)[0]}"
+
+
+# Beide Endpunkte hängen zusätzlich unter /mcp. Der Grund steht nicht im
+# Standard, sondern im Tunnel: auf dem Namen der Schnittstelle ist nur
+# der Pfad /mcp freigegeben, alles daneben beantwortet Cloudflare selbst
+# mit einem leeren 404 — die Anwendung sieht es nie. Gemessen:
+#
+#   /mcp/irgendwas   404 {"detail":"Not Found"}   ← die Anwendung
+#   /.well-known/…   404 (leerer Rumpf)           ← Cloudflare
+#
+# Die vorgeschriebene Stelle bleibt bestehen, damit es richtig wird,
+# sobald der Pfad bei Cloudflare freigegeben ist. Angekündigt wird aber
+# die Adresse, die HEUTE durchkommt.
+@app.get("/.well-known/oauth-authorization-server")
+@app.get("/mcp/.well-known/oauth-authorization-server")
+def oauth_kennblatt():
+    """Was ein Konnektor über diesen Autorisierungsdienst wissen muss.
+
+    Die beiden Endpunkte liegen mit Absicht auf VERSCHIEDENEN Namen:
+    der Autorisierungsschritt dort, wo Access davorsteht und einen
+    Menschen anmeldet, der Tokentausch dort, wo kein Mensch mehr
+    beteiligt ist und ein Anmeldefenster nur im Weg wäre.
+    """
+    _oauth_bereit()
+    return {
+        "issuer": _mcp_wurzel(),
+        "authorization_endpoint": f"{WEB_URL}/oauth/authorize",
+        # Unter /mcp, weil nur dieser Pfad durch den Tunnel kommt.
+        "token_endpoint": f"{_mcp_wurzel()}/mcp/oauth/token",
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code"],
+        "code_challenge_methods_supported": ["S256"],
+        "token_endpoint_auth_methods_supported": ["none", "client_secret_post"],
+        "scopes_supported": ["vokabeln"],
+    }
+
+
+@app.get("/.well-known/oauth-protected-resource")
+@app.get("/mcp/.well-known/oauth-protected-resource")
+def oauth_ressource():
+    _oauth_bereit()
+    return {"resource": MCP_URL,
+            "authorization_servers": [_mcp_wurzel()],
+            "scopes_supported": ["vokabeln"]}
+
+
+def _einwilligungsseite(vorgang: dict, handgriff: str, person: dict,
+                        client: dict) -> HTMLResponse:
+    from html import escape as _e
+    return HTMLResponse(f"""<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zugriff erlauben?</title>
+<style>
+  body {{ font: 16px/1.6 system-ui, sans-serif; margin: 0; padding: 2rem 1rem;
+         background: #f7f6f3; color: #222; display: flex;
+         justify-content: center; }}
+  main {{ max-width: 32rem; background: #fff; border-radius: .6rem;
+          padding: 1.5rem 1.8rem; box-shadow: 0 1px 4px rgba(0,0,0,.12); }}
+  h1 {{ font-size: 1.3rem; margin: 0 0 1rem; }}
+  dl {{ display: grid; grid-template-columns: auto 1fr; gap: .3rem .9rem;
+        margin: 1rem 0; }}
+  dt {{ color: #667; }}
+  dd {{ margin: 0; font-weight: 600; }}
+  .knoepfe {{ display: flex; gap: .6rem; margin-top: 1.4rem; }}
+  button {{ font: inherit; padding: .5rem 1.1rem; border-radius: .4rem;
+            border: 1px solid #ccc; background: #fff; cursor: pointer; }}
+  button.ja {{ background: #1d4ed8; border-color: #1d4ed8; color: #fff; }}
+  .leise {{ color: #667; font-size: .92rem; }}
+</style></head><body><main>
+<h1>Zugriff auf deine Vokabeln erlauben?</h1>
+<p><b>{_e(client["name"])}</b> möchte in deinem Namen auf den
+   Vokabeltrainer zugreifen: Wörter lesen, anlegen und ändern.</p>
+<dl>
+  <dt>Dein Profil</dt><dd>{_e(person["name"])}</dd>
+  <dt>Angemeldet als</dt><dd>{_e(vorgang["mail"])}</dd>
+  <dt>Zurück an</dt><dd class="leise">{_e(vorgang["rueckadresse"])}</dd>
+</dl>
+<p class="leise">Erlaubst du es, bekommt {_e(client["name"])} ein eigenes
+   Zugangsmerkmal. Du kannst es jederzeit in den Einstellungen unter
+   deinen Zugängen wieder zurücknehmen — dann ist die Verbindung sofort
+   tot.</p>
+<form method="post" action="/oauth/authorize" class="knoepfe">
+  <input type="hidden" name="vorgang" value="{_e(handgriff)}">
+  <button class="ja" name="antwort" value="ja">Erlauben</button>
+  <button name="antwort" value="nein">Abbrechen</button>
+</form>
+</main></body></html>""")
+
+
+def _zurueck(rueckadresse: str, **felder) -> RedirectResponse:
+    from urllib.parse import urlencode
+    teile = {k: v for k, v in felder.items() if v is not None}
+    trenner = "&" if "?" in rueckadresse else "?"
+    return RedirectResponse(f"{rueckadresse}{trenner}{urlencode(teile)}",
+                            status_code=303)
+
+
+@app.get("/oauth/authorize")
+def oauth_autorisieren(request: Request,
+                       client_id: str = "",
+                       redirect_uri: str = "",
+                       response_type: str = "code",
+                       code_challenge: str = "",
+                       code_challenge_method: str = "",
+                       state: str | None = None,
+                       scope: str | None = None,
+                       db: sqlite3.Connection = DB):
+    """Die Einwilligungsseite.
+
+    HIER liegt die eigentliche Absicherung, und sie ist eine einzige
+    Bedingung: ohne eine von Cloudflare Access geprüfte Mailadresse
+    passiert nichts. Dieser Endpunkt gehört deshalb auf den Namen, hinter
+    dem Access steht. Wird er anders erreicht — im Heimnetz oder über
+    den Namen ohne Access —, gibt es keine Einwilligung, sondern eine
+    Erklärung.
+    """
+    _oauth_bereit()
+    if response_type != "code":
+        raise HTTPException(400, "Nur response_type=code wird unterstützt.")
+
+    mail = identitaet.mail_aus_anfrage(request.headers)
+    if not mail:
+        raise HTTPException(
+            403, "Diese Seite muss über die von außen erreichbare Adresse "
+                 "aufgerufen werden, bei der die Anmeldung davorsteht. Nur "
+                 "dort steht fest, wer einwilligt.")
+    person = identitaet.profil_fuer_mail(db, mail, anlegen=False)
+    if person is None:
+        raise HTTPException(
+            403, f"Zu {mail} gibt es kein Profil im Trainer. Erst anlegen "
+                 f"und die Adresse dort hinterlegen.")
+    try:
+        handgriff = oauth.vorgang_anlegen(
+            db, client_id, person["id"], mail, redirect_uri,
+            code_challenge, code_challenge_method, state)
+        vorgang = oauth.vorgang_lesen(db, handgriff, mail)
+    except oauth.OAuthFehler as fehler:
+        # Fehler VOR der Prüfung der Rückadresse werden angezeigt und
+        # nicht weitergeleitet: an eine unbestätigte Adresse darf nichts
+        # geschickt werden, auch keine Fehlermeldung.
+        raise HTTPException(400, f"{fehler.code}: {fehler.beschreibung}")
+    return _einwilligungsseite(vorgang, handgriff,
+                               oauth.client_lesen(db, client_id) or {},
+                               person)
+
+
+@app.post("/oauth/authorize")
+async def oauth_einwilligen(request: Request, db: sqlite3.Connection = DB):
+    _oauth_bereit()
+    mail = identitaet.mail_aus_anfrage(request.headers)
+    if not mail:
+        raise HTTPException(403, "Keine geprüfte Anmeldung.")
+    formular = await _formular(request)
+    handgriff = formular.get("vorgang", "")
+    try:
+        if formular.get("antwort") == "ja":
+            e = oauth.einwilligen(db, handgriff, mail)
+            db.commit()
+            return _zurueck(e["rueckadresse"], code=e["code"],
+                            state=e["zustand"])
+        e = oauth.abbrechen(db, handgriff, mail)
+        db.commit()
+        return _zurueck(e["rueckadresse"], error="access_denied",
+                        state=e["zustand"])
+    except oauth.OAuthFehler as fehler:
+        raise HTTPException(400, f"{fehler.code}: {fehler.beschreibung}")
+
+
+@app.post("/oauth/token")
+@app.post("/mcp/oauth/token")
+async def oauth_token(request: Request, db: sqlite3.Connection = DB):
+    """Code gegen Zugangsmerkmal. Kein Mensch mehr beteiligt.
+
+    Mit derselben Sperre gegen Durchprobieren wie die Schnittstelle
+    selbst: ein Code ist zwar kurzlebig, aber der Endpunkt steht offen
+    im Netz.
+    """
+    _oauth_bereit()
+    wer = drossel.kennung_aus_anfrage(request)
+    rest = drossel.gesperrt(wer)
+    if rest > 0:
+        raise HTTPException(429, "Zu viele Fehlversuche.",
+                            headers={"Retry-After": str(int(rest) + 1)})
+    formular = await _formular(request)
+    if formular.get("grant_type") != "authorization_code":
+        return JSONResponse({"error": "unsupported_grant_type"}, 400)
+    try:
+        antwort = oauth.code_einloesen(
+            db, formular.get("code", ""), formular.get("client_id", ""),
+            formular.get("redirect_uri", ""),
+            formular.get("code_verifier", ""),
+            formular.get("client_secret") or None)
+    except oauth.OAuthFehler as fehler:
+        db.commit()        # auch die Rücknahme bei zweiter Einlösung
+        drossel.fehlversuch(wer)
+        return JSONResponse({"error": fehler.code,
+                             "error_description": fehler.beschreibung}, 400)
+    drossel.geschafft(wer)
+    oauth.aufraeumen(db)
+    return antwort
+
+
+@app.get("/api/oauth/clients")
+def oauth_clients_lesen(db: sqlite3.Connection = DB):
+    return {"eingerichtet": bool(WEB_URL and MCP_URL),
+            "clients": oauth.client_auflisten(db)}
+
+
+@app.post("/api/oauth/clients", status_code=201)
+def oauth_client_anlegen(eingabe: OAuthClientAnlegen,
+                         db: sqlite3.Connection = DB):
+    """Legt einen Konnektor an. Der Schlüssel kommt nur dieses eine Mal."""
+    _oauth_bereit()
+    try:
+        return oauth.client_anlegen(db, eingabe.name, eingabe.rueckadresse)
+    except oauth.OAuthFehler as fehler:
+        raise HTTPException(400, fehler.beschreibung)
+
+
+@app.delete("/api/oauth/clients/{client_id}", status_code=204)
+def oauth_client_zuruecknehmen(client_id: str, db: sqlite3.Connection = DB):
+    oauth.client_zuruecknehmen(db, client_id)
 
 
 # ============================================================ Oberfläche

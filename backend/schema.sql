@@ -55,6 +55,63 @@ CREATE TABLE IF NOT EXISTS mcp_token (
 );
 CREATE INDEX IF NOT EXISTS idx_mcp_token_benutzer ON mcp_token(benutzer_id);
 
+-- --------------------------------------------------------------- OAuth
+--
+-- Nur für Konnektoren, die KEINE eigene Kopfzeile mitschicken können.
+-- ChatGPT ist so einer: sein Dialog kennt nur »OAuth« oder »keine
+-- Authentifizierung«, kein Feld für einen API-Schlüssel. Ohne OAuth
+-- bliebe nur, das Geheimnis in die Adresse zu schreiben — und Adressen
+-- landen in Protokollen.
+--
+-- Die Anmeldung des MENSCHEN baut der Trainer dabei nicht selbst: der
+-- Autorisierungsschritt liegt auf dem Namen, hinter dem Cloudflare
+-- Access steht. Access fragt Mailadresse und Einmalcode und hängt die
+-- geprüfte Adresse als Kopfzeile an; daraus kennt der Trainer die
+-- Person. Was hier entsteht, ist am Ende ein ganz gewöhnliches
+-- mcp_token — die Bearer-Prüfung an /mcp bleibt unverändert.
+
+CREATE TABLE IF NOT EXISTS oauth_client (
+    id           INTEGER PRIMARY KEY,
+    client_id    TEXT NOT NULL UNIQUE,
+    name         TEXT NOT NULL,            -- wofür, z.B. "ChatGPT"
+    rueckadresse TEXT NOT NULL,            -- redirect_uri, ZEICHENGENAU
+    streuwert    TEXT,                     -- sha256 des Clientschlüssels
+    angelegt     TEXT NOT NULL DEFAULT (datetime('now')),
+    aktiv        INTEGER NOT NULL DEFAULT 1
+);
+
+-- Der angefangene Vorgang zwischen Einwilligungsseite und Klick auf
+-- »Erlauben«. Eigener Eintrag und nicht bloß versteckte Felder im
+-- Formular: sonst könnte eine fremde Seite das Formular nachbauen und
+-- ihr die Einwilligung für IHREN Konnektor unterschieben. Der Vorgang
+-- ist an die Mailadresse gebunden, die Access beim Aufruf geliefert
+-- hat, und wird beim Abschicken erneut dagegen geprüft.
+CREATE TABLE IF NOT EXISTS oauth_vorgang (
+    id           INTEGER PRIMARY KEY,
+    streuwert    TEXT NOT NULL UNIQUE,
+    client_id    TEXT NOT NULL,
+    benutzer_id  INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    mail         TEXT NOT NULL,
+    rueckadresse TEXT NOT NULL,
+    pruefwert    TEXT NOT NULL,            -- code_challenge, nur S256
+    zustand      TEXT,                     -- state des Konnektors
+    ablauf       TEXT NOT NULL
+);
+
+-- Der Autorisierungscode. Einmalig und kurzlebig: er wandert durch die
+-- Adresszeile des Browsers und steht damit im Verlauf.
+CREATE TABLE IF NOT EXISTS oauth_code (
+    id           INTEGER PRIMARY KEY,
+    streuwert    TEXT NOT NULL UNIQUE,
+    client_id    TEXT NOT NULL,
+    benutzer_id  INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    rueckadresse TEXT NOT NULL,
+    pruefwert    TEXT NOT NULL,
+    ablauf       TEXT NOT NULL,
+    eingeloest   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_code_ablauf ON oauth_code(ablauf);
+
 -- --------------------------------------------------------------- Sammlungen
 
 CREATE TABLE IF NOT EXISTS sammlung (

@@ -110,6 +110,11 @@ export const api = {
   // Text oder Merkmalsbündel, fällt die Form von selbst auf »ungeprüft«
   // zurück — was geändert wurde, ist nicht mehr das, was jemand
   // freigegeben hat.
+  oauthClients: () => ruf('/oauth/clients'),
+  oauthClientAnlegen: (daten) => ruf('/oauth/clients', { methode: 'POST', daten }),
+  oauthClientZuruecknehmen: (id) =>
+    ruf(`/oauth/clients/${encodeURIComponent(id)}`, { methode: 'DELETE' }),
+
   formTeilAendern: (id, daten) => ruf(`/formen/${id}/teil`, { methode: 'PATCH', daten }),
   formBestaetigen: (id) => ruf(`/formen/${id}/bestaetigen`, { methode: 'POST' }),
   formLoeschen: (id) => ruf(`/formen/${id}`, { methode: 'DELETE' }),

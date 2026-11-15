@@ -41,6 +41,7 @@ export async function zeichnen(behaelter) {
   el.append(await teilLegasthenie(behaelter));
   el.append(await teilAussen(behaelter));
   el.append(await teilZugaenge(behaelter));
+  el.append(await teilOAuth(behaelter));
   el.append(h('details', { class: 'karte' },
     h('summary', { text: 'Tastatur' }),
     h('ul', {},
@@ -680,6 +681,115 @@ async function teilZugaenge(behaelter) {
     name, hinweis, knopf));
   return kasten;
 }
+
+/* ----------------------------------------------- Konnektoren mit OAuth */
+
+/** Für Programme, die keine eigene Kopfzeile mitschicken können.
+ *
+ * ChatGPT ist so eines: sein Dialog »Benutzerdefinierten MCP-Server
+ * hinzufügen« kennt unter Authentifizierung nur OAuth, keine
+ * Authentifizierung oder beides — kein Feld für einen Schlüssel. Ohne
+ * OAuth bliebe nur, das Zugangsmerkmal in die Adresse zu schreiben,
+ * und Adressen landen in Protokollen.
+ *
+ * Für Claude braucht man das NICHT. Dort geht die Kopfzeile, und der
+ * Weg oben ist der einfachere. Darum steht dieser Abschnitt
+ * zugeklappt darunter und nicht an seiner Stelle.
+ */
+async function teilOAuth(behaelter) {
+  const kasten = h('details', { class: 'karte' },
+    h('summary', {}, h('strong', { text: 'Zugang für ChatGPT (OAuth)' })));
+  let d;
+  try {
+    d = await api.oauthClients();
+  } catch (fehler) {
+    kasten.append(h('p', { class: 'leise', text: fehler.message }));
+    return kasten;
+  }
+
+  kasten.append(h('p', { class: 'leise',
+    text: 'Nur für Programme, die keinen eigenen Schlüssel mitschicken '
+        + 'können — ChatGPT ist so eines. Für Claude ist der Weg oben der '
+        + 'einfachere; hier brauchst du nichts einzutragen.' }));
+
+  if (!d.eingerichtet) {
+    kasten.append(h('p', { class: 'hinweiskasten',
+      text: 'Dafür müssen die beiden Außenadressen hinterlegt sein '
+          + '(VOKABEL_WEB_URL und VOKABEL_MCP_URL). Solange sie fehlen, '
+          + 'bietet der Trainer kein OAuth an — lieber gar keines als '
+          + 'eines ohne Anmeldung davor.' }));
+    return kasten;
+  }
+
+  if (d.clients.length) {
+    const tafel = h('div', { class: 'liste' });
+    for (const c of d.clients) {
+      tafel.append(h('div', { class: 'eintrag' },
+        h('span', { class: 'lemma', text: c.name }),
+        h('span', { class: 'bedeutung', text: c.client_id }),
+        h('button', {
+          class: 'schlicht gefahr',
+          onclick: () => tun(async () => {
+            if (!confirm(`Konnektor „${c.name}" zurücknehmen? Neue `
+                       + 'Anmeldungen sind dann nicht mehr möglich. Bereits '
+                       + 'ausgegebene Zugänge nimmst du oben einzeln '
+                       + 'zurück.')) return;
+            await api.oauthClientZuruecknehmen(c.client_id);
+            zeichnen(behaelter);
+          }),
+        }, 'Zurücknehmen')));
+    }
+    kasten.append(tafel);
+  }
+
+  const name = h('input', { type: 'text', value: 'ChatGPT' });
+  // Kein Beispiel mit Adresse: das Repo ist öffentlich, und die Regel
+  // »keine festen Adressen im Quelltext« gilt auch für fremde. Die
+  // richtige steht ohnehin im Dialog des Konnektors zum Kopieren.
+  const rueck = h('input', { type: 'text',
+    placeholder: 'aus dem Dialog kopieren' });
+  const knopf = h('button', { class: 'wichtig' }, 'Konnektor anlegen');
+  knopf.addEventListener('click', () => tun(async () => {
+    const neu = await api.oauthClientAnlegen({
+      name: name.value.trim(), rueckadresse: rueck.value.trim() });
+    zeigeClient(kasten, neu);
+    rueck.value = '';
+  }));
+
+  kasten.append(h('div', { style: 'display:grid;gap:.5rem;margin-top:.8rem' },
+    h('label', { class: 'leise', text: 'Name des Konnektors' }), name,
+    h('label', { class: 'leise',
+      text: 'Callback-URL — steht im Dialog des Konnektors und muss '
+          + 'zeichengenau stimmen' }), rueck,
+    knopf));
+  return kasten;
+}
+
+
+function zeigeClient(kasten, neu) {
+  const feld = (wert) => h('input', {
+    type: 'text', value: wert, readonly: true,
+    onclick: (e) => e.target.select(),
+    style: 'font-family:ui-monospace,monospace;font-size:.9em;width:100%',
+  });
+  kasten.append(h('div', { class: 'rueckmeldung fast', style: 'margin-top:.8rem' },
+    h('div', { class: 'rueckmeldung-kopf' },
+      h('span', { text: '!' }), h('span', { text: 'Schlüssel nur jetzt sichtbar' })),
+    h('p', { text: 'Beides in den Dialog des Konnektors eintragen. Den '
+                 + 'Schlüssel kannst du auch weglassen — ChatGPT führt ihn '
+                 + 'als freiwillig; wird er mitgeschickt, muss er stimmen.' }),
+    h('p', { class: 'leise', style: 'margin:.6rem 0 .2rem', text: 'OAuth-Client-ID' }),
+    feld(neu.client_id),
+    h('p', { class: 'leise', style: 'margin:.6rem 0 .2rem',
+             text: 'Geheimer OAuth-Clientschlüssel' }),
+    feld(neu.geheimnis),
+    h('p', { class: 'leise', style: 'margin:.6rem 0 0',
+      text: 'Beim Verbinden fragt ChatGPT dann einmal die Anmeldung ab — '
+          + 'dieselbe Mailadresse mit Einmalcode wie im Browser. Danach '
+          + 'steht der Zugang oben in der Liste und lässt sich dort '
+          + 'zurücknehmen.' })));
+}
+
 
 /** Das Geheimnis wird nur dieses eine Mal angezeigt — danach steht es
  *  nirgends mehr, nur sein Streuwert. */

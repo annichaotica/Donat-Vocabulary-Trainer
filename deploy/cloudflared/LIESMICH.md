@@ -68,6 +68,31 @@ Daraus folgt für den Umgang damit:
   zugehörige Merkmal in den Einstellungen gelöscht. Dafür hat jedes
   einen Namen.
 
+## Der Tunnel lässt auf `mcp.` nur `/mcp` durch
+
+Gemessen am 15.11.2026, und nirgends sonst aufgeschrieben:
+
+```
+/mcp/irgendwas   404 {"detail":"Not Found"}   ← die Anwendung antwortet
+/.well-known/…   404 (leerer Rumpf)           ← Cloudflare antwortet
+```
+
+Auf diesem Namen ist also nur der Pfad `/mcp` freigegeben, und er gilt
+als **Präfix**. Alles daneben beantwortet Cloudflare selbst, die
+Anwendung sieht es nie — man sucht den Fehler sonst stundenlang im
+falschen Haus.
+
+Deshalb hängen die OAuth-Endpunkte zusätzlich unter `/mcp`:
+`/mcp/oauth/token` und `/mcp/.well-known/oauth-authorization-server`.
+An den vorgeschriebenen Stellen stehen sie auch; die werden erreichbar,
+sobald `/.well-known/*` und `/oauth/*` in der Tunnelkonfiguration
+freigegeben sind. Nötig ist das nicht — angekündigt wird die Adresse,
+die durchkommt.
+
+Der Name `vokabeln.` ist **nicht** so beschränkt: dort geht jeder Pfad
+durch, und davor steht Access. Genau deshalb liegt der Schritt, in dem
+ein Mensch einwilligt, auf diesem Namen.
+
 ## Wartung
 
 ```sh

@@ -367,6 +367,51 @@ CREATE TABLE IF NOT EXISTS text_lexem (
 );
 CREATE INDEX IF NOT EXISTS idx_text_lexem_lexem ON text_lexem(lexem_id);
 
+-- Mein eigener Übersetzungsversuch zu einem Abschnitt.
+--
+-- Getrennt von `textabschnitt.referenz`: das ist die Musterlösung und
+-- gehört zum Text, das hier gehört zu mir. Zwei Leute können denselben
+-- Text übersetzen, ohne sich zu überschreiben.
+--
+-- Es wird beim Tippen gesichert, nicht beim Abschicken — wer eine halbe
+-- Stunde an einem Absatz sitzt und dann den Reiter schließt, soll nicht
+-- von vorn anfangen.
+CREATE TABLE IF NOT EXISTS uebersetzungsversuch (
+    abschnitt_id INTEGER NOT NULL REFERENCES textabschnitt(id) ON DELETE CASCADE,
+    benutzer_id  INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    fassung      TEXT NOT NULL DEFAULT '',
+    geaendert    TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (abschnitt_id, benutzer_id)
+);
+
+-- Wörter, die ich noch nicht kenne und eingetragen haben möchte.
+--
+-- Der Übergabepunkt an die angebundene KI: sie liest hier, was offen
+-- ist, legt die Vokabeln an und hakt ab. Absichtlich NICHT an den Text
+-- gebunden — ein Wort, das einem beim Lesen auffällt, ist dasselbe
+-- Wort, das einem in der Zeitung auffällt. `text_id` und
+-- `zusammenhang` sind Beigaben, damit die KI die Form im Satz sieht
+-- und nicht raten muss, welche Bedeutung gemeint ist.
+--
+-- `wort` ist die SCHREIBWEISE aus dem Text, `vergleichsform` die
+-- normierte Fassung. Nur letztere ist eindeutig — sonst stünde
+-- dasselbe Wort zweimal in der Liste, einmal am Satzanfang groß.
+CREATE TABLE IF NOT EXISTS wortwunsch (
+    id            INTEGER PRIMARY KEY,
+    benutzer_id   INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    sammlung_id   INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
+    wort          TEXT NOT NULL,
+    vergleichsform TEXT NOT NULL,
+    zusammenhang  TEXT,
+    text_id       INTEGER REFERENCES text(id) ON DELETE SET NULL,
+    erledigt      INTEGER NOT NULL DEFAULT 0,
+    lexem_id      INTEGER REFERENCES lexem(id) ON DELETE SET NULL,
+    angelegt      TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (benutzer_id, sammlung_id, vergleichsform)
+);
+CREATE INDEX IF NOT EXISTS idx_wortwunsch_offen
+    ON wortwunsch(sammlung_id, erledigt);
+
 -- Aufgaben zum Text. Getrennt von `aufgabe` gehalten, weil hier nicht eine
 -- einzelne Form geprüft wird, sondern freier Text.
 --

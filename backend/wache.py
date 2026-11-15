@@ -57,6 +57,12 @@ MUSTER = [
     (re.compile(r"^/api/uebungen/(\d+)"), "uebung"),
     (re.compile(r"^/api/textaufgaben/(\d+)"), "textaufgabe"),
     (re.compile(r"^/api/regeln/(\d+)"), "regel"),
+    # Lesetexte sind ebenfalls Zeilen in `text` — dieselbe Prüfung wie
+    # bei den Übungen. Die Liste wächst nicht von selbst mit, und genau
+    # dadurch sind hier schon einmal dreizehn Löcher entstanden.
+    (re.compile(r"^/api/texte/(\d+)"), "uebung"),
+    (re.compile(r"^/api/abschnitte/(\d+)"), "textabschnitt"),
+    (re.compile(r"^/api/wortwuensche/(\d+)"), "wortwunsch"),
 ]
 
 # Diese Pfade sind für alle offen: Stammdaten ohne persönlichen Bezug.
@@ -122,6 +128,20 @@ def _pruefen(db, person: dict, pfad: str, methode: str):
                 if s is None:
                     return None
                 zugang.sammlung_pruefen(db, ich, s, schreibend)
+            elif art == "textabschnitt":
+                s_id = dbm.wert(db, """SELECT t.sammlung_id FROM textabschnitt a
+                                         JOIN text t ON t.id = a.text_id
+                                        WHERE a.id = ?""", (kennung,))
+                if s_id is None:
+                    return None
+                zugang.sammlung_pruefen(db, ich, s_id, schreibend)
+            elif art == "wortwunsch":
+                besitzer = dbm.wert(db, """SELECT benutzer_id FROM wortwunsch
+                                            WHERE id = ?""", (kennung,))
+                if besitzer is None:
+                    return None
+                if besitzer != ich:
+                    return _abweisen("Dieser Wortwunsch gehört dir nicht.")
             elif art == "regel":
                 s_id = dbm.wert(db, "SELECT sammlung_id FROM regel WHERE id = ?",
                                 (kennung,))

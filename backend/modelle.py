@@ -540,3 +540,28 @@ class RegelAendern(BaseModel):
     kennung: str | None = Field(default=None, max_length=120)
     quelle: str | None = None
     reihenfolge: int | None = None
+
+
+class LesetextAnlegen(BaseModel):
+    """Ein Text zum Lesen und Übersetzen — eingeworfen, nicht importiert.
+
+    Titel und Inhalt genügen; alles andere ist Beigabe. Wer erst ein
+    Formular ausfüllen muss, pastet den Text woanders hin.
+    """
+    titel: str = ""
+    inhalt: str
+    niveau: str | None = None
+    notiz: str | None = None
+    uebersetzung: str | None = None
+
+
+class FassungSichern(BaseModel):
+    benutzer_id: int
+    fassung: str
+
+
+class WortMerken(BaseModel):
+    """»Das kenne ich nicht.«"""
+    benutzer_id: int
+    wort: str
+    zusammenhang: str | None = None

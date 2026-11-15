@@ -28,6 +28,7 @@ from typing import Any, Callable
 from fastapi import HTTPException
 
 import datenbank as dbm
+import lesetexte
 import zugang
 
 VERSION = "0.2.0"
@@ -570,6 +571,68 @@ def sprache_einrichten(db: sqlite3.Connection, person: dict, code: str,
 
 
 # ------------------------------------------- Beschreibung der Werkzeuge
+
+def offene_woerter_lesen(db: sqlite3.Connection, person: dict,
+                         sammlung_id: int | None = None):
+    """Welche Wörter hat sie beim Lesen markiert und braucht sie noch?"""
+    if sammlung_id:
+        zugang.sammlung_pruefen(db, person["id"], sammlung_id)
+    offen = lesetexte.wortwuensche(db, person["id"], sammlung_id, offen=True)
+    return {
+        "anzahl": len(offen),
+        "woerter": [{"wunsch_id": w["id"], "wort": w["wort"],
+                     "sammlung_id": w["sammlung_id"],
+                     "sammlung": w["sammlung"], "sprache": w["sprache"],
+                     "zusammenhang": w["zusammenhang"],
+                     "aus_text": w["text"]}
+                    for w in offen],
+    }
+
+
+def offenes_wort_erledigen(db: sqlite3.Connection, person: dict,
+                           wunsch_id: int, lexem_id: int | None = None):
+    """Haken dran, nachdem die Vokabel angelegt ist."""
+    w = dbm.zeile(db, "SELECT * FROM wortwunsch WHERE id = ?", (wunsch_id,))
+    if w is None:
+        raise KeyError(f"Wortwunsch {wunsch_id} gibt es nicht")
+    if w["benutzer_id"] != person["id"]:
+        raise PermissionError("Dieser Wortwunsch gehört dir nicht.")
+    return dict(_fehler_wandeln(lesetexte.wortwunsch_erledigen, db,
+                                wunsch_id, lexem_id))
+
+
+def texte_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int):
+    """Welche Lesetexte liegen in dieser Sammlung?"""
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id)
+    return {"texte": [dict(t) for t in lesetexte.auflisten(db, sammlung_id)]}
+
+
+def text_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                 titel: str, inhalt: str, niveau: str | None = None,
+                 notiz: str | None = None):
+    """Einen Text hinterlegen, den sie dann lesen und übersetzen kann."""
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+    t = _fehler_wandeln(lesetexte.anlegen, db, sammlung_id, titel, inhalt,
+                        niveau=niveau, notiz=notiz, quelle="ki")
+    return {"text_id": t["id"], "titel": t["titel"],
+            "abschnitte": len(t["abschnitte"])}
+
+
+def text_deckung_lesen(db: sqlite3.Connection, person: dict, text_id: int):
+    """Welche Wörter des Textes fehlen ihr noch?
+
+    Der nützlichste Aufruf vor dem Anlegen von Vokabeln: er nennt die
+    Lücken, ohne dass sie jedes Wort einzeln markieren muss.
+    """
+    t = dbm.zeile(db, "SELECT sammlung_id FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    zugang.sammlung_pruefen(db, person["id"], t["sammlung_id"])
+    d = _fehler_wandeln(lesetexte.deckung, db, text_id, person["id"])
+    fehlend = sorted({w["wort"] for w in d["woerter"] if not w["lexem_id"]})
+    return {"abdeckung": d["abdeckung"], "zahlen": d["zahlen"],
+            "urteil": d["urteil"], "fehlende_woerter": fehlend}
+
 
 def _s(typ, beschreibung, **rest):
     return {"type": typ, "description": beschreibung, **rest}
@@ -1120,6 +1183,80 @@ WERKZEUGE: list[dict] = [
             "required": ["code", "name", "profil"]},
         "nur_verwalter": True,
         "funktion": sprache_einrichten,
+    },
+    {
+        "name": "offene_woerter_lesen",
+        "description": "Wörter, die sie beim Lesen eines Textes als »kenne "
+                       "ich nicht« markiert hat und eingetragen haben "
+                       "möchte. Mit Zusammenhang, also dem Satz, in dem das "
+                       "Wort stand — daran hängt, welche Bedeutung gemeint "
+                       "ist. Nach dem Anlegen offenes_wort_erledigen "
+                       "aufrufen, sonst steht das Wort weiter auf der Liste.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sammlung_id": _s("integer", "nur diese Sammlung; ohne "
+                                             "Angabe alle")},
+        },
+        "funktion": offene_woerter_lesen,
+    },
+    {
+        "name": "offenes_wort_erledigen",
+        "description": "Haken an einen Wortwunsch, nachdem die Vokabel "
+                       "angelegt ist. lexem_id mitgeben, damit sie "
+                       "nachvollziehen kann, woher der Eintrag stammt.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "wunsch_id": _s("integer", "aus offene_woerter_lesen"),
+                "lexem_id": _s("integer", "die angelegte Vokabel")},
+            "required": ["wunsch_id"],
+        },
+        "funktion": offenes_wort_erledigen,
+    },
+    {
+        "name": "texte_auflisten",
+        "description": "Welche Lesetexte liegen in einer Sammlung?",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sammlung_id": _s("integer", "aus sammlungen_auflisten")},
+            "required": ["sammlung_id"],
+        },
+        "funktion": texte_auflisten,
+    },
+    {
+        "name": "text_anlegen",
+        "description": "Einen Lesetext hinterlegen. Absätze durch Leerzeilen "
+                       "trennen — daran entstehen die Abschnitte, in denen "
+                       "übersetzt wird. Danach text_deckung_lesen aufrufen: "
+                       "es sagt, welche Wörter ihr dafür noch fehlen.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+                "titel": _s("string", "kurz, zum Wiederfinden"),
+                "inhalt": _s("string", "der Text in der Lernsprache"),
+                "niveau": _s("string", "A1 … C2, frei"),
+                "notiz": _s("string", "woher er stammt, worum es geht")},
+            "required": ["sammlung_id", "titel", "inhalt"],
+        },
+        "funktion": text_anlegen,
+    },
+    {
+        "name": "text_deckung_lesen",
+        "description": "Welche Wörter eines Textes stehen noch nicht in "
+                       "ihrem Wortschatz? Nennt die Lücken namentlich. "
+                       "Achtung: eine nicht eingetragene FORM gilt als "
+                       "Lücke, auch wenn das Lemma längst da ist — dann "
+                       "gehört die Form ergänzt (formen_ergaenzen), nicht "
+                       "eine zweite Vokabel angelegt.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"text_id": _s("integer", "aus texte_auflisten")},
+            "required": ["text_id"],
+        },
+        "funktion": text_deckung_lesen,
     },
 ]
 

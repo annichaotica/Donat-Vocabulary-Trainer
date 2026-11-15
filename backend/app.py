@@ -32,6 +32,7 @@ import freigabe as freigabemodul
 import datenbank as dbm
 import legasthenie
 import lernen as lernmodul
+import lesetexte
 import lernziele
 import identitaet
 import mcp_dienst
@@ -48,7 +49,8 @@ from modelle import (RegelEingabe, RegelAendern,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
-                     ImportEingabe, LernwahlSetzen,
+                     FassungSichern, ImportEingabe, LernwahlSetzen,
+                     LesetextAnlegen, WortMerken,
                      LernzielAendern, LernzielAnlegen,
                      SammelimportEingabe,
                      McpTokenAnlegen,
@@ -940,6 +942,129 @@ def uebung_loeschen(uebung_id: int, request: Request = None,
     _uebung(db, uebung_id)
     _wache_rumpf(db, request)
     uebungen.loeschen(db, uebung_id)
+    return Response(status_code=204)
+
+
+# ------------------------------------------------------- Lesen und Übersetzen
+
+@app.get("/api/sammlungen/{sammlung_id}/texte")
+def texte_auflisten(sammlung_id: int, request: Request = None,
+                    db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    _holen(db, "sammlung", sammlung_id)
+    return lesetexte.auflisten(db, sammlung_id)
+
+
+@app.post("/api/sammlungen/{sammlung_id}/texte", status_code=201)
+def text_anlegen(sammlung_id: int, eingabe: LesetextAnlegen,
+                 request: Request = None, db: sqlite3.Connection = DB):
+    """Text einwerfen — eingefügt oder hochgeladen, hier ist beides dasselbe."""
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    try:
+        return lesetexte.anlegen(db, sammlung_id, eingabe.titel,
+                                 eingabe.inhalt, niveau=eingabe.niveau,
+                                 notiz=eingabe.notiz,
+                                 uebersetzung=eingabe.uebersetzung)
+    except ValueError as f:
+        raise HTTPException(400, str(f))
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
+@app.get("/api/texte/{text_id}")
+def text_lesen(text_id: int, benutzer_id: int | None = None,
+               request: Request = None, db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    try:
+        return lesetexte.lesen(db, text_id, benutzer_id)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
+@app.delete("/api/texte/{text_id}", status_code=204)
+def text_loeschen(text_id: int, request: Request = None,
+                  db: sqlite3.Connection = DB):
+    try:
+        lesetexte.loeschen(db, text_id)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+    return Response(status_code=204)
+
+
+@app.get("/api/texte/{text_id}/deckung")
+def text_deckung(text_id: int, benutzer_id: int, request: Request = None,
+                 db: sqlite3.Connection = DB):
+    """Könnte ich das schon übersetzen?"""
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _holen(db, "benutzer", benutzer_id)
+    try:
+        return lesetexte.deckung(db, text_id, benutzer_id)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
+@app.get("/api/texte/{text_id}/nachschlagen")
+def text_nachschlagen(text_id: int, wort: str, request: Request = None,
+                      db: sqlite3.Connection = DB):
+    try:
+        return lesetexte.nachschlagen(db, text_id, wort)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
+@app.put("/api/abschnitte/{abschnitt_id}/fassung")
+def fassung_sichern(abschnitt_id: int, eingabe: FassungSichern,
+                    request: Request = None, db: sqlite3.Connection = DB):
+    """Meine Übersetzung eines Abschnitts — beim Tippen gesichert."""
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id)
+    _holen(db, "benutzer", eingabe.benutzer_id)
+    try:
+        return lesetexte.fassung_sichern(db, abschnitt_id,
+                                         eingabe.benutzer_id, eingabe.fassung)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
+@app.post("/api/texte/{text_id}/wortwunsch", status_code=201)
+def wort_merken(text_id: int, eingabe: WortMerken, request: Request = None,
+                db: sqlite3.Connection = DB):
+    """»Das Wort kenne ich nicht« — auf die Liste für die KI."""
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id)
+    _holen(db, "benutzer", eingabe.benutzer_id)
+    try:
+        return lesetexte.wort_merken(db, eingabe.benutzer_id, text_id,
+                                     eingabe.wort, eingabe.zusammenhang)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+    except ValueError as f:
+        raise HTTPException(400, str(f))
+
+
+@app.delete("/api/texte/{text_id}/wortwunsch", status_code=204)
+def wort_vergessen(text_id: int, benutzer_id: int, wort: str,
+                   request: Request = None, db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    try:
+        lesetexte.wort_vergessen(db, benutzer_id, text_id, wort)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+    return Response(status_code=204)
+
+
+@app.get("/api/wortwuensche")
+def wortwuensche_lesen(benutzer_id: int, sammlung_id: int | None = None,
+                       offen: bool = True, request: Request = None,
+                       db: sqlite3.Connection = DB):
+    """Die Liste, die auch die angebundene KI über den MCP sieht."""
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _holen(db, "benutzer", benutzer_id)
+    return lesetexte.wortwuensche(db, benutzer_id, sammlung_id, offen)
+
+
+@app.delete("/api/wortwuensche/{wunsch_id}", status_code=204)
+def wortwunsch_loeschen(wunsch_id: int, request: Request = None,
+                        db: sqlite3.Connection = DB):
+    db.execute("DELETE FROM wortwunsch WHERE id = ?", (wunsch_id,))
     return Response(status_code=204)
 
 

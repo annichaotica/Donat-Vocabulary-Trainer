@@ -140,6 +140,30 @@ export const api = {
   lernblock: (id, benutzerId, anzahl) =>
     ruf(`/lernziele/${id}/block`, { frage: { benutzer_id: benutzerId, anzahl } }),
 
+  texte: (sammlungId) => ruf(`/sammlungen/${sammlungId}/texte`),
+  textAnlegen: (sammlungId, daten) =>
+    ruf(`/sammlungen/${sammlungId}/texte`, { methode: 'POST', daten }),
+  text: (id, benutzerId) =>
+    ruf(`/texte/${id}`, { frage: { benutzer_id: benutzerId } }),
+  textLoeschen: (id) => ruf(`/texte/${id}`, { methode: 'DELETE' }),
+  textDeckung: (id, benutzerId) =>
+    ruf(`/texte/${id}/deckung`, { frage: { benutzer_id: benutzerId } }),
+  textNachschlagen: (id, wort) =>
+    ruf(`/texte/${id}/nachschlagen`, { frage: { wort } }),
+  fassungSichern: (abschnittId, benutzerId, fassung) =>
+    ruf(`/abschnitte/${abschnittId}/fassung`,
+        { methode: 'PUT', daten: { benutzer_id: benutzerId, fassung } }),
+  wortMerken: (textId, benutzerId, wort, zusammenhang) =>
+    ruf(`/texte/${textId}/wortwunsch`,
+        { methode: 'POST',
+          daten: { benutzer_id: benutzerId, wort, zusammenhang } }),
+  wortVergessen: (textId, benutzerId, wort) =>
+    ruf(`/texte/${textId}/wortwunsch`,
+        { methode: 'DELETE', frage: { benutzer_id: benutzerId, wort } }),
+  wortwuensche: (benutzerId, sammlungId) =>
+    ruf('/wortwuensche',
+        { frage: { benutzer_id: benutzerId, sammlung_id: sammlungId } }),
+
   stand: (benutzerId, sammlungId) =>
     ruf('/lernen/stand', { frage: { benutzer_id: benutzerId, sammlung_id: sammlungId } }),
   naechste: (frage) => ruf('/lernen/naechste', { frage }),

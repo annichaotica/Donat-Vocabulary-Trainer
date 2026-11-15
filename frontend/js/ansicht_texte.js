@@ -1,0 +1,311 @@
+/** Texte lesen und übersetzen.
+ *
+ * Drei Ansichten in einer Datei, weil sie dieselbe Sache in drei
+ * Zuständen sind: die Liste der Texte, der Einwurf eines neuen, und die
+ * Werkbank, auf der übersetzt wird.
+ *
+ * Die Werkbank zeigt links den Abschnitt, rechts das eigene Feld. Jedes
+ * Wort im Original ist anklickbar: ein Klick schlägt nach, was im
+ * eigenen Wortschatz dazu steht. Steht nichts da, bietet derselbe Klick
+ * an, das Wort für die KI zu merken — der Weg vom »das kenne ich nicht«
+ * bis zum Eintrag ist damit zwei Klicks lang und verlässt die Seite
+ * nicht.
+ *
+ * Dass er die Seite nicht verlässt, ist hier gelernt: »Wenn ich ein
+ * Wort ansehe, weil ich es nicht weiß, dann komme ich nicht wieder
+ * zurück zur Abfrage.« Dieselbe Falle wäre hier noch teurer — eine
+ * halbe Stunde Übersetzungsarbeit hinge daran.
+ */
+
+import { api } from './api.js';
+import { h, leeren, meldung } from './hilfen.js';
+import { zustand, merken } from './zustand.js';
+
+const FARBE = {
+  sitzt: 'wort-sitzt',
+  lernen: 'wort-lernen',
+  neu: 'wort-neu',
+  unbekannt: 'wort-unbekannt',
+};
+
+
+// ------------------------------------------------------------- Textliste
+
+export async function zeichnen(behaelter) {
+  leeren(behaelter);
+  if (!zustand.sammlungId) {
+    behaelter.append(h('p', { class: 'leise',
+      text: 'Erst eine Sammlung wählen — ein Text gehört zu einer Sprache.' }));
+    behaelter.append(h('button', {
+      onclick: () => { location.hash = '#/uebersicht'; },
+    }, 'Zur Übersicht'));
+    return;
+  }
+
+  behaelter.append(h('h1', { text: 'Texte' }));
+  behaelter.append(h('p', { class: 'leise',
+    text: 'Einen Text einwerfen und sehen, ob du ihn schon übersetzen '
+        + 'könntest. Was dir fehlt, kannst du beim Lesen anfordern.' }));
+
+  const liste = h('div', { class: 'karte-reihe' });
+  behaelter.append(liste, teilEinwerfen(behaelter));
+
+  const texte = await api.texte(zustand.sammlungId);
+  if (!texte.length) {
+    liste.append(h('p', { class: 'leise', text: 'Noch kein Text.' }));
+    return;
+  }
+  for (const t of texte) {
+    liste.append(h('div', { class: 'karte' },
+      h('strong', { text: t.titel }),
+      h('p', { class: 'leise', style: 'margin:.2rem 0 .6rem',
+               text: `${t.abschnitte} Abschnitte · ${t.zeichen} Zeichen`
+                   + (t.niveau ? ` · ${t.niveau}` : '') }),
+      h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+        h('button', { class: 'wichtig',
+          onclick: () => { location.hash = `#/texte/${t.id}`; },
+        }, 'Öffnen'),
+        h('button', { class: 'schlicht', onclick: () => entfernen(t, behaelter) },
+          'Löschen'))));
+  }
+}
+
+
+function teilEinwerfen(behaelter) {
+  const titel = h('input', { type: 'text', placeholder: 'Titel' });
+  // Kein Pflichtfeld-Gehabe: Titel darf leer bleiben, dann heißt er so.
+  const inhalt = h('textarea', {
+    rows: '8', placeholder: 'Text hier einfügen …',
+    style: 'width:100%;font-family:inherit',
+  });
+  const datei = h('input', { type: 'file', accept: '.txt,.md,text/plain' });
+  datei.addEventListener('change', async () => {
+    const f = datei.files?.[0];
+    if (!f) return;
+    // Nur Text — eine PDF hier zu entpacken wäre ein eigenes Vorhaben,
+    // und ein halb entpacktes PDF ist schlimmer als keins.
+    inhalt.value = await f.text();
+    if (!titel.value.trim()) titel.value = f.name.replace(/\.[^.]+$/, '');
+  });
+
+  return h('details', { class: 'karte', style: 'margin-top:1rem' },
+    h('summary', { text: 'Text einwerfen' }),
+    h('p', { class: 'leise', style: 'margin:.4rem 0',
+             text: 'Absätze durch Leerzeilen trennen — daran entstehen die '
+                 + 'Abschnitte, in denen du übersetzt.' }),
+    titel, inhalt,
+    h('p', { class: 'leise', style: 'margin:.4rem 0' },
+      'oder eine Datei: ', datei),
+    h('button', {
+      class: 'wichtig',
+      onclick: async () => {
+        if (!inhalt.value.trim()) { meldung('Der Text ist leer.'); return; }
+        try {
+          const t = await api.textAnlegen(zustand.sammlungId, {
+            titel: titel.value, inhalt: inhalt.value });
+          location.hash = `#/texte/${t.id}`;
+        } catch (f) { meldung(f.message, 'fehler'); }
+      },
+    }, 'Speichern und öffnen'));
+}
+
+
+async function entfernen(t, behaelter) {
+  if (!window.confirm(`»${t.titel}« löschen? Deine Übersetzung dazu `
+                      + 'geht mit verloren.')) return;
+  await api.textLoeschen(t.id);
+  zeichnen(behaelter);
+}
+
+
+// -------------------------------------------------------------- Werkbank
+
+export async function zeichnenText(behaelter, textId) {
+  leeren(behaelter);
+  const [text, deckung] = await Promise.all([
+    api.text(textId, zustand.benutzerId),
+    api.textDeckung(textId, zustand.benutzerId),
+  ]);
+  merken({ sammlungId: text.sammlung_id });
+
+  behaelter.append(h('h1', { text: text.titel }));
+  behaelter.append(teilDeckung(deckung, textId, behaelter));
+
+  // Die Wortfarben je Abschnitt: die Deckung liefert die Wörter in der
+  // Reihenfolge des ganzen Textes, die Abschnitte schneiden ihn in
+  // Stücke. Statt die Stellen auszurechnen, wird je Abschnitt neu
+  // zugeordnet — dieselbe Vergleichsform, derselbe Topf.
+  const nachForm = new Map();
+  for (const w of deckung.woerter) {
+    if (!nachForm.has(w.vergleichsform)) nachForm.set(w.vergleichsform, w);
+  }
+
+  for (const a of text.abschnitte) {
+    behaelter.append(teilAbschnitt(a, deckung, textId, behaelter));
+  }
+
+  behaelter.append(h('div', { class: 'frage-werkzeuge',
+                              style: 'justify-content:flex-start' },
+    h('button', { onclick: () => { location.hash = '#/texte'; } },
+      'Zurück zu den Texten')));
+}
+
+
+function teilDeckung(d, textId, behaelter) {
+  const z = d.zahlen;
+  return h('div', { class: 'karte' },
+    h('p', { style: 'margin:0 0 .6rem;font-weight:600', text: d.urteil }),
+    h('div', { class: 'zahlen' },
+      zahl(z.sitzt, 'sitzt'), zahl(z.lernen, 'am Lernen'),
+      zahl(z.neu, 'neu'), zahl(z.unbekannt, 'kennst du nicht')),
+    h('p', { class: 'leise', style: 'margin:.6rem 0 0',
+             text: `${d.abdeckung} % der ${d.verschiedene_woerter} `
+                 + 'verschiedenen Wörter stehen in deinem Wortschatz.' }),
+    z.unbekannt
+      ? h('p', { class: 'leise', style: 'margin:.4rem 0 0' },
+          'Tippe ein rot unterlegtes Wort an, um es für die KI zu merken.')
+      : null);
+}
+
+
+function zahl(wert, beschriftung) {
+  return h('div', { class: 'zahl' },
+    h('b', { text: String(wert ?? 0) }), h('span', { text: beschriftung }));
+}
+
+
+function teilAbschnitt(a, deckung, textId, behaelter) {
+  const original = h('div', { class: 'textabschnitt-original' });
+  for (const stueck of woerterDesAbschnitts(a.original, deckung)) {
+    if (stueck.lexem_id === undefined) {
+      original.append(document.createTextNode(stueck.text));
+      continue;
+    }
+    original.append(h('button', {
+      type: 'button',
+      class: 'wortknopf ' + FARBE[stueck.art]
+           + (stueck.gewuenscht ? ' wort-gewuenscht' : ''),
+      onclick: (e) => wortZeigen(e.target, stueck, textId, a, behaelter),
+    }, stueck.text));
+  }
+
+  const feld = h('textarea', {
+    rows: '3', placeholder: 'Deine Übersetzung …',
+    style: 'width:100%;font-family:inherit',
+  });
+  feld.value = a.meine_fassung || '';
+  // Beim Tippen sichern, nicht beim Abschicken. Es gibt kein
+  // Abschicken — wer eine halbe Stunde an einem Absatz sitzt, soll
+  // nichts verlieren, wenn der Reiter zugeht.
+  let warten = null;
+  feld.addEventListener('input', () => {
+    clearTimeout(warten);
+    warten = setTimeout(() => {
+      api.fassungSichern(a.id, zustand.benutzerId, feld.value)
+        .catch((f) => meldung(f.message, 'fehler'));
+    }, 800);
+  });
+
+  return h('div', { class: 'karte' },
+    original,
+    feld,
+    a.referenz
+      ? h('details', { style: 'margin-top:.4rem' },
+          h('summary', { class: 'leise', text: 'Referenzübersetzung' }),
+          h('p', { text: a.referenz }))
+      : null);
+}
+
+
+/** Den Abschnitt in Wörter und Zwischenräume zerlegen, mit Farbe.
+ *
+ * Die Deckung hat den ganzen Text zerlegt; hier wird dieselbe Zerlegung
+ * auf einen Abschnitt angewandt, damit die Mehrwort-Einträge (»το
+ * μήλο«) auch hier als EIN Knopf erscheinen und nicht als zwei.
+ */
+function woerterDesAbschnitts(original, deckung) {
+  const nach = new Map();
+  for (const w of deckung.woerter) if (!nach.has(w.wort)) nach.set(w.wort, w);
+  // Die längsten zuerst, sonst zerschneidet »το« das »το μήλο«.
+  const muster = [...nach.keys()].sort((a, b) => b.length - a.length)
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!muster.length) return [{ text: original }];
+
+  const regel = new RegExp(`(${muster.join('|')})`, 'g');
+  const stuecke = [];
+  let zuletzt = 0;
+  for (const treffer of original.matchAll(regel)) {
+    if (treffer.index > zuletzt) {
+      stuecke.push({ text: original.slice(zuletzt, treffer.index) });
+    }
+    stuecke.push({ ...nach.get(treffer[0]), text: treffer[0] });
+    zuletzt = treffer.index + treffer[0].length;
+  }
+  if (zuletzt < original.length) stuecke.push({ text: original.slice(zuletzt) });
+  return stuecke;
+}
+
+
+/** Nachschlagen — und wenn nichts dasteht, anfordern. */
+async function wortZeigen(knopf, stueck, textId, abschnitt, behaelter) {
+  // Die Karte kommt UNTER den Abschnitt, nicht zwischen die Wörter.
+  // Mitten hinein gesetzt schob sie den Rest des Satzes nach unten —
+  // und beim Übersetzen ist der Satz das, worauf man schaut.
+  const original = knopf.closest('.textabschnitt-original');
+  const alt = original.parentElement.querySelector('.wortkarte');
+  if (alt) alt.remove();
+  for (const k of original.querySelectorAll('.wort-offen')) {
+    k.classList.remove('wort-offen');
+  }
+  knopf.classList.add('wort-offen');
+
+  const karte = h('div', { class: 'wortkarte karte' });
+  original.insertAdjacentElement('afterend', karte);
+  karte.append(h('p', { class: 'leise', text: 'einen Augenblick …' }));
+
+  let d;
+  try {
+    d = await api.textNachschlagen(textId, stueck.text);
+  } catch (f) { karte.textContent = f.message; return; }
+
+  leeren(karte);
+  karte.append(h('strong', { text: stueck.text }),
+    h('button', { class: 'schlicht', style: 'float:right',
+                  onclick: () => karte.remove() }, 'Schließen'));
+
+  if (d.gefunden) {
+    karte.append(h('p', { style: 'margin:.3rem 0' },
+      h('b', { text: d.lemma }), ` · ${d.wortart}`));
+    for (const b of d.bedeutungen) {
+      karte.append(h('p', { style: 'margin:.2rem 0',
+        text: b.uebersetzungen.join(', ')
+            + (b.kontext ? ` (${b.kontext})` : '') }));
+    }
+    if (d.merkmale) {
+      karte.append(h('p', { class: 'leise', style: 'margin:.2rem 0',
+        text: Object.entries(d.merkmale).map(([k, v]) => `${k}: ${v}`)
+          .join(' · ') }));
+    }
+    return;
+  }
+
+  karte.append(h('p', { style: 'margin:.3rem 0',
+    text: 'Steht nicht in deinem Wortschatz.' }));
+  const schon = stueck.gewuenscht;
+  karte.append(h('button', {
+    class: schon ? 'schlicht' : 'wichtig',
+    onclick: async () => {
+      try {
+        if (schon) {
+          await api.wortVergessen(textId, zustand.benutzerId, stueck.text);
+          meldung(`»${stueck.text}« ist wieder von der Liste.`);
+        } else {
+          await api.wortMerken(textId, zustand.benutzerId, stueck.text,
+                               abschnitt.original);
+          meldung(`»${stueck.text}« steht auf der Liste für die KI.`);
+        }
+        zeichnenText(behaelter, textId);
+      } catch (f) { meldung(f.message, 'fehler'); }
+    },
+  }, schon ? 'Doch nicht anfordern' : 'Für die KI merken'));
+}

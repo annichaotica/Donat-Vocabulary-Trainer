@@ -234,6 +234,9 @@ export async function zeichnen(behaelter) {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/ueben'; },
         }, 'Sätze'),
         h('button', {
+          onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/texte'; },
+        }, 'Texte'),
+        h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/import'; },
         }, 'Einlesen'),
         wartendes(s).length

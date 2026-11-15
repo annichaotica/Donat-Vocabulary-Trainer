@@ -1,0 +1,483 @@
+"""Texte lesen und übersetzen — und vorher wissen, ob man das kann.
+
+»Ich möchte eine Übersetzungsfunktion, in dem Sinne, dass ich Texte
+hochladen kann oder auch pasten, die gespeichert werden, und wo zum
+einen analysiert wird, ob ich das schon übersetzen können müsste, eine
+Unterstützung bei der Übersetzung, und als Allerletztes noch Worte, die
+ich quasi noch nicht kenne, markieren kann. Die soll dann die
+angebundene KI über den MCP auslesen können, um mir hier die
+entsprechenden Datensätze einfügen zu können.«
+
+Vier Dinge, und das erste trägt die anderen: die Deckung. Ohne sie ist
+ein Text ein Text; mit ihr ist er eine Aussage über den eigenen Stand.
+
+Wie gezählt wird
+----------------
+Jedes Wort des Textes wird in seine Vergleichsform gebracht — dieselbe,
+mit der die Satzprüfung arbeitet, also mit den Schriftregeln der
+Sprache (griechisches Schluss-Sigma, Apostrophe, Groß und Klein). Dann
+wird es im Wortschatz der Sammlung gesucht, und zwar sowohl unter den
+Grundformen als auch unter allen eingetragenen Formen. »γράφεις« findet
+also »γράφω«, sofern die Form eingetragen ist.
+
+Was dabei NICHT passiert, und das ist wichtig für das Vertrauen in die
+Zahl: es wird nicht geraten. Keine Stammformenerkennung, keine
+Endungsheuristik. Eine Form, die niemand eingetragen hat, gilt als
+unbekannt — lieber eine zu vorsichtige Aussage als eine zu
+freundliche. Wer die Lücke schließt, trägt die Form ein; dann stimmt
+die Zahl dauerhaft, statt beim nächsten Text wieder geraten zu werden.
+
+Die vier Töpfe
+--------------
+  sitzt      kenne ich, der Lernstand ist reif
+  lernen     ist in Arbeit (fällig, verlernt, angefangen)
+  neu        steht im Wortschatz, war aber noch nie dran
+  unbekannt  steht nicht im Wortschatz
+
+Nur der letzte Topf ist ein echtes Hindernis beim Übersetzen. »neu«
+heißt: es ist eingetragen, du hast es nur noch nicht gelernt — beim
+Nachschlagen findest du es.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sqlite3
+
+import datenbank as dbm
+import pruefung
+import sprachen
+
+
+# Zahlen und reine Satzzeichen zählen nicht mit. Sie als »unbekanntes
+# Wort« zu führen wäre nicht falsch, aber unbrauchbar: die Deckung eines
+# Textes mit Jahreszahlen sähe schlechter aus, als sie ist.
+_NUR_ZIFFERN = re.compile(r"^[\d.,:/-]+$")
+
+# Satzzeichen am Wortrand — dieselbe Liste wie in der Satzprüfung. Innen
+# bleiben sie stehen: »σ' αγαπώ« ist ein Wort mit Apostroph.
+_RAND = " \t\n\r.,;:!?¡¿\"»«“”„…()[]{}·'’—–-"
+_TRENNER = re.compile(r"[\s ]+")
+
+
+def woerter(inhalt: str, profil: dict) -> list[dict]:
+    """Zerlegt einen Text in Wörter, mit Schreibweise UND Vergleichsform.
+
+    Beides, weil beides gebraucht wird: angezeigt wird die Schreibweise
+    aus dem Text, verglichen wird die normierte Fassung. Wer nur
+    letztere behielte, zeigte der Leserin ein Wort, das so nicht
+    dasteht.
+    """
+    gefunden = []
+    for roh in _TRENNER.split(inhalt or ""):
+        wort = roh.strip(_RAND)
+        if not wort or _NUR_ZIFFERN.match(wort):
+            continue
+        gefunden.append({
+            "wort": wort,
+            "vergleichsform": pruefung._genau(wort, profil),
+        })
+    return gefunden
+
+
+def _wortschatz(db: sqlite3.Connection, sammlung_id: int,
+                profil: dict) -> dict[str, int]:
+    """Vergleichsform -> lexem_id, über Grundformen UND Formen.
+
+    Die Formen zählen ausdrücklich mit. Ohne sie wäre jeder flektierte
+    Text »unbekannt«, obwohl das Wort längst gelernt ist — und genau
+    das ist bei einer Flexionssprache die Regel und nicht die Ausnahme.
+
+    Mehrwortige Einträge stehen hier als Ganzes drin: griechische
+    Substantive werden mit Artikel gelernt (»το μήλο«), französische
+    teils auch (»le pain«). Wer nur Einzelwörter abglich, fand beim
+    ersten Text keines davon wieder und meldete lauter Lücken, die
+    keine sind. Gesucht wird deshalb weiter unten mit dem längsten
+    passenden Stück zuerst.
+    """
+    karte: dict[str, int] = {}
+    # Erst die Formen, dann die Lemmata: bei gleicher Vergleichsform soll
+    # das Lemma gewinnen, denn es ist der Eintrag, den man nachschlägt.
+    for zeile in dbm.zeilen(db, """
+            SELECT f.text, f.lexem_id FROM form f
+              JOIN lexem l ON l.id = f.lexem_id
+             WHERE l.sammlung_id = ?""", (sammlung_id,)):
+        karte.setdefault(pruefung._genau(zeile["text"], profil),
+                         zeile["lexem_id"])
+    for zeile in dbm.zeilen(db, """
+            SELECT id, lemma FROM lexem WHERE sammlung_id = ?""",
+            (sammlung_id,)):
+        karte[pruefung._genau(zeile["lemma"], profil)] = zeile["id"]
+    return karte
+
+
+def _lernstaende(db: sqlite3.Connection, sammlung_id: int,
+                 benutzer_id: int) -> dict[int, str]:
+    """lexem_id -> sitzt | lernen | neu.
+
+    Ein Wort hat mehrere Aufgaben (Bedeutung hin, Bedeutung zurück,
+    Formen). Fürs Lesen zählt die GÜNSTIGSTE: wer »το μήλο« von
+    Griechisch nach Deutsch sicher kann, kann den Text lesen, auch wenn
+    die Gegenrichtung noch hakt. Beim Übersetzen in die Fremdsprache
+    wäre es umgekehrt — darum steht die Richtung in der Aufgabe und
+    nicht hier, und hier wird für das Lesen entschieden.
+    """
+    stand: dict[int, str] = {}
+    for zeile in dbm.zeilen(db, """
+            SELECT a.lexem_id,
+                   MAX(CASE WHEN z.zustand = 'reif' THEN 2
+                            WHEN z.zustand IS NOT NULL THEN 1
+                            ELSE 0 END) AS beste
+              FROM aufgabe a
+              JOIN lexem l ON l.id = a.lexem_id
+              LEFT JOIN lernzustand z
+                     ON z.aufgabe_id = a.id AND z.benutzer_id = ?
+             WHERE l.sammlung_id = ? AND a.aktiv = 1
+             GROUP BY a.lexem_id""", (benutzer_id, sammlung_id)):
+        stand[zeile["lexem_id"]] = {2: "sitzt", 1: "lernen"}.get(
+            zeile["beste"], "neu")
+    return stand
+
+
+def _zuordnen(folge: list[dict], karte: dict[str, int]) -> list[dict]:
+    """Legt den Wortschatz über die Wortfolge — längstes Stück zuerst.
+
+    »Το μήλο είναι κόκκινο« soll als »το μήλο« + »είναι« + »κόκκινο«
+    gelesen werden und nicht als vier Einzelwörter, von denen zwei
+    unbekannt sind. Die Länge des längsten Eintrags bestimmt, wie weit
+    vorausgeschaut wird; mehr als ein paar Wörter ist das nie.
+
+    Gierig von links, ohne Rückzug: ein Eintrag, der zufällig in der
+    Mitte eines längeren beginnt, wird erst gar nicht geprüft. Das
+    genügt — die Einträge sind Lemmata, keine Satzteile.
+    """
+    laengste = max((e.count(" ") + 1 for e in karte), default=1)
+    ergebnis: list[dict] = []
+    i = 0
+    while i < len(folge):
+        for laenge in range(min(laengste, len(folge) - i), 0, -1):
+            teile = folge[i:i + laenge]
+            zusammen = " ".join(w["vergleichsform"] for w in teile)
+            lexem_id = karte.get(zusammen)
+            if lexem_id or laenge == 1:
+                ergebnis.append({
+                    "wort": " ".join(w["wort"] for w in teile),
+                    "vergleichsform": zusammen,
+                    "lexem_id": lexem_id,
+                })
+                i += laenge
+                break
+    return ergebnis
+
+
+def deckung(db: sqlite3.Connection, text_id: int, benutzer_id: int) -> dict:
+    """Könnte ich diesen Text übersetzen?
+
+    Gibt jedes Wort einzeln zurück UND die Zusammenfassung. Einzeln,
+    weil die Oberfläche die unbekannten Wörter hervorheben soll — wer
+    nur eine Prozentzahl bekommt, weiß nicht, woran es liegt.
+    """
+    t = dbm.zeile(db, "SELECT * FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    profil = sprachen.profil(t["sprache"])
+    karte = _wortschatz(db, t["sammlung_id"], profil)
+    staende = _lernstaende(db, t["sammlung_id"], benutzer_id)
+    gewuenscht = _wortwunsch_formen(db, benutzer_id, t["sammlung_id"])
+
+    treffer: list[dict] = []
+    # Je Vergleichsform nur einmal zählen — ein Text, in dem »και«
+    # zwanzigmal steht, ist nicht zu 95 % gedeckt, nur weil ein
+    # Allerweltswort oft vorkommt.
+    gesehen: dict[str, dict] = {}
+    for stueck in _zuordnen(woerter(t["inhalt"], profil), karte):
+        lexem_id = stueck["lexem_id"]
+        art = staende.get(lexem_id, "neu") if lexem_id else "unbekannt"
+        eintrag = {**stueck, "art": art,
+                   "gewuenscht": stueck["vergleichsform"] in gewuenscht}
+        treffer.append(eintrag)
+        gesehen.setdefault(stueck["vergleichsform"], eintrag)
+
+    zahlen = {"sitzt": 0, "lernen": 0, "neu": 0, "unbekannt": 0}
+    for eintrag in gesehen.values():
+        zahlen[eintrag["art"]] += 1
+    verschieden = len(gesehen) or 1
+
+    return {
+        "text_id": text_id,
+        "woerter": treffer,
+        "verschiedene_woerter": len(gesehen),
+        "woerter_gesamt": len(treffer),
+        "zahlen": zahlen,
+        # Was beim Lesen trägt: alles, was im Wortschatz steht. »neu«
+        # zählt mit, denn nachschlagen kann man es.
+        "abdeckung": round(100 * (verschieden - zahlen["unbekannt"])
+                           / verschieden),
+        "sicher": round(100 * zahlen["sitzt"] / verschieden),
+        "urteil": _urteil(zahlen, verschieden),
+    }
+
+
+def _urteil(zahlen: dict, verschieden: int) -> str:
+    """Ein Satz statt einer Zahl — die Zahl steht ja daneben."""
+    unbekannt = zahlen["unbekannt"]
+    sitzt_anteil = zahlen["sitzt"] / verschieden
+    if unbekannt == 0 and sitzt_anteil >= 0.8:
+        return ("Das müsstest du können — jedes Wort steht in deinem "
+                "Wortschatz, das meiste sitzt.")
+    if unbekannt == 0:
+        return ("Jedes Wort steht in deinem Wortschatz. Gelernt ist noch "
+                "nicht alles, nachschlagen kannst du aber alles.")
+    if unbekannt <= 3:
+        return (f"Fast — {unbekannt} Wörter fehlen dir noch. "
+                "Die kannst du gleich hier anfordern.")
+    if unbekannt / verschieden <= 0.15:
+        return (f"Machbar mit Hilfe: {unbekannt} von {verschieden} Wörtern "
+                "stehen noch nicht in deinem Wortschatz.")
+    return (f"Das ist noch zu früh: {unbekannt} von {verschieden} Wörtern "
+            "kennst du nicht. Lieber erst einen leichteren Text.")
+
+
+# --------------------------------------------------------------- Wortwünsche
+
+def _wortwunsch_formen(db: sqlite3.Connection, benutzer_id: int,
+                       sammlung_id: int) -> set[str]:
+    return {z["vergleichsform"] for z in dbm.zeilen(db, """
+        SELECT vergleichsform FROM wortwunsch
+         WHERE benutzer_id = ? AND sammlung_id = ? AND erledigt = 0""",
+        (benutzer_id, sammlung_id))}
+
+
+def wort_merken(db: sqlite3.Connection, benutzer_id: int, text_id: int,
+                wort: str, zusammenhang: str | None = None) -> dict:
+    """»Das kenne ich nicht« — auf die Liste damit.
+
+    Zweimal dasselbe Wort ergibt einen Eintrag, nicht zwei: verglichen
+    wird die normierte Fassung. Sonst stünde »Και« vom Satzanfang neben
+    »και« aus der Satzmitte, und die KI legte zwei Vokabeln an.
+    """
+    t = dbm.zeile(db, "SELECT * FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    profil = sprachen.profil(t["sprache"])
+    vergleichsform = pruefung._genau(wort.strip(_RAND), profil)
+    if not vergleichsform:
+        raise ValueError("Das ist kein Wort.")
+
+    db.execute("""INSERT INTO wortwunsch (benutzer_id, sammlung_id, wort,
+                                          vergleichsform, zusammenhang, text_id)
+                  VALUES (?, ?, ?, ?, ?, ?)
+                  ON CONFLICT (benutzer_id, sammlung_id, vergleichsform)
+                  DO UPDATE SET erledigt = 0,
+                                zusammenhang = COALESCE(excluded.zusammenhang,
+                                                        wortwunsch.zusammenhang)""",
+               (benutzer_id, t["sammlung_id"], wort.strip(_RAND),
+                vergleichsform, zusammenhang, text_id))
+    return dbm.zeile(db, """SELECT * FROM wortwunsch
+                             WHERE benutzer_id = ? AND sammlung_id = ?
+                               AND vergleichsform = ?""",
+                     (benutzer_id, t["sammlung_id"], vergleichsform))
+
+
+def wort_vergessen(db: sqlite3.Connection, benutzer_id: int, text_id: int,
+                   wort: str) -> None:
+    """Doch gekannt — wieder herunter von der Liste."""
+    t = dbm.zeile(db, "SELECT * FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    vergleichsform = pruefung._genau(wort.strip(_RAND),
+                                     sprachen.profil(t["sprache"]))
+    db.execute("""DELETE FROM wortwunsch
+                   WHERE benutzer_id = ? AND sammlung_id = ?
+                     AND vergleichsform = ?""",
+               (benutzer_id, t["sammlung_id"], vergleichsform))
+
+
+def wortwuensche(db: sqlite3.Connection, benutzer_id: int,
+                 sammlung_id: int | None = None,
+                 offen: bool = True) -> list[dict]:
+    """Die Liste, die die KI über den MCP abholt."""
+    bedingungen = ["w.benutzer_id = ?"]
+    werte: list = [benutzer_id]
+    if sammlung_id:
+        bedingungen.append("w.sammlung_id = ?")
+        werte.append(sammlung_id)
+    if offen:
+        bedingungen.append("w.erledigt = 0")
+    return dbm.zeilen(db, f"""
+        SELECT w.*, s.name AS sammlung, s.sprache, t.titel AS text
+          FROM wortwunsch w
+          JOIN sammlung s ON s.id = w.sammlung_id
+          LEFT JOIN text t ON t.id = w.text_id
+         WHERE {' AND '.join(bedingungen)}
+         ORDER BY w.angelegt""", tuple(werte))
+
+
+def wortwunsch_erledigen(db: sqlite3.Connection, wunsch_id: int,
+                         lexem_id: int | None = None) -> dict:
+    """Die KI hat die Vokabel angelegt — Haken dran.
+
+    Der Eintrag wird NICHT gelöscht: er ist der Beleg, woher die Vokabel
+    stammt, und er verhindert, dass dasselbe Wort beim nächsten Text
+    erneut angefordert wird, bevor es freigegeben ist.
+    """
+    w = dbm.zeile(db, "SELECT * FROM wortwunsch WHERE id = ?", (wunsch_id,))
+    if w is None:
+        raise KeyError(f"Wortwunsch {wunsch_id} gibt es nicht")
+    db.execute("UPDATE wortwunsch SET erledigt = 1, lexem_id = ? WHERE id = ?",
+               (lexem_id, wunsch_id))
+    return dbm.zeile(db, "SELECT * FROM wortwunsch WHERE id = ?", (wunsch_id,))
+
+
+# -------------------------------------------------------------- Texte selbst
+
+def anlegen(db: sqlite3.Connection, sammlung_id: int, titel: str,
+            inhalt: str, **rest) -> dict:
+    """Einen Text einwerfen. Mehr braucht es nicht: Titel und Inhalt.
+
+    Die Abschnitte entstehen gleich mit, denn ohne sie gäbe es keine
+    Einheit zum Übersetzen. Zerlegt wird an Leerzeilen (Absätze) und
+    sonst an Satzenden — ein Absatz ist die natürliche Einheit, ein
+    einzelner Satz die kleinere Ausweichmöglichkeit, wenn kein Absatz
+    erkennbar ist.
+    """
+    s = dbm.zeile(db, "SELECT * FROM sammlung WHERE id = ?", (sammlung_id,))
+    if s is None:
+        raise KeyError(f"Sammlung {sammlung_id} gibt es nicht")
+    if not (inhalt or "").strip():
+        raise ValueError("Der Text ist leer.")
+
+    cur = db.execute("""INSERT INTO text (sammlung_id, titel, sprache, inhalt,
+                                          uebersetzung, niveau, quelle, notiz,
+                                          typ, geprueft)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'lesetext', 1)""",
+                     (sammlung_id, titel.strip() or "Ohne Titel",
+                      rest.get("sprache") or s["sprache"], inhalt.strip(),
+                      rest.get("uebersetzung"), rest.get("niveau"),
+                      rest.get("quelle", "manuell"), rest.get("notiz")))
+    text_id = cur.lastrowid
+    _abschnitte_schreiben(db, text_id, inhalt)
+    return lesen(db, text_id)
+
+
+def _abschnitte_schreiben(db: sqlite3.Connection, text_id: int,
+                          inhalt: str) -> None:
+    db.execute("DELETE FROM textabschnitt WHERE text_id = ?", (text_id,))
+    for i, stueck in enumerate(abschnitte_zerlegen(inhalt)):
+        db.execute("""INSERT INTO textabschnitt (text_id, reihenfolge, original)
+                      VALUES (?, ?, ?)""", (text_id, i, stueck))
+
+
+def abschnitte_zerlegen(inhalt: str) -> list[str]:
+    """Absätze, und nur ersatzweise Sätze.
+
+    Ein Absatz ist die Einheit, in der man übersetzt — Satz für Satz
+    zerreißt den Zusammenhang, auf den es beim Übersetzen gerade
+    ankommt. Nur wenn jemand einen Block ohne Leerzeilen einwirft, wird
+    an Satzenden getrennt, sonst stünde der ganze Text in einem Feld.
+    """
+    roh = (inhalt or "").strip()
+    absaetze = [a.strip() for a in re.split(r"\n\s*\n", roh) if a.strip()]
+    if len(absaetze) > 1:
+        return absaetze
+    # Ein Block: an Satzenden trennen, das Satzzeichen bleibt dabei stehen.
+    saetze = [s.strip() for s in re.split(r"(?<=[.!?;·])\s+", roh) if s.strip()]
+    return saetze or [roh]
+
+
+def lesen(db: sqlite3.Connection, text_id: int,
+          benutzer_id: int | None = None) -> dict:
+    t = dbm.zeile(db, "SELECT * FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    ergebnis = dict(t)
+    ergebnis["abschnitte"] = [dict(a) for a in dbm.zeilen(db, """
+        SELECT * FROM textabschnitt WHERE text_id = ?
+         ORDER BY reihenfolge""", (text_id,))]
+    if benutzer_id:
+        eigene = {z["abschnitt_id"]: z["fassung"] for z in dbm.zeilen(db, """
+            SELECT v.abschnitt_id, v.fassung FROM uebersetzungsversuch v
+              JOIN textabschnitt a ON a.id = v.abschnitt_id
+             WHERE a.text_id = ? AND v.benutzer_id = ?""",
+            (text_id, benutzer_id))}
+        for a in ergebnis["abschnitte"]:
+            a["meine_fassung"] = eigene.get(a["id"], "")
+    return ergebnis
+
+
+def auflisten(db: sqlite3.Connection, sammlung_id: int) -> list[dict]:
+    return dbm.zeilen(db, """
+        SELECT t.id, t.titel, t.sprache, t.niveau, t.angelegt, t.notiz,
+               LENGTH(t.inhalt) AS zeichen,
+               (SELECT COUNT(*) FROM textabschnitt a WHERE a.text_id = t.id)
+                 AS abschnitte
+          FROM text t
+         WHERE t.sammlung_id = ? AND t.typ = 'lesetext'
+         ORDER BY t.angelegt DESC""", (sammlung_id,))
+
+
+def loeschen(db: sqlite3.Connection, text_id: int) -> None:
+    if dbm.zeile(db, "SELECT 1 FROM text WHERE id = ?", (text_id,)) is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    db.execute("DELETE FROM text WHERE id = ?", (text_id,))
+
+
+def fassung_sichern(db: sqlite3.Connection, abschnitt_id: int,
+                    benutzer_id: int, fassung: str) -> dict:
+    """Meine Übersetzung eines Abschnitts."""
+    if dbm.zeile(db, "SELECT 1 FROM textabschnitt WHERE id = ?",
+                 (abschnitt_id,)) is None:
+        raise KeyError(f"Abschnitt {abschnitt_id} gibt es nicht")
+    db.execute("""INSERT INTO uebersetzungsversuch
+                      (abschnitt_id, benutzer_id, fassung, geaendert)
+                  VALUES (?, ?, ?, datetime('now'))
+                  ON CONFLICT (abschnitt_id, benutzer_id)
+                  DO UPDATE SET fassung = excluded.fassung,
+                                geaendert = datetime('now')""",
+               (abschnitt_id, benutzer_id, fassung))
+    return {"abschnitt_id": abschnitt_id, "fassung": fassung}
+
+
+def nachschlagen(db: sqlite3.Connection, text_id: int, wort: str) -> dict:
+    """Was weiß der Wortschatz über dieses Wort?
+
+    Die Unterstützung beim Übersetzen, in ihrer einfachsten und
+    ehrlichsten Form: nicht eine Maschinenübersetzung, sondern der
+    eigene Eintrag. Steht er nicht da, sagt die Antwort das — und
+    genau dann ist der Knopf »anfordern« richtig.
+    """
+    t = dbm.zeile(db, "SELECT * FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    profil = sprachen.profil(t["sprache"])
+    vergleichsform = pruefung._genau(wort.strip(_RAND), profil)
+    lexem_id = _wortschatz(db, t["sammlung_id"], profil).get(vergleichsform)
+    if not lexem_id:
+        return {"wort": wort, "gefunden": False, "bedeutungen": []}
+
+    lexem = dbm.zeile(db, "SELECT * FROM lexem WHERE id = ?", (lexem_id,))
+    bedeutungen = []
+    for b in dbm.zeilen(db, """SELECT * FROM bedeutung WHERE lexem_id = ?
+                                ORDER BY reihenfolge""", (lexem_id,)):
+        bedeutungen.append({
+            "kontext": b["kontext"],
+            "notiz": b["notiz"],
+            "uebersetzungen": [u["text"] for u in dbm.zeilen(db, """
+                SELECT text FROM uebersetzung WHERE bedeutung_id = ?
+                 ORDER BY ist_haupt DESC, id""", (b["id"],))],
+        })
+    # Welche Form ist es denn? Das ist beim Übersetzen die halbe Miete:
+    # »έγραψα« ist nicht »γράφω«, sondern dessen Aorist.
+    form = dbm.zeile(db, """SELECT * FROM form
+                             WHERE lexem_id = ? AND text = ?""",
+                     (lexem_id, wort.strip(_RAND)))
+    return {
+        "wort": wort,
+        "gefunden": True,
+        "lexem_id": lexem_id,
+        "lemma": lexem["lemma"],
+        "wortart": lexem["wortart"],
+        "bedeutungen": bedeutungen,
+        "merkmale": json.loads(form["merkmale"]) if form else None,
+    }

@@ -2490,14 +2490,20 @@ def _mcp_wurzel() -> str:
 # Die vorgeschriebene Stelle bleibt bestehen, damit es richtig wird,
 # sobald der Pfad bei Cloudflare freigegeben ist. Angekündigt wird aber
 # die Adresse, die HEUTE durchkommt.
-# Die dritte Schreibweise, und sie ist die eigentlich vorgeschriebene:
-# hat der Herausgeber einen Pfad (hier /mcp), schiebt RFC 8414 ihn
-# HINTER den .well-known-Teil. Dasselbe tut RFC 9728 für die
-# Ressource. Sichtbar wurde das erst, als der Tunnel /.well-known
-# durchließ — vorher beantwortete Cloudflare alles mit einem leeren
-# 404, und ein fehlender Pfad sah aus wie ein gesperrter.
+# WO dieses Blatt liegen DARF, bestimmt der Herausgeber: RFC 8414 §3.3
+# verlangt, dass der darin genannte `issuer` genau zu der Adresse
+# passt, unter der es abgerufen wurde. Ein Blatt an der falschen
+# Stelle ist darum schlimmer als keines — ein prüfender Client
+# verwirft es und sucht weiter. Genau daran ist ChatGPT gescheitert:
+# es holte das Blatt (200) und ging danach trotzdem weiter auf die
+# Suche, weil der Herausgeber »…/mcp« hieß und die Adresse auf den
+# bloßen Namen zeigte.
+#
+# Darum ist der Herausgeber jetzt der Name ohne Pfad, und das Blatt
+# liegt an der dazu passenden Stelle. Die Fassung unter /mcp bleibt
+# als Notnagel für den Fall, dass die Tunnelroute für /.well-known
+# einmal fehlt — dann ist sie das einzig Erreichbare.
 @app.get("/.well-known/oauth-authorization-server")
-@app.get("/.well-known/oauth-authorization-server/mcp")
 @app.get("/mcp/.well-known/oauth-authorization-server")
 def oauth_kennblatt():
     """Was ein Konnektor über diesen Autorisierungsdienst wissen muss.
@@ -2509,14 +2515,14 @@ def oauth_kennblatt():
     """
     _oauth_bereit()
     return {
-        # Der Herausgeber ist die MCP-Adresse MIT Pfad, nicht bloß der
-        # Name. Daran hängt, wo ein Client dieses Blatt sucht: an
-        # <Herausgeber>/.well-known/… — und das ist hier
-        # /mcp/.well-known/…, also das, was durch den Tunnel kommt.
-        # Mit dem bloßen Namen als Herausgeber landete die Suche unter
-        # /.well-known/… und damit bei Cloudflares leerem 404.
-        "issuer": MCP_URL,
-        "authorization_endpoint": f"{WEB_URL}/oauth/authorize",
+        "issuer": _mcp_wurzel(),
+        # Auf DEMSELBEN Namen wie der Herausgeber. Dass hier vorher der
+        # andere Name stand, war die zweite Auffälligkeit: erlaubt,
+        # aber ungewöhnlich, und manche Clients nehmen es nicht an.
+        # Die Weiterleitung dorthin macht jetzt der Server selbst —
+        # siehe oauth_weiterleiten. Am Ablauf ändert das nichts: der
+        # Mensch landet weiterhin hinter der Access-Anmeldung.
+        "authorization_endpoint": f"{_mcp_wurzel()}/mcp/oauth/authorize",
         # Unter /mcp, weil nur dieser Pfad durch den Tunnel kommt.
         "token_endpoint": f"{_mcp_wurzel()}/mcp/oauth/token",
         "response_types_supported": ["code"],
@@ -2527,13 +2533,16 @@ def oauth_kennblatt():
     }
 
 
-@app.get("/.well-known/oauth-protected-resource")
+# Die Ressource HAT einen Pfad (/mcp), hier gehört er also hinter den
+# .well-known-Teil. Die Fassung unter /mcp daneben ist die, auf die
+# die WWW-Authenticate-Kopfzeile zeigt; RFC 9728 lässt dort jede
+# Adresse zu, und sie kommt auch ohne Tunnelroute durch.
 @app.get("/.well-known/oauth-protected-resource/mcp")
 @app.get("/mcp/.well-known/oauth-protected-resource")
 def oauth_ressource():
     _oauth_bereit()
     return {"resource": MCP_URL,
-            "authorization_servers": [MCP_URL],
+            "authorization_servers": [_mcp_wurzel()],
             "scopes_supported": ["vokabeln"]}
 
 
@@ -2587,6 +2596,22 @@ def _zurueck(rueckadresse: str, **felder) -> RedirectResponse:
     trenner = "&" if "?" in rueckadresse else "?"
     return RedirectResponse(f"{rueckadresse}{trenner}{urlencode(teile)}",
                             status_code=303)
+
+
+@app.get("/mcp/oauth/authorize")
+def oauth_weiterleiten(request: Request):
+    """Schickt den Browser zu der Adresse, hinter der die Anmeldung steht.
+
+    Der Umweg hat einen einzigen Zweck: im Kennblatt soll der
+    Autorisierungsendpunkt auf demselben Namen stehen wie der
+    Herausgeber. Die Anmeldung selbst kann hier nicht stattfinden —
+    vor diesem Namen steht kein Access, und ohne geprüfte Mailadresse
+    verweigert die Einwilligungsseite ohnehin.
+    """
+    _oauth_bereit()
+    frage = request.url.query
+    return RedirectResponse(f"{WEB_URL}/oauth/authorize"
+                            + (f"?{frage}" if frage else ""), status_code=302)
 
 
 @app.get("/oauth/authorize")

@@ -16,6 +16,42 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Warum ChatGPT das Kennblatt holte und trotzdem weitersuchte
+
+Im Serverprotokoll stand die Antwort, zweimal dieselbe Schleife im
+Abstand von fünf Sekunden:
+
+```
+POST /mcp                                        401   wie vorgesehen
+GET  /mcp/.well-known/oauth-protected-resource   200   folgt der Kopfzeile
+GET  /.well-known/oauth-authorization-server/mcp 200   findet das Blatt
+GET  …/openid-configuration  (drei Schreibweisen) 404
+→ und von vorn
+```
+
+Es **bekam** das Blatt und suchte danach trotzdem weiter. Also hat es
+das Blatt verworfen, und dafür gab es zwei Gründe — beide von mir:
+
+**Der Herausgeber passte nicht zur Adresse.** RFC 8414 verlangt, dass
+der im Blatt genannte Herausgeber genau zu der Stelle passt, an der es
+liegt. Unter `/.well-known/oauth-authorization-server` heißt der
+Herausgeber `https://mcp.…`, im Blatt stand aber `https://mcp.…/mcp`.
+Dass ich den Pfad hineingeschrieben hatte, war ein Umweg um das
+Tunnelproblem — auf Kosten der Richtigkeit, und es hat sich gerächt.
+Seit die Tunnelroute steht, braucht es den Umweg nicht mehr.
+
+**Der Autorisierungsendpunkt lag auf einem anderen Namen** als der
+Herausgeber. Erlaubt, aber ungewöhnlich. Er liegt jetzt auf
+demselben Namen und leitet von dort dorthin weiter, wo Cloudflare
+Access die Anmeldung macht — am Ablauf ändert das nichts, am Blatt
+schon.
+
+Ein Blatt an der falschen Stelle ist schlimmer als keines: es wird
+geholt, geprüft, verworfen, und die Suche beginnt von vorn. Darum
+liegen die Blätter jetzt nur noch dort, wo sie hingehören, und die
+früher zusätzlich bedienten Stellen antworten wieder mit 404.
+
+
 ### Die Anmeldeangaben stehen jetzt an allen drei Stellen
 
 Nachdem der Tunnel `/.well-known` durchlässt, wurde eine dritte

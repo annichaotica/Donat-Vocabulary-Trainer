@@ -109,15 +109,33 @@ def test_der_ganze_weg(klient, eingerichtet):
     assert mcp.status_code == 200, mcp.text
 
 
-def test_das_kennblatt_nennt_zwei_verschiedene_namen(klient, eingerichtet):
-    """Der Autorisierungsschritt liegt dort, wo Access einen Menschen
-    anmeldet; der Tokentausch dort, wo keiner mehr beteiligt ist und ein
-    Anmeldefenster nur im Weg wäre."""
+def test_der_herausgeber_passt_zur_adresse(klient, eingerichtet):
+    """RFC 8414 §3.3: der genannte Herausgeber muss genau zu der
+    Adresse passen, unter der das Blatt liegt. Tut er es nicht,
+    verwirft ein prüfender Client das Blatt und sucht weiter — ChatGPT
+    hat es geholt, verworfen und die Suche von vorn begonnen, in einer
+    Schleife alle fünf Sekunden."""
     d = klient.get("/.well-known/oauth-authorization-server").json()
-    assert d["authorization_endpoint"].startswith("https://vokabeln.example.org")
-    assert d["token_endpoint"].startswith("https://mcp.example.org")
+    assert d["issuer"] == "https://mcp.example.org"
+    # Und der Endpunkt liegt auf DEMSELBEN Namen. Dass er vorher auf
+    # einen anderen zeigte, war erlaubt, aber ungewöhnlich.
+    assert d["authorization_endpoint"] == \
+        "https://mcp.example.org/mcp/oauth/authorize"
+    assert d["token_endpoint"] == "https://mcp.example.org/mcp/oauth/token"
     # plain wäre kein Schutz und steht darum nicht drin.
     assert d["code_challenge_methods_supported"] == ["S256"]
+
+
+def test_der_umweg_fuehrt_hinter_die_anmeldung(klient, eingerichtet):
+    """Der Endpunkt auf dem MCP-Namen leitet dorthin weiter, wo Access
+    davorsteht — angemeldet wird weiterhin dort und nirgends sonst."""
+    antwort = klient.get("/mcp/oauth/authorize",
+                         params={"client_id": "x", "state": "abc"},
+                         follow_redirects=False)
+    assert antwort.status_code == 302
+    ziel = antwort.headers["location"]
+    assert ziel.startswith("https://vokabeln.example.org/oauth/authorize?")
+    assert "client_id=x" in ziel and "state=abc" in ziel
 
 
 def test_der_401_sagt_wo_die_angaben_stehen(klient, eingerichtet):
@@ -143,17 +161,25 @@ def test_der_401_sagt_wo_die_angaben_stehen(klient, eingerichtet):
            'oauth-protected-resource"' in kopf
 
 
-def test_der_herausgeber_zeigt_auf_das_erreichbare_blatt(klient, eingerichtet):
-    """Ein Client sucht das Kennblatt bei <Herausgeber>/.well-known/….
-    Stünde dort nur der Name ohne Pfad, landete er unter /.well-known/…
-    und damit bei Cloudflares leerem 404."""
+def test_ressource_und_herausgeber_sind_zweierlei(klient, eingerichtet):
+    """Die Ressource ist die Schnittstelle MIT Pfad, der Herausgeber
+    der Name OHNE.
+
+    Hier stand erst beides auf »…/mcp«, weil nur dieser Pfad durch den
+    Tunnel kam. Das war ein Umweg um ein Transportproblem auf Kosten
+    der Richtigkeit, und es hat sich gerächt: unter der Adresse ohne
+    Pfad nannte das Blatt einen Herausgeber mit Pfad, und das ist nach
+    RFC 8414 §3.3 ungültig. Seit die Tunnelroute steht, braucht es den
+    Umweg nicht mehr.
+    """
     d = klient.get("/.well-known/oauth-authorization-server").json()
-    assert d["issuer"] == "https://mcp.example.org/mcp"
-    r = klient.get("/.well-known/oauth-protected-resource").json()
-    assert r["authorization_servers"] == ["https://mcp.example.org/mcp"]
+    r = klient.get("/.well-known/oauth-protected-resource/mcp").json()
+    assert r["resource"] == "https://mcp.example.org/mcp"
+    assert r["authorization_servers"] == [d["issuer"]]
+    assert d["issuer"] == "https://mcp.example.org"
 
 
-def test_alle_drei_schreibweisen_antworten(klient, eingerichtet):
+def test_die_blaetter_liegen_an_den_passenden_stellen(klient, eingerichtet):
     """Ein Client sucht je nach Auslegung an verschiedenen Stellen.
 
     Hat der Herausgeber einen Pfad — hier /mcp —, schiebt RFC 8414 ihn
@@ -163,17 +189,21 @@ def test_alle_drei_schreibweisen_antworten(klient, eingerichtet):
     Einrichtung ablehnt, ohne den Server je zu fragen.
     """
     for pfad in ("/.well-known/oauth-authorization-server",
-                 "/.well-known/oauth-authorization-server/mcp",
                  "/mcp/.well-known/oauth-authorization-server"):
         a = klient.get(pfad)
         assert a.status_code == 200, pfad
-        assert a.json()["issuer"] == "https://mcp.example.org/mcp", pfad
-    for pfad in ("/.well-known/oauth-protected-resource",
-                 "/.well-known/oauth-protected-resource/mcp",
+        assert a.json()["issuer"] == "https://mcp.example.org", pfad
+    for pfad in ("/.well-known/oauth-protected-resource/mcp",
                  "/mcp/.well-known/oauth-protected-resource"):
         a = klient.get(pfad)
         assert a.status_code == 200, pfad
         assert a.json()["resource"] == "https://mcp.example.org/mcp", pfad
+        assert a.json()["authorization_servers"] == ["https://mcp.example.org"]
+
+    # Und NICHT dort, wo der Herausgeber nicht zur Adresse passte: ein
+    # Blatt an falscher Stelle ist schlimmer als keines.
+    assert klient.get(
+        "/.well-known/oauth-authorization-server/mcp").status_code == 404
 
 
 def test_ohne_anlage_kein_oauth(klient):

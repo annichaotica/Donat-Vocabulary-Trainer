@@ -101,12 +101,22 @@ auch nur einmal anzufragen — es suchte die Anmeldeangaben unter
 über die Kopfzeile `WWW-Authenticate`, mit der der Server die
 erreichbare Stelle selbst nennt.
 
-Ein Client, der darauf besteht, die Angaben an der vorgeschriebenen
-Stelle zu finden, braucht eine Freigabe im Tunnel. In der
-Cloudflare-Verwaltung unter **Networks → Tunnels → Public Hostname**
-einen ZWEITEN Eintrag für denselben Namen anlegen, mit dem Pfad für
-`.well-known` und demselben Dienst wie der bestehende
-`mcp`-Eintrag — die Schreibweise des Pfads genauso wie dort.
+**Am 15.11.2026 eingerichtet.** Die Routen stehen in der
+Cloudflare-Verwaltung unter **Netzwerk → Tunnel → familienserver →
+Routen** (nicht mehr unter Zero Trust, dort ist die Seite weg). Der
+Pfad ist ein regulärer Ausdruck. Jetzt stehen dort fünf Routen:
+
+| Ziel | Dienst |
+|---|---|
+| `vokabeln.<domain>` | `http://127.0.0.1:8030` |
+| `rezepte.<domain>` | `http://127.0.0.1:9925` |
+| `fotos.<domain>` | `http://127.0.0.1:2283` |
+| `mcp.<domain>` Pfad `^/mcp` | `http://127.0.0.1:8030` |
+| `mcp.<domain>` Pfad `^/\.well-known` | `http://127.0.0.1:8030` |
+
+Die letzte kam dazu, damit ein Konnektor die Anmeldeangaben an der
+vorgeschriebenen Stelle findet. Nachgemessen, dass sie nichts weiter
+öffnet: `/api/benutzer` über diesen Namen liefert weiterhin 0 Byte.
 
 > **Die bestehende Beschränkung dabei NICHT entfernen.** Hinter dem
 > Namen liegt dieselbe Anwendung wie hinter `vokabeln.`, aber ohne

@@ -153,6 +153,29 @@ def test_der_herausgeber_zeigt_auf_das_erreichbare_blatt(klient, eingerichtet):
     assert r["authorization_servers"] == ["https://mcp.example.org/mcp"]
 
 
+def test_alle_drei_schreibweisen_antworten(klient, eingerichtet):
+    """Ein Client sucht je nach Auslegung an verschiedenen Stellen.
+
+    Hat der Herausgeber einen Pfad — hier /mcp —, schiebt RFC 8414 ihn
+    HINTER den .well-known-Teil; daneben gibt es die schlichte Form
+    und die angehängte. Alle drei zu bedienen kostet drei Zeilen und
+    spart die Suche nach dem Grund, warum ein Konnektor die
+    Einrichtung ablehnt, ohne den Server je zu fragen.
+    """
+    for pfad in ("/.well-known/oauth-authorization-server",
+                 "/.well-known/oauth-authorization-server/mcp",
+                 "/mcp/.well-known/oauth-authorization-server"):
+        a = klient.get(pfad)
+        assert a.status_code == 200, pfad
+        assert a.json()["issuer"] == "https://mcp.example.org/mcp", pfad
+    for pfad in ("/.well-known/oauth-protected-resource",
+                 "/.well-known/oauth-protected-resource/mcp",
+                 "/mcp/.well-known/oauth-protected-resource"):
+        a = klient.get(pfad)
+        assert a.status_code == 200, pfad
+        assert a.json()["resource"] == "https://mcp.example.org/mcp", pfad
+
+
 def test_ohne_anlage_kein_oauth(klient):
     """Ohne die beiden Adressen bietet der Trainer gar nichts an, statt
     einen Endpunkt zu nennen, der ungeschützt wäre."""

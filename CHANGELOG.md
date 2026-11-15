@@ -16,6 +16,25 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Die Anmeldeangaben stehen jetzt an allen drei Stellen
+
+Nachdem der Tunnel `/.well-known` durchlässt, wurde eine dritte
+Schreibweise sichtbar, die vorher unter Cloudflares leerem 404
+verborgen war: hat der Herausgeber einen Pfad — hier `/mcp` —, schiebt
+RFC 8414 ihn **hinter** den `.well-known`-Teil
+(`/.well-known/oauth-authorization-server/mcp`). Dasselbe tut RFC 9728
+für die Ressource. Genau das ist bei dieser Anlage die eigentlich
+vorgeschriebene Stelle, und sie fehlte.
+
+Alle drei Schreibweisen antworten jetzt, für beide Blätter. Das kostet
+sechs Zeilen und erspart die Suche nach dem Grund, warum ein Konnektor
+ablehnt, ohne den Server je zu fragen.
+
+Von außen nachgemessen: sechsmal 200. Und `/api` über diesen Namen
+weiterhin 0 Byte — die neue Tunnelroute öffnet nichts außer
+`.well-known`.
+
+
 ### ChatGPT lehnte die Einrichtung ab — zwei Ursachen
 
 **»Ich glaube, die Callback-URL wird nicht gespeichert.«** Sie wurde,

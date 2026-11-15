@@ -2490,7 +2490,14 @@ def _mcp_wurzel() -> str:
 # Die vorgeschriebene Stelle bleibt bestehen, damit es richtig wird,
 # sobald der Pfad bei Cloudflare freigegeben ist. Angekündigt wird aber
 # die Adresse, die HEUTE durchkommt.
+# Die dritte Schreibweise, und sie ist die eigentlich vorgeschriebene:
+# hat der Herausgeber einen Pfad (hier /mcp), schiebt RFC 8414 ihn
+# HINTER den .well-known-Teil. Dasselbe tut RFC 9728 für die
+# Ressource. Sichtbar wurde das erst, als der Tunnel /.well-known
+# durchließ — vorher beantwortete Cloudflare alles mit einem leeren
+# 404, und ein fehlender Pfad sah aus wie ein gesperrter.
 @app.get("/.well-known/oauth-authorization-server")
+@app.get("/.well-known/oauth-authorization-server/mcp")
 @app.get("/mcp/.well-known/oauth-authorization-server")
 def oauth_kennblatt():
     """Was ein Konnektor über diesen Autorisierungsdienst wissen muss.
@@ -2521,6 +2528,7 @@ def oauth_kennblatt():
 
 
 @app.get("/.well-known/oauth-protected-resource")
+@app.get("/.well-known/oauth-protected-resource/mcp")
 @app.get("/mcp/.well-known/oauth-protected-resource")
 def oauth_ressource():
     _oauth_bereit()

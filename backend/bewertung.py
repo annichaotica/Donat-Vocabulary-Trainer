@@ -34,6 +34,27 @@ from fsrs import BEWERTUNGEN, GUT, LEICHT, NOCHMAL, SCHWER
 
 # Ab so vielen eigenen Messwerten gilt die Bezugszeit als belastbar.
 GENUG_MESSWERTE = 6
+
+# Ab wann eine Denkzeit keine Denkzeit mehr ist.
+#
+# Aus dem Betrieb: »manchmal wird etwas als wacklig beurteilt, wo ich mir
+# denke, nie im Leben habe ich so lange gebraucht«. Im Protokoll stand
+# als Höchstwert 103 Sekunden. Das ist kein zähes Nachdenken, das ist
+# eine Unterbrechung — das Telefon klingelt, jemand kommt zur Tür, die
+# Seite liegt im Hintergrund.
+#
+# Beim Bilden des Bezugsmedians wurden solche Werte längst
+# ausgeschlossen (BETWEEN 200 AND 60000). Für die EINZELNE Messung galt
+# das nicht: sie wurde voll gegen die Schwelle gehalten und zog die
+# Bewertung herunter. Dieselbe Spanne gilt jetzt für beides — was zum
+# Median nicht taugt, taugt auch nicht zum Urteil.
+MESSUNG_MIN_MS, MESSUNG_MAX_MS = 200, 60000
+
+
+def messung_brauchbar(denkzeit_ms: int | None) -> bool:
+    """Ist diese Zeitmessung überhaupt eine Aussage über das Können?"""
+    return (denkzeit_ms is not None
+            and MESSUNG_MIN_MS <= denkzeit_ms <= MESSUNG_MAX_MS)
 MESSWERTE_FENSTER = 60
 
 # Grenzen für das Verhältnis Denkzeit zu Bezugszeit.
@@ -113,7 +134,7 @@ def einschaetzen(urteil: str, fehlerart: str | None = None,
 
     # ---- Verfeinerung: wie zäh ging es?
     zeitwert = None
-    if zeitmessung and denkzeit_ms and bezug_ms:
+    if zeitmessung and bezug_ms and messung_brauchbar(denkzeit_ms):
         zeitwert = denkzeit_ms / bezug_ms
         belastbar = messwerte >= GENUG_MESSWERTE
         # Ohne genug eigene Messwerte nur bei deutlichen Ausschlägen eingreifen.
@@ -150,7 +171,15 @@ def einschaetzen(urteil: str, fehlerart: str | None = None,
             "bezugszeit_ms": round(bezug_ms) if bezug_ms else None,
             "zeitwert": round(zeitwert, 2) if zeitwert else None,
             "eigene_messwerte": messwerte,
-            "zeit_gewertet": bool(zeitmessung and denkzeit_ms and bezug_ms),
+            # Dieselbe Bedingung wie oben beim Urteil, nicht eine
+            # ähnliche. Sie stand hier als »zeitmessung and denkzeit_ms
+            # and bezug_ms« und meldete damit `true`, nachdem die
+            # Messung als unbrauchbar verworfen worden war — die
+            # Begründung, die sie aufklappt, behauptete also, die Zeit
+            # habe gezählt. Eine Begründung, die nicht stimmt, ist
+            # schlimmer als keine.
+            "zeit_gewertet": bool(zeitmessung and bezug_ms
+                                  and messung_brauchbar(denkzeit_ms)),
         },
     }
 

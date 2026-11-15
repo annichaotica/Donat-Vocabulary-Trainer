@@ -49,6 +49,20 @@ export class Sitzung {
     this.merkmalsWahl = {};
     this.lg = {};
     this.tastatur = (e) => this.aufTaste(e);
+    /* Lag die Seite zwischendurch im Hintergrund?
+     *
+     * `performance.now()` läuft weiter, wenn man auf dem Handy die App
+     * wechselt oder der Bildschirm zugeht. Die Zeit bis zum ersten
+     * Tastendruck misst dann die Unterbrechung, nicht das Nachdenken —
+     * und der Trainer wertet ein gekonntes Wort als »lange gesucht«
+     * herunter. Darum wird die Messung in diesem Fall verworfen: lieber
+     * keine Aussage als eine falsche.
+     */
+    this.warVersteckt = false;
+    this.sichtbarkeit = () => {
+      if (document.visibilityState === 'hidden') this.warVersteckt = true;
+    };
+    document.addEventListener('visibilitychange', this.sichtbarkeit);
   }
 
   async start() {
@@ -75,6 +89,7 @@ export class Sitzung {
     // auf eine Antwort wartet, in den Inhaltsbereich der neuen Ansicht.
     this.abgebrochen = true;
     document.removeEventListener('keydown', this.tastatur);
+    document.removeEventListener('visibilitychange', this.sichtbarkeit);
     if (this._umschriftLoesen) this._umschriftLoesen();
     if (this._umschriftReihe) this._umschriftReihe.forEach((f) => f());
   }
@@ -92,6 +107,7 @@ export class Sitzung {
     this.aufgedeckt = false;      // sonst wirkt "Weiß ich nicht" fort
     this.tipps = 0;               // ebenso die genommenen Tipps
     this.tippText = null;
+    this.warVersteckt = false;    // und die Unterbrechung der vorigen Frage
     this.zeichneLade();
     let reihe;
     try {
@@ -923,7 +939,7 @@ export class Sitzung {
         benutzer_id: zustand.benutzerId,
         aufgabe_id: this.aufgabe.aufgabe_id,
         antwort,
-        denkzeit_ms: this.denkzeit,
+        denkzeit_ms: this.warVersteckt ? null : this.denkzeit,
         versuche: this.versuche,
       });
     } catch (fehler) {
@@ -1001,7 +1017,7 @@ export class Sitzung {
           || (u.abweichungen || []).find((a) => a === 'diakritika'
                                              || a === 'verwechslung') || null,
         dauer_ms: Math.round(performance.now() - this.begonnen),
-        denkzeit_ms: this.denkzeit,
+        denkzeit_ms: this.warVersteckt ? null : this.denkzeit,
         versuche: this.versuche,
         aufgedeckt: Boolean(this.aufgedeckt),
       });

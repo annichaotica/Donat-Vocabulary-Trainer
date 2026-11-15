@@ -16,6 +16,32 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Fehler von mir: die `.env` auf dem Server gelöscht
+
+Beim Ausliefern habe ich `rsync --delete` von Hand benutzt und dabei
+nur `daten` ausgenommen. Die `.env` auf dem Server steht
+richtigerweise **nicht** im Repo — also sah rsync eine Datei, die es
+hier nicht mehr gibt, und hat sie entfernt.
+
+Folge: `VOKABEL_ACCESS_TEAM` war leer. Damit sieht der Trainer die von
+Cloudflare Access geprüfte Mailadresse gar nicht erst an (so ist es
+gebaut: ohne Team-Kennung wird die Kopfzeile ignoriert, weil sie sich
+im Heimnetz fälschen ließe). Wer von außen kam, landete darum auf der
+Profilliste statt in seinem eigenen Profil. Bestand und Lernstände
+waren nie betroffen — `daten` war ausgenommen.
+
+Wiederhergestellt. Beide Werte waren eindeutig rekonstruierbar: die
+Team-Kennung steht in der Weiterleitung, die Access selbst schickt,
+und die MCP-Adresse in der Anleitung.
+
+Damit das nicht wiederkommt, gibt es jetzt
+`werkzeuge/ausliefern.sh`: feste Ausnahmeliste für alles, was nur auf
+dem Server lebt (`daten`, `.env`, `ZUGANGSDATEN*`), ein Probelauf, der
+**vor** der Übertragung zeigt, was gelöscht würde und dann nachfragt,
+und am Ende die Kontrolle, ob die Anlagewerte im Container noch
+gesetzt sind.
+
+
 ### Ein Knopf zum Berichtigen
 
 »Wir müssen die Datensätze natürlich auch mal überarbeiten können.

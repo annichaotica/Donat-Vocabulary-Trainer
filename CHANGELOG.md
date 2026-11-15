@@ -16,6 +16,31 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Das Protokoll sagt jetzt, was die KI tut
+
+»Er verbessert gerade die bestehenden Einträge« — 43 Aufrufe in
+siebzig Sekunden, und in der Datenbank änderte sich **keine einzige
+Zeile**. Im Zugriffsprotokoll stand nur `POST /mcp 200`, denn ein
+**gescheiterter** Werkzeugaufruf kommt bei MCP ebenfalls mit 200
+zurück; der Fehler steckt in der Antwort. Damit ließ sich nicht
+unterscheiden, ob die KI liest, ob sie schreiben will und abgewiesen
+wird, oder ob sie etwas erzählt, was sie gar nicht tut.
+
+Jetzt wird jeder Werkzeugaufruf mitgeschrieben: wer, welches Werkzeug,
+und ob es geklappt hat — bei einem Fehler dessen Text. Auch ein
+Werkzeug, das es gar nicht gibt: ein Agent mit falscher Vorstellung
+vom Server fiel sonst nirgends auf.
+
+**Nicht** mitgeschrieben werden die Argumente. Die enthalten ganze
+Vokabeleinträge und bei den Lesetexten halbe Privatlektüre; das
+gehört nicht ins Serverprotokoll. Ein Test hält das fest.
+
+Beim ersten Lauf blieb das Protokoll trotzdem leer: ohne gesetzten
+Pegel verwirft Python alles unterhalb von WARNING, und die Aufrufe
+sind INFO. Auch das ist behoben — und im Container nachgemessen,
+nicht nur im Test.
+
+
 ### Die openid-Adresse antwortet — verspricht aber nichts
 
 Jeder ChatGPT-Durchlauf endete gleich, über mehr als eine Stunde

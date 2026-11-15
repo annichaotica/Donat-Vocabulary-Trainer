@@ -520,3 +520,57 @@ def test_kein_werkzeugtext_nennt_ein_werkzeug_das_es_nicht_gibt():
                 fehlend.add(treffer)
     assert not fehlend, (
         f"Werkzeugtexte nennen das, was es nicht gibt: {sorted(fehlend)}")
+
+
+
+def test_werkzeugaufrufe_werden_mitgeschrieben(mcp, caplog):
+    """»Er verbessert gerade die bestehenden Einträge« — 43 Aufrufe in
+    siebzig Sekunden, und in der Datenbank änderte sich keine Zeile.
+
+    Im Zugriffsprotokoll stand nur »POST /mcp 200«, denn ein
+    GESCHEITERTER Werkzeugaufruf kommt bei MCP ebenfalls mit 200
+    zurück — der Fehler steckt im Rumpf. Damit ließ sich nicht
+    unterscheiden, ob die KI liest, ob sie abgewiesen wird, oder ob
+    sie etwas erzählt, was sie gar nicht tut. Jetzt steht beides im
+    Protokoll.
+    """
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="vokabeltrainer.mcp"):
+        werkzeug(mcp, "sammlungen_auflisten")
+    assert "sammlungen_auflisten · ok" in caplog.text
+    assert "Verwalterin" in caplog.text
+
+    # Der gescheiterte Aufruf steht ebenso drin — das ist der Punkt.
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="vokabeltrainer.mcp"):
+        ergebnis = werkzeug(mcp, "vokabeln_auflisten", sammlung_id=9999)
+    assert ergebnis.get("_werkzeugfehler")
+    assert "vokabeln_auflisten" in caplog.text
+    assert "NICHT ERLAUBT" in caplog.text
+    # »ok« darf hier NICHT stehen — aber nicht naiv prüfen: es steckt
+    # auch in »vokabeltrainer«.
+    assert "· ok" not in caplog.text
+
+    # Und ein Werkzeug, das es gar nicht gibt: ein Agent mit falscher
+    # Vorstellung vom Server soll auffallen, nicht verschwinden.
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="vokabeltrainer.mcp"):
+        werkzeug(mcp, "gibtsnicht")
+    assert "UNBEKANNTES WERKZEUG" in caplog.text
+
+
+def test_das_protokoll_enthaelt_keine_argumente(mcp, caplog):
+    """Mitgeschrieben wird, WAS gerufen wurde — nicht, womit. Die
+    Argumente enthalten ganze Vokabeleinträge und bei den Lesetexten
+    halbe Privatlektüre; das gehört nicht ins Serverprotokoll."""
+    import logging
+    _b, s = _aufbau(mcp)
+    with caplog.at_level(logging.INFO, logger="vokabeltrainer.mcp"):
+        werkzeug(mcp, "vokabel_anlegen", sammlung_id=s["id"],
+                 lemma="γεωμετρία", wortart="substantiv",
+                 merkmale={"genus": "f"},
+                 bedeutungen=[{"uebersetzungen": ["Geometrie"]}])
+    assert "vokabel_anlegen" in caplog.text
+    assert "γεωμετρία" not in caplog.text
+    assert "Geometrie" not in caplog.text

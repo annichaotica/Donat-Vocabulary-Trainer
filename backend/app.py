@@ -76,6 +76,15 @@ from modelle import (RegelEingabe, RegelAendern,
 OBERFLAECHE = pathlib.Path(__file__).resolve().parent.parent / "frontend"
 
 protokoll = logging.getLogger("vokabeltrainer")
+# Ohne gesetzten Pegel verwirft Python alles unterhalb von WARNING, und
+# die Werkzeugaufrufe am MCP (INFO) kämen nie im Protokoll an — genau
+# das ist beim ersten Lauf passiert: die Zeilen waren gebaut, das
+# Protokoll blieb leer. Ein Handler wird nur angelegt, wenn keiner da
+# ist; unter uvicorn ist einer da.
+protokoll.setLevel(logging.INFO)
+if not logging.getLogger().handlers:
+    logging.basicConfig(format="%(levelname)s:     %(message)s",
+                        level=logging.INFO)
 
 
 @asynccontextmanager

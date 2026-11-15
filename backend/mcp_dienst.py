@@ -27,6 +27,8 @@ from typing import Any, Callable
 
 from fastapi import HTTPException
 
+import logging
+
 import datenbank as dbm
 import lehrgang
 import lesetexte
@@ -1545,6 +1547,25 @@ def _text(inhalt: Any, fehler: bool = False) -> dict:
     return antwort
 
 
+# Mitschreiben, WELCHES Werkzeug gerufen wurde und ob es geklappt hat.
+#
+# Der Anlass: ChatGPT meldete »ich verbessere gerade die bestehenden
+# Einträge«, machte 43 Aufrufe in siebzig Sekunden — und in der
+# Datenbank änderte sich keine einzige Zeile. Im Zugriffsprotokoll
+# stand nur »POST /mcp 200«, denn ein GESCHEITERTER Werkzeugaufruf
+# kommt bei MCP ebenfalls mit 200 zurück; der Fehler steckt im Rumpf.
+# Damit ließ sich nicht unterscheiden, ob die KI liest, ob sie
+# schreiben will und abgewiesen wird, oder ob sie etwas erzählt, was
+# sie gar nicht tut.
+#
+# Mitgeschrieben wird der Name des Werkzeugs, wer es gerufen hat und
+# das Ergebnis — bei einem Fehler dessen Text. NICHT die Argumente:
+# die enthalten ganze Vokabeleinträge, das Protokoll wäre nach einer
+# Sitzung unlesbar und bei den Texten stünde halbe Privatlektüre
+# darin.
+protokoll = logging.getLogger("vokabeltrainer.mcp")
+
+
 def behandeln(nachricht: dict, db: sqlite3.Connection,
               person: dict) -> dict | None:
     """Beantwortet eine JSON-RPC-Nachricht. None heißt: keine Antwort nötig
@@ -1587,21 +1608,32 @@ def behandeln(nachricht: dict, db: sqlite3.Connection,
         name = parameter.get("name")
         werkzeug = NACH_NAME.get(name)
         if werkzeug is None:
+            # Auch das gehört ins Protokoll: ein Agent, der ein Werkzeug
+            # ruft, das es nicht gibt, hat eine falsche Vorstellung vom
+            # Server — und das sieht man sonst nirgends.
+            protokoll.warning("%s · %s · UNBEKANNTES WERKZEUG",
+                              person.get("name", "?"), name)
             return antwort(fehler={"code": -32602,
                                    "message": f"Unbekanntes Werkzeug: {name}"})
+        wer = person.get("name", "?")
         try:
             ergebnis = werkzeug["funktion"](db, person,
                                             **(parameter.get("arguments") or {}))
+            protokoll.info("%s · %s · ok", wer, name)
             return antwort(_text(ergebnis))
         except zugang.NichtErlaubt as f:
+            protokoll.warning("%s · %s · NICHT ERLAUBT: %s", wer, name, f)
             return antwort(_text({"fehler": str(f), "art": "nicht_erlaubt"},
                                  fehler=True))
         except WerkzeugFehler as f:
+            protokoll.warning("%s · %s · abgelehnt: %s", wer, name, f)
             return antwort(_text({"fehler": str(f)}, fehler=True))
         except TypeError as f:
+            protokoll.warning("%s · %s · falsche Angaben: %s", wer, name, f)
             return antwort(_text({"fehler": f"Falsche Angaben für {name}: {f}"},
                                  fehler=True))
         except Exception as f:                              # noqa: BLE001
+            protokoll.exception("%s · %s · FEHLER", wer, name)
             return antwort(_text({"fehler": f"{type(f).__name__}: {f}"},
                                  fehler=True))
     if kennung is not None:

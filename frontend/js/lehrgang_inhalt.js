@@ -66,7 +66,9 @@ export const SPUREN = [
           ['liste', [
             'Betonung: erst die Taste Ö, dann den Vokal — ά.',
             'Oder den Vokal gedrückt halten und die Ziffer wählen: '
-              + 'ι wird zu ί, ϊ oder ΐ.',
+              + 'bei ι stehen ί, ϊ und ΐ zur Wahl. Die 1 ist gleich '
+              + 'der erste Akzent — den unbetonten Buchstaben hast du '
+              + 'ja schon getippt.',
             'Wortende-ς liegt auf W.',
             'Unter dem Antwortfeld kannst du die Belegung aufklappen, '
               + 'ohne die Abfrage zu verlassen.',

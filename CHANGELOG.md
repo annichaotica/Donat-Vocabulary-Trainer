@@ -16,6 +16,24 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Akzentauswahl: nur noch eine, und sie beginnt beim Akzent
+
+Zu merken war: beim Halten eines Vokals erschienen **zwei** Fenster
+übereinander — das des Trainers und das von macOS. Das zweite bot
+lateinische Akzente an (î, ï), die im Griechischen nichts zu suchen
+haben, und beide hörten auf dieselben Zifferntasten, wobei das System
+gewann.
+
+Solange eine Taste mit Varianten gehalten wird, steht das Antwortfeld
+jetzt auf »nur lesen«. In einem Feld, das man nicht beschreiben kann,
+bietet macOS keine Buchstaben an — eingefügt wird ohnehin aus dem
+Programm heraus. Die Sperre löst sich beim Loslassen und außerdem beim
+Verlassen des Feldes oder Wegschalten der Seite; ein hängengebliebener
+Schreibschutz wäre schlimmer als alles, wogegen er hilft.
+
+Und die Auswahl beginnt beim Akzent: bei ι stehen ί, ϊ, ΐ auf 1, 2, 3.
+Den unbetonten Buchstaben hat man ja schon getippt.
+
 ### Die Rundgänge überarbeitet: sechs statt vier, und nur noch Orientierung
 
 Ein Rundgang sagt jetzt nur noch, **wo** etwas liegt. Das Warum steht

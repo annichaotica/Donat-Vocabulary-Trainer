@@ -118,10 +118,15 @@ const TREMA = { ι: 'ϊ', υ: 'ϋ', Ι: 'Ϊ', Υ: 'Ϋ' };
 // Beides zusammen, für die Auswahl beim Gedrückthalten.
 const BEIDES = { ι: 'ΐ', υ: 'ΰ' };
 
-/** Welche Varianten gibt es zu diesem Zeichen? Grundform zuerst. */
+/** Welche BETONTEN Varianten gibt es zu diesem Zeichen?
+ *
+ * Ohne die Grundform. Sie steht schon im Feld — man hat die Taste ja
+ * gedrückt —, und als erste Wahl hieße sie: eine Taste drücken, um
+ * nichts zu ändern. »Den normalen Buchstaben kann ich ja ohne langes
+ * Drücken direkt auswählen.«
+ */
 function varianten(zeichen) {
-  return [zeichen, BETONT[zeichen], TREMA[zeichen], BEIDES[zeichen]]
-    .filter(Boolean);
+  return [BETONT[zeichen], TREMA[zeichen], BEIDES[zeichen]].filter(Boolean);
 }
 
 // Wie lange halten, bis die Auswahl erscheint. 400 ms ist die Spanne,
@@ -154,6 +159,22 @@ export function umschriftAnhaengen(feld, code) {
     const neu = a + zeichen.length;
     feld.setSelectionRange(neu, neu);
     feld.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  // Solange eine Taste mit Varianten gehalten wird, steht das Feld auf
+  // »nur lesen«. Das ist der einzige Hebel, den eine Webseite gegen das
+  // Akzentfenster von macOS hat: in einem Feld, das man nicht beschreiben
+  // kann, bietet es keine Buchstaben an. Eingefügt wird ohnehin aus dem
+  // Programm heraus, dem steht »nur lesen« nicht im Weg.
+  //
+  // Ohne das erschienen ZWEI Fenster übereinander — und beide hörten auf
+  // dieselben Zifferntasten, wobei das des Systems gewann. Es bot dabei
+  // lateinische Akzente an (î, ï), die im Griechischen nichts zu suchen
+  // haben.
+  let warNurLesen = feld.readOnly;
+  const sperren = (zu) => {
+    if (zu && !feld.readOnly) { warNurLesen = false; feld.readOnly = true; }
+    else if (!zu && !warNurLesen) feld.readOnly = false;
   };
 
   const behandler = (e) => {
@@ -192,21 +213,33 @@ export function umschriftAnhaengen(feld, code) {
     else if (wartend === 'trema' && TREMA[aus]) aus = TREMA[aus];
     wartend = null;
     einfuegen(aus);
-    // Gehalten? Dann nach kurzer Zeit die Varianten anbieten.
-    if (varianten(aus).length > 1) auswahl.planen(e.code, aus);
+    // Gehalten? Dann nach kurzer Zeit die Varianten anbieten — und
+    // bis zum Loslassen das Systemfenster aussperren.
+    if (varianten(aus).length) { sperren(true); auswahl.planen(e.code, aus); }
   };
 
-  const loslassen = (e) => auswahl.loslassen(e.code);
+  const loslassen = (e) => { sperren(false); auswahl.loslassen(e.code); };
   const auswahl = akzentauswahl(feld, einfuegen);
 
+  // Die Sperre MUSS wieder aufgehen, sonst steht das Feld still und
+  // man kann nichts mehr tippen. `keyup` reicht dafür nicht: wer
+  // während des Haltens das Fenster wechselt, bekommt keines. Darum
+  // zusätzlich beim Verlassen des Feldes und beim Wegschalten der
+  // Seite — ein hängengebliebener Schreibschutz wäre schlimmer als
+  // alles, wogegen er hilft.
+  const aufgeben = () => { sperren(false); auswahl.schliessen(); };
   feld.addEventListener('keydown', behandler);
   feld.addEventListener('keyup', loslassen);
-  feld.addEventListener('blur', auswahl.schliessen);
+  feld.addEventListener('blur', aufgeben);
+  window.addEventListener('blur', aufgeben);
+  document.addEventListener('visibilitychange', aufgeben);
   return () => {
-    auswahl.schliessen();
+    aufgeben();
     feld.removeEventListener('keydown', behandler);
     feld.removeEventListener('keyup', loslassen);
-    feld.removeEventListener('blur', auswahl.schliessen);
+    feld.removeEventListener('blur', aufgeben);
+    window.removeEventListener('blur', aufgeben);
+    document.removeEventListener('visibilitychange', aufgeben);
   };
 }
 

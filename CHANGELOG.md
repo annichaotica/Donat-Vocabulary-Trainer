@@ -16,6 +16,21 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Abtippen: kein Überspringen mehr, außer man hat es versucht
+
+»Lernende 2 möchte für den Abtippen-Modus, dass sie gezwungen wird, die
+Wörter zu tippen, auch wenn sie diese schon kennt.«
+
+Der Knopf **Überspringen** ist weg — und erscheint erst, wenn bei
+dieser Karte einmal getippt wurde und es nicht gestimmt hat. Wer die
+Vokabel kennt, kommt also nicht daran vorbei; wer an einem Eintrag
+mit unttippbaren Zeichen hängt, schon.
+
+Ganz ohne Ausweg wäre es keine Strenge, sondern eine Falle: eine
+Übung, aus der man nur durch Schließen des Reiters herauskommt, macht
+niemand ein zweites Mal.
+
+
 ### Das Protokoll sagt jetzt, was die KI tut
 
 »Er verbessert gerade die bestehenden Einträge« — 43 Aufrufe in

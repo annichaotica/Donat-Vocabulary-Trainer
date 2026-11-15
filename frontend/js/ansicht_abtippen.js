@@ -93,6 +93,9 @@ class Lauf {
     this.geschafft = new Set();
     this.ergebnis = null;
     this.eingabe = '';
+    // Wie oft bei DIESER Karte schon getippt wurde. Daran hängt, ob es
+    // einen Weg daran vorbei gibt — siehe teilWerkzeuge.
+    this.versuche = 0;
   }
 
   async start() {
@@ -186,12 +189,27 @@ class Lauf {
                      || 'Schau noch einmal genau hin.' })));
     }
 
+    // »Sie möchte gezwungen werden, die Wörter zu tippen, auch wenn sie
+    // diese schon kennt.«
+    //
+    // Darum gibt es »Überspringen« nicht mehr von vornherein. Es
+    // erscheint erst, wenn bei dieser Karte einmal getippt wurde und
+    // es nicht gestimmt hat. Beides zusammen: wer die Vokabel kennt,
+    // kommt nicht daran vorbei — wer an einem kaputten Eintrag
+    // hängenbleibt, aber schon.
+    //
+    // Ein Ausweg muss bleiben. Eine Übung, aus der man nur durch
+    // Schließen des Reiters herauskommt, ist keine Strenge, sondern
+    // eine Falle; und es gibt Einträge mit Zeichen, die auf keiner
+    // Tastatur liegen.
     el.append(h('div', { class: 'frage-werkzeuge',
                          style: 'justify-content:flex-start' },
       h('button', { class: 'wichtig', onclick: () => this.pruefen() },
         'Prüfen'),
-      h('button', { class: 'schlicht', onclick: () => this.springen(1) },
-        'Überspringen'),
+      this.versuche > 0
+        ? h('button', { class: 'schlicht', onclick: () => this.springen(1) },
+            'Überspringen')
+        : null,
       this.stelle > 0
         ? h('button', { class: 'schlicht', onclick: () => this.springen(-1) },
             'Zurück')
@@ -209,7 +227,8 @@ class Lauf {
     el.append(h('p', { class: 'leise', style: 'margin-top:1rem',
       text: `${this.geschafft.size} in dieser Runde abgetippt. Das zählt `
           + 'nicht für die Abfrage — hier wird nichts bewertet und kein '
-          + 'Termin gesetzt.' }));
+          + 'Termin gesetzt. Übersprungen wird nichts: jedes Wort will '
+          + 'getippt werden, auch das, das du schon kennst.' }));
 
     feld.focus();
   }
@@ -221,6 +240,7 @@ class Lauf {
         lexem_id: this.karte.lexem_id, eingabe: this.eingabe });
     } catch (fehler) { meldung(fehler.message); return; }
 
+    this.versuche += 1;
     if (this.ergebnis.urteil === 'richtig') {
       this.geschafft.add(this.karte.lexem_id);
       // Kurz stehenlassen, damit man das Grün sieht, dann von selbst
@@ -238,6 +258,7 @@ class Lauf {
     const ziel = this.stelle + um;
     this.ergebnis = null;
     this.eingabe = '';
+    this.versuche = 0;
     if (ziel >= this.karten.length) { this.fertig(); return; }
     this.stelle = Math.max(0, ziel);
     standMerken(this.d.sammlung_id, this.stelle);

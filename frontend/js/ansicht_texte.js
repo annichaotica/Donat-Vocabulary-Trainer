@@ -164,6 +164,36 @@ function teilDeckung(d, textId, behaelter) {
     z.unbekannt
       ? h('p', { class: 'leise', style: 'margin:.4rem 0 0' },
           'Tippe ein rot unterlegtes Wort an, um es für die KI zu merken.')
+      : null,
+    // Bei einem Zeitungsartikel sind es schnell achthundert. Einzeln
+    // anzutippen ist dann keine Bedienung mehr, sondern eine Strafe.
+    z.unbekannt
+      ? h('div', { class: 'frage-werkzeuge',
+                   style: 'justify-content:flex-start;margin-top:.6rem' },
+          h('button', {
+            onclick: async (e) => {
+              e.target.disabled = true;
+              try {
+                const r2 = await api.alleUnbekanntenMerken(
+                  textId, zustand.benutzerId);
+                meldung(`${r2.angefordert} Wörter stehen auf der Liste für `
+                      + 'die KI — häufigste zuerst.', 5000);
+                zeichnenText(behaelter, textId);
+              } catch (f) {
+                meldung(f.message, 'fehler'); e.target.disabled = false;
+              }
+            },
+          }, `Alle ${z.unbekannt} unbekannten anfordern`),
+          h('button', {
+            class: 'schlicht',
+            onclick: async () => {
+              try {
+                const r2 = await api.alleZurueck(textId, zustand.benutzerId);
+                meldung(`${r2.entfernt} wieder von der Liste.`);
+                zeichnenText(behaelter, textId);
+              } catch (f) { meldung(f.message, 'fehler'); }
+            },
+          }, 'Aus diesem Text zurücknehmen'))
       : null);
 }
 

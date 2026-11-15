@@ -462,6 +462,11 @@ CREATE TABLE IF NOT EXISTS wortwunsch (
     zusammenhang  TEXT,
     text_id       INTEGER REFERENCES text(id) ON DELETE SET NULL,
     erledigt      INTEGER NOT NULL DEFAULT 0,
+    -- Wie oft das Wort im Text vorkam. Bei einem Zeitungsartikel mit
+    -- 840 unbekannten Wörtern ist das der Unterschied zwischen einer
+    -- Liste und einem Haufen: die KI fängt bei dem an, was sechsmal
+    -- dasteht, nicht bei der Überschrift in Großbuchstaben.
+    vorkommen     INTEGER NOT NULL DEFAULT 1,
     lexem_id      INTEGER REFERENCES lexem(id) ON DELETE SET NULL,
     angelegt      TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (benutzer_id, sammlung_id, vergleichsform)

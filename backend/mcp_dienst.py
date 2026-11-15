@@ -613,19 +613,34 @@ def sprache_einrichten(db: sqlite3.Connection, person: dict, code: str,
 # ------------------------------------------- Beschreibung der Werkzeuge
 
 def offene_woerter_lesen(db: sqlite3.Connection, person: dict,
-                         sammlung_id: int | None = None):
-    """Welche Wörter hat sie beim Lesen markiert und braucht sie noch?"""
+                         sammlung_id: int | None = None,
+                         anzahl: int = 40):
+    """Welche Wörter hat sie beim Lesen markiert und braucht sie noch?
+
+    Mit Grenze, und die ist nicht Zierde: aus einem Zeitungsartikel
+    kamen in einem Zug 840 Wörter auf die Liste. Die alle in eine
+    Antwort zu packen hieße, dass die KI den Anfang vergessen hat,
+    bevor sie am Ende ist.
+    """
     if sammlung_id:
         zugang.sammlung_pruefen(db, person["id"], sammlung_id)
     offen = lesetexte.wortwuensche(db, person["id"], sammlung_id, offen=True)
+    grenze = max(1, min(int(anzahl), 200))
+    gezeigt = offen[:grenze]
     return {
-        "anzahl": len(offen),
+        "anzahl": len(gezeigt),
+        "offen_gesamt": len(offen),
+        "hinweis": ("Nach Häufigkeit im Text geordnet, Häufigstes zuerst. "
+                    + (f"Es warten noch {len(offen) - len(gezeigt)} weitere — "
+                       "diese hier erledigen, dann erneut abrufen."
+                       if len(offen) > len(gezeigt) else "")),
         "woerter": [{"wunsch_id": w["id"], "wort": w["wort"],
+                     "vorkommen": w["vorkommen"],
                      "sammlung_id": w["sammlung_id"],
                      "sammlung": w["sammlung"], "sprache": w["sprache"],
                      "zusammenhang": w["zusammenhang"],
                      "aus_text": w["text"]}
-                    for w in offen],
+                    for w in gezeigt],
     }
 
 
@@ -1307,12 +1322,28 @@ WERKZEUGE: list[dict] = [
                        "möchte. Mit Zusammenhang, also dem Satz, in dem das "
                        "Wort stand — daran hängt, welche Bedeutung gemeint "
                        "ist. Nach dem Anlegen offenes_wort_erledigen "
-                       "aufrufen, sonst steht das Wort weiter auf der Liste.",
+                       "aufrufen, sonst steht das Wort weiter auf der "
+                       "Liste.\n\n"
+                       "Geordnet nach Häufigkeit im Text. Bei einem ganzen "
+                       "Artikel stehen schnell hunderte darauf, und dann "
+                       "ist die Reihenfolge das Wichtigste: oben anfangen "
+                       "lohnt sich auch, wenn man nicht durchkommt.\n\n"
+                       "ZWEI FÄLLE, die keine neue Vokabel brauchen und bei "
+                       "denen du das sagen sollst statt eine anzulegen: "
+                       "(1) eine FLEKTIERTE FORM eines Wortes, das schon im "
+                       "Bestand ist — dann gehört die Form ergänzt "
+                       "(formen_ergaenzen), nicht ein zweites Lemma "
+                       "angelegt; (2) EIGENNAMEN und Abkürzungen (Orte, "
+                       "Personen, »AfD«) — die gehören nicht in einen "
+                       "Wortschatz. Beide mit offenes_wort_erledigen "
+                       "abhaken und kurz begründen.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "sammlung_id": _s("integer", "nur diese Sammlung; ohne "
-                                             "Angabe alle")},
+                                             "Angabe alle"),
+                "anzahl": _s("integer", "wie viele auf einmal, "
+                                        "Vorgabe 40, höchstens 200")},
         },
         "funktion": offene_woerter_lesen,
     },

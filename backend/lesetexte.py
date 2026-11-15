@@ -302,6 +302,77 @@ def wort_merken(db: sqlite3.Connection, benutzer_id: int, text_id: int,
                      (benutzer_id, t["sammlung_id"], vergleichsform))
 
 
+def alle_unbekannten_merken(db: sqlite3.Connection, benutzer_id: int,
+                            text_id: int) -> dict:
+    """Alle unbekannten Wörter eines Textes auf einmal anfordern.
+
+    »Wenn ich einen ganz neuen Artikel hier rein poste, dann müsste
+    ich alle Wörter markieren können, die ich nicht kenne. Wenn ich
+    jetzt 260 mal klicke, macht das keinen Spaß.« — Gemessen an einem
+    echten Zeitungsartikel waren es 840 von 1145.
+
+    Die Auswahl trifft der Server, nicht die Oberfläche: er hat die
+    Deckung gerade gerechnet und weiß, welche Wörter fehlen. Eine
+    Liste von 840 Wörtern durch die Leitung zu schicken, nur damit er
+    sie wieder nachschlägt, wäre doppelte Arbeit mit doppelter
+    Gelegenheit, sich zu unterscheiden.
+
+    Je Wort wird mitgeschrieben, wie oft es im Text vorkam und in
+    welchem Satz es zuerst stand. Ohne das stünde die KI vor einem
+    Haufen ohne Reihenfolge.
+    """
+    d = deckung(db, text_id, benutzer_id)
+    t = dbm.zeile(db, "SELECT * FROM text WHERE id = ?", (text_id,))
+    abschnitte = dbm.zeilen(db, """SELECT original FROM textabschnitt
+                                    WHERE text_id = ? ORDER BY reihenfolge""",
+                            (text_id,))
+
+    gezaehlt: dict[str, dict] = {}
+    for w in d["woerter"]:
+        if w["lexem_id"] or w["gewuenscht"]:
+            continue
+        eintrag = gezaehlt.setdefault(
+            w["vergleichsform"], {"wort": w["wort"], "n": 0})
+        eintrag["n"] += 1
+
+    def zusammenhang(wort: str) -> str | None:
+        for a in abschnitte:
+            if wort in a["original"]:
+                return a["original"][:400]
+        return None
+
+    neu = 0
+    for form, e in gezaehlt.items():
+        db.execute("""INSERT INTO wortwunsch (benutzer_id, sammlung_id, wort,
+                                              vergleichsform, zusammenhang,
+                                              text_id, vorkommen)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)
+                      ON CONFLICT (benutzer_id, sammlung_id, vergleichsform)
+                      DO UPDATE SET erledigt = 0,
+                                    vorkommen = MAX(wortwunsch.vorkommen,
+                                                    excluded.vorkommen)""",
+                   (benutzer_id, t["sammlung_id"], e["wort"], form,
+                    zusammenhang(e["wort"]), text_id, e["n"]))
+        neu += 1
+    return {"text_id": text_id, "angefordert": neu}
+
+
+def alle_zuruecknehmen(db: sqlite3.Connection, benutzer_id: int,
+                       text_id: int) -> dict:
+    """Alles, was aus DIESEM Text angefordert wurde, wieder weg.
+
+    Nur die offenen: was die KI schon eingetragen hat, ist erledigt
+    und bleibt als Beleg stehen.
+    """
+    t = dbm.zeile(db, "SELECT * FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    cur = db.execute("""DELETE FROM wortwunsch
+                         WHERE benutzer_id = ? AND text_id = ? AND erledigt = 0""",
+                     (benutzer_id, text_id))
+    return {"text_id": text_id, "entfernt": cur.rowcount}
+
+
 def wort_vergessen(db: sqlite3.Connection, benutzer_id: int, text_id: int,
                    wort: str) -> None:
     """Doch gekannt — wieder herunter von der Liste."""
@@ -333,7 +404,10 @@ def wortwuensche(db: sqlite3.Connection, benutzer_id: int,
           JOIN sammlung s ON s.id = w.sammlung_id
           LEFT JOIN text t ON t.id = w.text_id
          WHERE {' AND '.join(bedingungen)}
-         ORDER BY w.angelegt""", tuple(werte))
+         -- Häufigstes zuerst: wer eine Liste von achthundert Wörtern
+         -- abarbeitet, soll oben anfangen können und etwas davon
+         -- haben, auch wenn er nicht zu Ende kommt.
+         ORDER BY w.vorkommen DESC, w.angelegt""", tuple(werte))
 
 
 def wortwunsch_erledigen(db: sqlite3.Connection, wunsch_id: int,

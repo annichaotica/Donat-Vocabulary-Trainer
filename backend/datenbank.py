@@ -73,6 +73,9 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
     "aufgabe": {
         "formgruppe": "TEXT",
     },
+    "wortwunsch": {
+        "vorkommen": "INTEGER NOT NULL DEFAULT 1",
+    },
     "lektion": {
         "nr": "INTEGER",
         "beschreibung": "TEXT",

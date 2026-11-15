@@ -16,6 +16,39 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Einen ganzen Artikel auf einmal anfordern
+
+Zu merken war: beim Einfügen eines Zeitungsartikels standen unter der
+Deckungsanalyse hunderte Wörter, jedes mit einem eigenen Knopf. »Wenn
+ich jetzt 260 mal klicke, macht das keinen Spaß.«
+
+Gemessen am eingefügten Artikel: 1145 verschiedene Wörter, 840 davon
+unbekannt, 27 % Deckung. Es gibt jetzt zwei Knöpfe in der
+Deckungskarte — **Alle 840 unbekannten anfordern** und **Aus diesem
+Text zurücknehmen**. Die Auswahl trifft der Server aus der Analyse,
+die er ohnehin schon gerechnet hat; der Browser schickt nicht 840
+Anfragen.
+
+Dabei wird mitgezählt, wie oft jedes Wort im Text steht, und die
+Liste ist danach geordnet. Bei 840 Einträgen ist die Reihenfolge das
+Wichtigste: oben anfangen lohnt sich auch, wenn man nicht durchkommt.
+Im Artikel kamen zuerst τη (22×), AfD (19×), στην (16×).
+
+Was der Chat daraus liest, kommt jetzt in Häppchen von vierzig statt
+in einem Block — achthundert Wörter in einer Antwort hieße, dass er
+den Anfang vergessen hat, bevor er am Ende ist. Und zwei Fälle stehen
+ihm ausdrücklich ins Werkzeug geschrieben, weil sie bei einem echten
+Text die Mehrheit sind: eine **flektierte Form** eines Wortes, das
+schon im Bestand steht, gehört an dieses Wort ergänzt und nicht als
+zweites Lemma angelegt; **Eigennamen** wie »AfD« oder ein Nachname
+gehören gar nicht in einen Wortschatz. Beides soll er abhaken und
+sagen, warum.
+
+Der Gegenknopf nimmt nur zurück, was noch offen ist. Was der Chat
+schon eingetragen hat, bleibt stehen — es ist der Beleg dafür, woher
+die Vokabel stammt.
+
+
 ### Akzentauswahl: nur noch eine, und sie beginnt beim Akzent
 
 Zu merken war: beim Halten eines Vokals erschienen **zwei** Fenster

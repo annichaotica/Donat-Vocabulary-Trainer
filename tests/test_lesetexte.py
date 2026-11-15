@@ -384,3 +384,92 @@ def test_die_deckung_bringt_die_bedeutungen_mit(bestand, klient):
     # Bedeutung wäre schlimmer als keine.
     assert all(w.get("bedeutung") is None
                for w in d["woerter"] if not w["lexem_id"])
+
+
+# ------------------------------- alle Unbekannten auf einmal
+
+def test_alle_unbekannten_auf_einmal(bestand, klient):
+    """»Wenn ich einen ganz neuen Artikel hier rein poste, dann müsste
+    ich alle Wörter markieren können, die ich nicht kenne. Wenn ich
+    jetzt 260 mal klicke, macht das keinen Spaß.«
+
+    Gemessen an einem echten Zeitungsartikel: 1145 verschiedene
+    Wörter, 840 davon unbekannt.
+    """
+    b, s = bestand
+    t = _text(klient, s)
+    vorher = klient.get(f"/api/texte/{t['id']}/deckung",
+                        params={"benutzer_id": b["id"]}).json()
+    offen = vorher["zahlen"]["unbekannt"]
+    assert offen > 0, "nichts unbekannt — dann prüft der Test nichts"
+
+    antwort = klient.post(f"/api/texte/{t['id']}/wortwuensche/alle",
+                          params={"benutzer_id": b["id"]})
+    assert antwort.status_code == 201, antwort.text
+    assert antwort.json()["angefordert"] == offen
+
+    liste = klient.get("/api/wortwuensche",
+                       params={"benutzer_id": b["id"]}).json()
+    assert len(liste) == offen
+
+
+def test_haeufiges_steht_oben(bestand, klient):
+    """Bei achthundert Wörtern ist die Reihenfolge das Wichtigste: wer
+    oben anfängt, hat auch dann etwas davon, wenn er nicht durchkommt."""
+    b, s = bestand
+    t = _text(klient, s, inhalt="ξένο ξένο ξένο. άλλο άλλο. drittes.")
+    klient.post(f"/api/texte/{t['id']}/wortwuensche/alle",
+                params={"benutzer_id": b["id"]})
+    liste = klient.get("/api/wortwuensche",
+                       params={"benutzer_id": b["id"]}).json()
+    assert [w["wort"] for w in liste][:2] == ["ξένο", "άλλο"], liste
+    assert liste[0]["vorkommen"] == 3
+
+
+def test_schon_angefordertes_wird_nicht_verdoppelt(bestand, klient):
+    b, s = bestand
+    t = _text(klient, s)
+    klient.post(f"/api/texte/{t['id']}/wortwuensche/alle",
+                params={"benutzer_id": b["id"]})
+    erst = len(klient.get("/api/wortwuensche",
+                          params={"benutzer_id": b["id"]}).json())
+    klient.post(f"/api/texte/{t['id']}/wortwuensche/alle",
+                params={"benutzer_id": b["id"]})
+    assert len(klient.get("/api/wortwuensche",
+                          params={"benutzer_id": b["id"]}).json()) == erst
+
+
+def test_alles_laesst_sich_zurueckziehen(bestand, klient):
+    """Ein Knopf, der achthundert Einträge anlegt, braucht einen
+    Gegenknopf — sonst traut sich niemand, ihn zu drücken."""
+    b, s = bestand
+    t = _text(klient, s)
+    klient.post(f"/api/texte/{t['id']}/wortwuensche/alle",
+                params={"benutzer_id": b["id"]})
+    antwort = klient.delete(f"/api/texte/{t['id']}/wortwuensche/alle",
+                            params={"benutzer_id": b["id"]})
+    assert antwort.status_code == 200, antwort.text
+    assert klient.get("/api/wortwuensche",
+                      params={"benutzer_id": b["id"]}).json() == []
+
+
+def test_erledigtes_bleibt_beim_zuruecknehmen_stehen(bestand, klient):
+    """Was die KI schon eingetragen hat, ist der Beleg dafür, woher die
+    Vokabel stammt."""
+    b, s = bestand
+    t = _text(klient, s)
+    klient.post(f"/api/texte/{t['id']}/wortwuensche/alle",
+                params={"benutzer_id": b["id"]})
+    import datenbank as dbm
+    db = dbm.verbindung()
+    try:
+        eine = dbm.wert(db, "SELECT id FROM wortwunsch LIMIT 1")
+        db.execute("UPDATE wortwunsch SET erledigt = 1 WHERE id = ?", (eine,))
+        db.commit()
+    finally:
+        db.close()
+    klient.delete(f"/api/texte/{t['id']}/wortwuensche/alle",
+                  params={"benutzer_id": b["id"]})
+    alle = klient.get("/api/wortwuensche", params={
+        "benutzer_id": b["id"], "offen": False}).json()
+    assert len(alle) == 1

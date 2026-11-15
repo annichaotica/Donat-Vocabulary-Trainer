@@ -177,6 +177,12 @@ export const api = {
     ruf(`/texte/${textId}/wortwunsch`,
         { methode: 'POST',
           daten: { benutzer_id: benutzerId, wort, zusammenhang } }),
+  alleUnbekanntenMerken: (textId, benutzerId) =>
+    ruf(`/texte/${textId}/wortwuensche/alle`,
+        { methode: 'POST', frage: { benutzer_id: benutzerId } }),
+  alleZurueck: (textId, benutzerId) =>
+    ruf(`/texte/${textId}/wortwuensche/alle`,
+        { methode: 'DELETE', frage: { benutzer_id: benutzerId } }),
   wortVergessen: (textId, benutzerId, wort) =>
     ruf(`/texte/${textId}/wortwunsch`,
         { methode: 'DELETE', frage: { benutzer_id: benutzerId, wort } }),

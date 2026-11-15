@@ -1196,6 +1196,31 @@ def wort_merken(text_id: int, eingabe: WortMerken, request: Request = None,
         raise HTTPException(400, str(f))
 
 
+@app.post("/api/texte/{text_id}/wortwuensche/alle", status_code=201)
+def alle_unbekannten_merken(text_id: int, benutzer_id: int,
+                            request: Request = None,
+                            db: sqlite3.Connection = DB):
+    """Alle unbekannten Wörter dieses Textes auf einmal anfordern."""
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _holen(db, "benutzer", benutzer_id)
+    try:
+        return lesetexte.alle_unbekannten_merken(db, benutzer_id, text_id)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
+@app.delete("/api/texte/{text_id}/wortwuensche/alle")
+def alle_zuruecknehmen(text_id: int, benutzer_id: int,
+                       request: Request = None,
+                       db: sqlite3.Connection = DB):
+    """Was aus diesem Text angefordert wurde, wieder von der Liste."""
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    try:
+        return lesetexte.alle_zuruecknehmen(db, benutzer_id, text_id)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+
+
 @app.delete("/api/texte/{text_id}/wortwunsch", status_code=204)
 def wort_vergessen(text_id: int, benutzer_id: int, wort: str,
                    request: Request = None, db: sqlite3.Connection = DB):

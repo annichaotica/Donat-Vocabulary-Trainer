@@ -473,3 +473,59 @@ def test_erledigtes_bleibt_beim_zuruecknehmen_stehen(bestand, klient):
     alle = klient.get("/api/wortwuensche", params={
         "benutzer_id": b["id"], "offen": False}).json()
     assert len(alle) == 1
+
+
+def test_eine_grosse_liste_verdeckt_keine_kleine(klient):
+    """»Die 89 neuen mittelhochdeutschen Wörter werden mir noch nicht
+    angezeigt.«
+
+    Sie waren da. Nur steht die Liste nach Häufigkeit, und zwar quer
+    über alle Sammlungen: aus 825 griechischen und 89
+    mittelhochdeutschen Wünschen bestand das Häppchen von 40 aus
+    vierzig griechischen. Die KI sah nach, fand kein einziges
+    mittelhochdeutsches Wort und schloss daraus, es gebe keines.
+
+    Darum nennt die Antwort jetzt immer, WELCHE Sammlungen etwas offen
+    haben — auch die, aus denen gerade nichts im Häppchen ist.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+    import mcp_dienst
+
+    b = klient.post("/api/benutzer", json={"name": "Lesende"}).json()
+    gross = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klein = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Mittelhochdeutsch",
+        "sprache": "gmh"}).json()
+
+    db = dbm.verbindung()
+    try:
+        # Viele häufige Wünsche in der einen, wenige in der anderen.
+        for i in range(45):
+            db.execute("""INSERT INTO wortwunsch
+                            (benutzer_id, sammlung_id, wort, vergleichsform,
+                             vorkommen)
+                          VALUES (?, ?, ?, ?, ?)""",
+                       (b["id"], gross["id"], f"g{i}", f"g{i}", 99))
+        for i in range(3):
+            db.execute("""INSERT INTO wortwunsch
+                            (benutzer_id, sammlung_id, wort, vergleichsform,
+                             vorkommen)
+                          VALUES (?, ?, ?, ?, ?)""",
+                       (b["id"], klein["id"], f"m{i}", f"m{i}", 1))
+        db.commit()
+        person = dict(dbm.zeile(db, "SELECT * FROM benutzer WHERE id = ?",
+                                (b["id"],)))
+        d = mcp_dienst.offene_woerter_lesen(db, person)
+    finally:
+        db.close()
+
+    # Im Häppchen steht nichts Mittelhochdeutsches …
+    assert all(w["sammlung"] == "Griechisch" for w in d["woerter"])
+    # … aber die Antwort verschweigt es trotzdem nicht.
+    assert d["offen_nach_sammlung"]["Mittelhochdeutsch"] == 3
+    assert d["offen_nach_sammlung"]["Griechisch"] == 45
+    assert "Mittelhochdeutsch (3)" in d["hinweis"]
+    assert "sammlung_id" in d["hinweis"]

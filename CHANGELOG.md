@@ -16,6 +16,31 @@ Eintrag wiederfindet.
 
 ## 15.11.2026
 
+### Eine große Wunschliste verdeckte eine kleine
+
+»Die 89 neuen mittelhochdeutschen Wörter werden mir noch nicht
+angezeigt.«
+
+Sie waren da. Die Liste steht aber nach Häufigkeit, und zwar **quer
+über alle Sammlungen**: bei 825 griechischen und 89
+mittelhochdeutschen Wünschen bestand das Häppchen von 40 aus vierzig
+griechischen. Die KI sah nach, fand kein mittelhochdeutsches Wort und
+schloss daraus, es gebe keines.
+
+Die Häppchen waren richtig — 840 Wörter in einer Antwort hieße, dass
+die KI den Anfang vergessen hat, bevor sie am Ende ist. Falsch war,
+dass die Antwort nichts über das sagte, was sie **nicht** zeigt. Jetzt
+nennt sie immer, welche Sammlungen etwas offen haben, auch die ohne
+Eintrag im Häppchen:
+
+```
+offen_nach_sammlung: {"Griechisch": 825, "Mittelhochdeutsch": 89}
+```
+
+Dazu der Satz, dass die Reihenfolge über alle Sammlungen gilt und man
+für eine bestimmte die `sammlung_id` mitgeben soll.
+
+
 ### Abtippen: kein Überspringen mehr, außer man hat es versucht
 
 »Lernende 2 möchte für den Abtippen-Modus, dass sie gezwungen wird, die

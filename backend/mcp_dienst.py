@@ -629,13 +629,41 @@ def offene_woerter_lesen(db: sqlite3.Connection, person: dict,
     offen = lesetexte.wortwuensche(db, person["id"], sammlung_id, offen=True)
     grenze = max(1, min(int(anzahl), 200))
     gezeigt = offen[:grenze]
+
+    # WELCHE Sammlungen überhaupt etwas offen haben, immer mitgeben.
+    #
+    # Ohne das verdeckt eine große Liste jede kleinere: die Reihenfolge
+    # ist die Häufigkeit, und die zählt quer über alle Sammlungen. Aus
+    # 825 griechischen und 89 mittelhochdeutschen Wünschen kamen im
+    # Häppchen von 40 vierzig griechische — die KI sah nach, fand kein
+    # einziges mittelhochdeutsches Wort und schloss daraus, es gebe
+    # keines. Genau so ist es passiert.
+    alle = (offen if not sammlung_id
+            else lesetexte.wortwuensche(db, person["id"], None, offen=True))
+    nach_sammlung: dict[str, int] = {}
+    for w in alle:
+        name = w["sammlung"] or "ohne Sammlung"
+        nach_sammlung[name] = nach_sammlung.get(name, 0) + 1
+
+    weitere = ""
+    if len(nach_sammlung) > 1:
+        weitere = (" Offen nach Sammlung: "
+                   + ", ".join(f"{n} ({z})" for n, z in
+                               sorted(nach_sammlung.items(),
+                                      key=lambda x: -x[1]))
+                   + ". Die Reihenfolge ist die Häufigkeit und gilt über "
+                     "ALLE Sammlungen — eine große verdeckt sonst eine "
+                     "kleine. Für eine bestimmte sammlung_id mitgeben.")
+
     return {
         "anzahl": len(gezeigt),
         "offen_gesamt": len(offen),
+        "offen_nach_sammlung": nach_sammlung,
         "hinweis": ("Nach Häufigkeit im Text geordnet, Häufigstes zuerst. "
                     + (f"Es warten noch {len(offen) - len(gezeigt)} weitere — "
                        "diese hier erledigen, dann erneut abrufen."
-                       if len(offen) > len(gezeigt) else "")),
+                       if len(offen) > len(gezeigt) else "")
+                    + weitere),
         "woerter": [{"wunsch_id": w["id"], "wort": w["wort"],
                      "vorkommen": w["vorkommen"],
                      "sammlung_id": w["sammlung_id"],

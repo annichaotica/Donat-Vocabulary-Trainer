@@ -16,6 +16,28 @@ Eintrag wiederfindet.
 
 ## 16.11.2026
 
+### »wie geht es euch« galt als falsch
+
+Zu merken war: bei »πώς είστε« getippt, abgewiesen — und darunter
+stand als richtige Lösung »wie geht es Ihnen / euch?«.
+
+Die Pflege war schuld, nicht die Prüfung. Der Eintrag hatte **eine**
+Übersetzung, in der zwei Varianten mit einem Schrägstrich
+zusammengefasst waren. Der Trainer nimmt jede hinterlegte Übersetzung
+als richtig an — aber nur als Ganzes. Wer eine der beiden Varianten
+tippt, bekommt ein »falsch« für eine Antwort, die stimmt.
+
+Im ganzen Bestand waren es sechs solche Einträge, alle aus einem
+frühen KI-Import (`πώς είστε`, `γεια σας`, `γεια σου`, `στο`, `στον`,
+`που`). Sie sind in getrennte Übersetzungen zerlegt; »wie geht es
+euch« und »wie geht es Ihnen« zählen jetzt beide, »wie geht es dir«
+weiterhin nicht.
+
+Damit es nicht wiederkommt — die KI legt ja laufend Einträge an —
+meldet die Qualitätsprüfung einen Schrägstrich in der Übersetzung
+jetzt als Hinweis.
+
+
 ### Kapitel 101 eingespielt — und drei Dinge dabei gelernt
 
 Das Paket aus `kapitel101.zip`: **550 neue Wörter mit 7.216 Formen**,

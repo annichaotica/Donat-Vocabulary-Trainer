@@ -93,6 +93,24 @@ def _bedeutungen_pruefen(uebersetzungen: list[dict], grund: str) -> list[dict]:
             rat="Der Trainer nimmt jede hinterlegte Übersetzung als richtig an. "
                 "Wer nur eine einträgt, verschenkt das — und bekommt ein "
                 "»falsch« für eine Antwort, die stimmt."))
+    # Alternativen, die mit Schrägstrich in EINE Übersetzung gepresst
+    # sind. »wie geht es Ihnen / euch?« sieht hilfreich aus und ist das
+    # Gegenteil: der Trainer nimmt jede hinterlegte Übersetzung als
+    # richtig an, aber nur als Ganzes. Wer »wie geht es euch« tippt,
+    # bekommt ein »falsch« für eine Antwort, die stimmt — genau so ist
+    # es passiert.
+    gebuendelt = [u["text"] for u in einzeln
+                  if "/" in u["text"]
+                  and all(t.strip() for t in u["text"].split("/"))]
+    if gebuendelt:
+        befunde.append(_befund(
+            "uebersetzung_gebuendelt", "hinweis",
+            f"Schrägstrich in der Übersetzung: {', '.join(gebuendelt)}.",
+            betrifft=gebuendelt,
+            rat="Alternativen gehören als getrennte Übersetzungen "
+                "hinterlegt, nicht in eine Zeichenkette. Sonst zählt nur "
+                "die ganze Zeichenkette als richtig, und jede einzelne "
+                "Variante gilt als Fehler."))
     doppelt = [t for t in {u["text"] for u in einzeln}
                if sum(1 for u in einzeln if u["text"] == t) > 1]
     if doppelt:

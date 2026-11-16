@@ -300,3 +300,45 @@ def test_woerterbuch_stellt_genaue_treffer_nach_vorn(klient):
     ergebnis = klient.get(f"/api/sammlungen/{s['id']}/woerterbuch",
                           params={"suche": "parler"}).json()
     assert ergebnis["eintraege"][0]["lemma"] == "parler"
+
+
+def test_schraegstrich_in_der_uebersetzung_wird_gemeldet(klient):
+    """»Da ist die Pflege falsch, oder?« — ja.
+
+    Der Eintrag »πώς είστε« hatte eine einzige Übersetzung: »wie geht
+    es Ihnen / euch?«. Der Trainer nimmt jede HINTERLEGTE Übersetzung
+    als richtig an, aber nur als Ganzes — wer »wie geht es euch«
+    tippt, bekommt ein »falsch« für eine Antwort, die stimmt.
+
+    Im Bestand waren es sechs solche Einträge, alle aus einem frühen
+    KI-Import. Damit es nicht wiederkommt, meldet die Qualitätsprüfung
+    es jetzt.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Prüfende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "πώς είστε", "wortart": "wendung",
+                       "bedeutungen": [{"uebersetzungen":
+                                        ["wie geht es Ihnen / euch?"]}]}]})
+    lexem = klient.get(f"/api/sammlungen/{s['id']}/lexeme",
+                       params={"suche": "πώς"}).json()["lexeme"][0]
+    d = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    arten = [b["art"] for b in d["befunde"]]
+    assert "uebersetzung_gebuendelt" in arten, arten
+
+
+def test_getrennte_uebersetzungen_werden_nicht_gemeldet(klient):
+    """Richtig gepflegt — dann soll der Hinweis schweigen."""
+    b = klient.post("/api/benutzer", json={"name": "Prüfende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "πώς είστε", "wortart": "wendung",
+                       "bedeutungen": [{"uebersetzungen":
+                                        ["wie geht es Ihnen?",
+                                         "wie geht es euch?"]}]}]})
+    lexem = klient.get(f"/api/sammlungen/{s['id']}/lexeme",
+                       params={"suche": "πώς"}).json()["lexeme"][0]
+    d = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    assert "uebersetzung_gebuendelt" not in [b["art"] for b in d["befunde"]]

@@ -507,6 +507,8 @@ def test_kein_werkzeugtext_nennt_ein_werkzeug_das_es_nicht_gibt():
                # Wunsch gestellt hat. In einer Familie ist das nicht
                # immer die Person, über deren Zugang gesprochen wird.
                "angefordert_von",
+               # Werte für »ziel« eines Lernziels, keine Werkzeuge.
+               "einmal_richtig",
                # Feldnamen und Fachwörter, die zufällig wie ein
                # Werkzeugname aussehen.
                "alternativen_grundsprache", "alternativen_zielsprache",

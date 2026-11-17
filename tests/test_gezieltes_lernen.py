@@ -153,3 +153,73 @@ def test_uebersicht_zeigt_und_filtert(klient):
     nur = klient.get(f"/api/sammlungen/{s['id']}/abfrage",
                      params={"nur_aus": True}).json()
     assert [w["lexem_id"] for w in nur["woerter"]] == [aus["id"]]
+
+
+# ------------------------------------------------- Lernziel über Wörter
+
+def test_lernziel_ueber_genau_diese_woerter(klient):
+    """»Könnte ich das dem Claude geben, um eine Sammlung aus genau den
+    Wörtern zu erstellen, die in den zwei Fotos meiner Tochter sind?«
+
+    Eine eigene Sammlung wäre der Umweg: sie verdoppelt die Wörter und
+    teilt den Lernstand. Ein Lernziel nimmt `umfang.lexeme` — genau
+    diese Wörter, aus der Sammlung, die es schon gibt.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+    import mcp_dienst
+
+    b, s = _aufbau(klient, sprache="fr")
+    ids = [_wort(klient, s["id"], w)["id"]
+           for w in ("le tandem", "s'inscrire", "sans cesse", "le hasard")]
+    liste = ids[:3]          # die zwei Fotos ergeben drei Wörter
+
+    db = dbm.verbindung()
+    try:
+        person = dict(dbm.zeile(db, "SELECT * FROM benutzer WHERE id = ?",
+                                (b["id"],)))
+        ziel = mcp_dienst.lernziel_anlegen(
+            db, person, name="Vokabeltest Freitag",
+            umfang={"lexeme": liste}, termin="2099-01-15",
+            ziel="einmal_richtig")
+        db.commit()
+        offen = mcp_dienst.lernziele_auflisten(db, person)
+    finally:
+        db.close()
+
+    assert ziel["name"] == "Vokabeltest Freitag"
+    eintrag = offen["lernziele"][0]
+    assert eintrag["umfang_text"] == "3 ausgewählte Wörter"
+    # Der Fortschritt zählt NUR diese drei, nicht das vierte Wort.
+    assert eintrag["fortschritt"]["gesamt"] > 0
+    d = klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
+                   params={"benutzer_id": b["id"]}).json()
+    assert d["gesamt"] == eintrag["fortschritt"]["gesamt"]
+
+
+def test_lernziel_nicht_ueber_fremden_bestand(klient):
+    """Ohne diese Prüfung ließe sich ein Ziel über Wörter legen, die
+    einen nichts angehen — und die Abfrage zeigte sie dann."""
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+    import mcp_dienst
+    import zugang
+
+    a, _ = _aufbau(klient)
+    fremd_b = klient.post("/api/benutzer", json={"name": "Max"}).json()
+    fremd_s = klient.post("/api/sammlungen", json={
+        "besitzer_id": fremd_b["id"], "name": "Max", "sprache": "gmh"}).json()
+    fremdes_wort = _wort(klient, fremd_s["id"], "ouwê")
+
+    db = dbm.verbindung()
+    try:
+        person = dict(dbm.zeile(db, "SELECT * FROM benutzer WHERE id = ?",
+                                (a["id"],)))
+        with pytest.raises(zugang.NichtErlaubt):
+            mcp_dienst.lernziel_anlegen(
+                db, person, name="geht nicht",
+                umfang={"lexeme": [fremdes_wort["id"]]})
+    finally:
+        db.close()

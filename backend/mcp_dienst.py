@@ -712,6 +712,33 @@ def offene_woerter_abhaken(db: sqlite3.Connection, person: dict,
         zugang.beschreibbare_sammlungen(db, person["id"]))
 
 
+def lernziele_auflisten(db: sqlite3.Connection, person: dict,
+                        nur_aktive: bool = True):
+    """Welche Lernziele hat diese Person, und wie weit sind sie?"""
+    import lernziele
+    liste = lernziele.auflisten(db, person["id"], nur_aktive)
+    for z in liste:
+        z["fortschritt"] = lernziele.fortschritt(db, person["id"], z["id"])
+        z["umfang_text"] = lernziele.umfang_beschreiben(db, z["umfang"])
+    return {"lernziele": [dict(z) for z in liste]}
+
+
+def lernziel_anlegen(db: sqlite3.Connection, person: dict, name: str,
+                     umfang: dict, termin: str | None = None,
+                     ziel: str = "reif", notiz: str | None = None):
+    """Ein Lernziel über einen Ausschnitt des Bestands."""
+    import lernziele
+    # Nur auf Sammlungen, die dieser Person zugänglich sind. Ohne das
+    # ließe sich ein Ziel über fremden Bestand legen, und die Person
+    # bekäme Wörter zu sehen, die sie nichts angehen.
+    for sid in (umfang or {}).get("sammlungen") or []:
+        zugang.sammlung_pruefen(db, person["id"], int(sid))
+    for lid in (umfang or {}).get("lexeme") or []:
+        zugang.lexem_pruefen(db, person["id"], int(lid))
+    return dict(_fehler_wandeln(lernziele.anlegen, db, person["id"], name,
+                                umfang or {}, termin, ziel, notiz))
+
+
 def abfrage_setzen(db: sqlite3.Connection, person: dict,
                    lexem_ids: list, abfrage=None):
     """Legt fest, ob Wörter abgefragt werden."""
@@ -1441,6 +1468,53 @@ WERKZEUGE: list[dict] = [
                                         "Vorgabe 40, höchstens 200")},
         },
         "funktion": offene_woerter_lesen,
+    },
+    {
+        "name": "lernziele_auflisten",
+        "funktion": lernziele_auflisten,
+        "description": "Die Lernziele dieser Person mit ihrem Fortschritt.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "nur_aktive": _s("boolean", "nur die noch offenen, "
+                                            "Vorgabe wahr")},
+        },
+    },
+    {
+        "name": "lernziel_anlegen",
+        "funktion": lernziel_anlegen,
+        "description": "Legt ein Lernziel an: ein Ausschnitt des Bestands "
+                       "mit einem Termin.\n\n"
+                       "DER AUSSCHNITT ist `umfang`, ein Objekt aus Listen, "
+                       "alle freigestellt — was fehlt, schränkt nicht ein:\n"
+                       "• sammlungen: [id, …]\n"
+                       "• lektionen: [id, …]\n"
+                       "• lexeme: [id, …] — GENAU diese Wörter. Das ist "
+                       "der Weg für eine Liste, die jemand mitbringt: die "
+                       "Wörter im Bestand suchen (vokabeln_auflisten), "
+                       "fehlende anlegen, und die gefundenen ids hier "
+                       "eintragen. Eine eigene Sammlung dafür anzulegen "
+                       "wäre der Umweg — sie verdoppelt die Wörter und "
+                       "teilt den Lernstand.\n"
+                       "• wortarten, typen, formgruppen: [», …]\n\n"
+                       "»ziel« sagt, wann es geschafft ist: »reif« "
+                       "(sitzt dauerhaft) oder »einmal_richtig« (für den "
+                       "Test am Freitag genug).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": _s("string", "wie das Ziel heißt, z.B. "
+                                     "»Vokabeltest 21.11.«"),
+                "umfang": {"type": "object",
+                           "description": "Listen je Feld, alle freigestellt"},
+                "termin": _s("string", "JJJJ-MM-TT, freigestellt"),
+                "ziel": {"type": "string",
+                         "enum": ["reif", "einmal_richtig"],
+                         "description": "Vorgabe »reif«"},
+                "notiz": _s("string", "freigestellt"),
+            },
+            "required": ["name", "umfang"],
+        },
     },
     {
         "name": "abfrage_setzen",

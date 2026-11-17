@@ -16,6 +16,27 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### Die KI kann jetzt Lernziele anlegen
+
+»Könnte ich das dem angeschlossenen Claude geben, um eine Sammlung
+aus genau den Wörtern zu erstellen, die in den zwei Fotos meiner
+Tochter enthalten sind, aus denen sie dann ein Lernziel machen kann?«
+
+Die Antwort ist: ja — aber **ohne neue Sammlung**. Ein Lernziel nimmt
+im `umfang` das Feld `lexeme`, also genau diese Wörter. Eine eigene
+Sammlung dafür wäre der Umweg: sie verdoppelt die Wörter und teilt
+den Lernstand, und beim nächsten Test ginge es wieder von vorn los.
+
+Gefehlt hat nur das Werkzeug. Die KI konnte Wörter anlegen und
+suchen, aber kein Ziel daraus machen — das hätte von Hand gebaut
+werden müssen, mit Lexem-Kennungen, die in der Oberfläche nirgends
+stehen. Neu sind `lernziel_anlegen` und `lernziele_auflisten`.
+
+Ein Ziel über fremden Bestand wird abgelehnt: ohne diese Prüfung
+ließe sich eines über Wörter legen, die einen nichts angehen, und die
+Abfrage zeigte sie dann.
+
+
 ### Gezielt lernen: Wort für Wort an und aus
 
 »Meine Tochter muss genau die Vokabeln lernen, die sie mir als Liste

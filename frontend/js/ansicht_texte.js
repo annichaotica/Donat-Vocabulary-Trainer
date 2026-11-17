@@ -37,9 +37,11 @@ const FARBE = {
  * Kapitel. So ist das schwer für jemand, der damit lernt.«
  *
  * Der Iwein liegt in 173 Stücken vor. Als flache Liste ist das keine
- * Bedienung, sondern ein Stapel. Die Spalte text.lektion_id gab es
- * längst — bei den griechischen Texten ist sie sogar gefüllt (390 von
- * 392), nur sah man sie nirgends. */
+ * Bedienung, sondern ein Stapel.
+ *
+ * Die Spalte text.lektion_id gab es längst, gefüllt ist sie aber nur
+ * beim Übungsmaterial (352 griechische Übungssätze). Diese Liste zeigt
+ * nur typ='lesetext', und davon hatte keiner ein Kapitel. */
 let textFilter = '';
 let textAngehakt = new Set();
 let textSammlung = null;

@@ -29,10 +29,16 @@ darüber steht eine Auswahl — nur mit den Kapiteln, in denen auch
 wirklich ein Text liegt. Umhängen geht wie beim Wortschatz: anhaken,
 Kapitel wählen, umhängen. Eine neue Nummer legt ein Kapitel an.
 
-Die Spalte dafür gab es längst, und bei den **griechischen Texten ist
-sie sogar gefüllt** — 390 von 392 hängen an ihrer Lektion. Man sah es
-nur nirgends. Beim Mittelhochdeutschen ist sie leer; dort wäre ein
-Kapitel »Iwein« der erste Griff.
+Die Spalte dafür gab es längst. Gefüllt ist sie allerdings nur beim
+Übungsmaterial — die 352 griechischen Übungssätze hängen alle an ihrer
+Lektion, aber die stehen gar nicht in dieser Liste. Von den
+**Lesetexten hat bisher keiner ein Kapitel**: zwei auf Griechisch, 173
+auf Mittelhochdeutsch. Dort wäre ein Kapitel »Iwein« der erste Griff.
+
+(Im ersten Entwurf dieses Eintrags stand »390 von 392 hängen schon an
+ihrer Lektion«. Das war gezählt über alle Zeilen der Texttabelle,
+Übungssätze eingeschlossen — und damit über etwas anderes, als diese
+Liste zeigt.)
 
 Anders als beim Wortschatz entscheidet das Kapitel hier über nichts —
 ein Text wird nicht früher oder später fällig. Es ordnet nur.

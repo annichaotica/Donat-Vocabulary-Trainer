@@ -891,3 +891,35 @@ def test_ein_einzelner_akzent_wird_nicht_angetastet(klient):
     assert lesetexte._ohne_zweitakzent("ποτέ") is None
     assert lesetexte._ohne_zweitakzent("πελατολόγιό") == "πελατολόγιο"
     assert lesetexte._ohne_zweitakzent("καλημέρα") is None
+
+
+def test_die_textliste_sagt_wie_weit_die_uebersetzung_ist(klient):
+    """Sonst weiß niemand, wo er aufgehört hat.
+
+    Der mittelhochdeutsche Bestand hat 173 Texte mit 8912 Abschnitten
+    und keiner einzigen Referenzübersetzung. Wer die einträgt, tut es
+    über Tage — und braucht beim nächsten Mal die Antwort auf »welcher
+    ist dran«. Ohne die Zahl bliebe nur, jeden Text einzeln zu öffnen.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lernender 1"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Mittelhochdeutsch",
+        "sprache": "gmh"}).json()
+    t = klient.post(f"/api/sammlungen/{s['id']}/texte", json={
+        "titel": "Iwein", "typ": "text",
+        "inhalt": "Swer an rehte güete wendet sîn gemüete.\n\n"
+                  "dem volget sælde und êre.\n\n"
+                  "des gît gewisse lêre künec Artûs der guote."}).json()
+    ids = [a["id"] for a in t["abschnitte"]]
+    assert len(ids) == 3
+
+    liste = klient.get(f"/api/sammlungen/{s['id']}/texte").json()
+    assert liste[0]["abschnitte"] == 3
+    assert liste[0]["uebersetzt"] == 0
+
+    klient.put(f"/api/texte/{t['id']}/referenz", json={"fassungen": {
+        str(ids[0]): "Wer auf rechte Güte seinen Sinn richtet.",
+        # Leerer Text ist NICHT übersetzt — er sieht nur so aus.
+        str(ids[1]): "   "}})
+    liste = klient.get(f"/api/sammlungen/{s['id']}/texte").json()
+    assert liste[0]["uebersetzt"] == 1, liste[0]

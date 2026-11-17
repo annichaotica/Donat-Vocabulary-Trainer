@@ -60,7 +60,17 @@ export async function zeichnen(behaelter) {
       h('strong', { text: t.titel }),
       h('p', { class: 'leise', style: 'margin:.2rem 0 .6rem',
                text: `${t.abschnitte} Abschnitte · ${t.zeichen} Zeichen`
-                   + (t.niveau ? ` · ${t.niveau}` : '') }),
+                   + (t.niveau ? ` · ${t.niveau}` : '')
+                   // Wie weit die Übersetzung ist. Nur wo sie überhaupt
+                   // eine Rolle spielt: »0 übersetzt« an jedem Satz
+                   // einer Anfängersammlung wäre Lärm.
+                   + (t.abschnitte > 1
+                      ? (t.uebersetzt === t.abschnitte
+                         ? ' · ganz übersetzt'
+                         : t.uebersetzt
+                           ? ` · ${t.uebersetzt} von ${t.abschnitte} übersetzt`
+                           : ' · noch nicht übersetzt')
+                      : '') }),
       h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
         h('button', { class: 'wichtig',
           onclick: () => { location.hash = `#/texte/${t.id}`; },

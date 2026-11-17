@@ -1735,7 +1735,11 @@ WERKZEUGE: list[dict] = [
     },
     {
         "name": "texte_auflisten",
-        "description": "Welche Lesetexte liegen in einer Sammlung?",
+        "description": "Welche Lesetexte liegen in dieser Sammlung? Je "
+                       "Text kommt zurück, wie viele Abschnitte er hat und "
+                       "wie viele davon schon eine Referenzübersetzung "
+                       "haben — daran sieht man, wo man beim Übersetzen "
+                       "aufgehört hat.",
         "inputSchema": {
             "type": "object",
             "properties": {

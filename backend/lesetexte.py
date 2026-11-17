@@ -709,11 +709,27 @@ def lesen(db: sqlite3.Connection, text_id: int,
 
 
 def auflisten(db: sqlite3.Connection, sammlung_id: int) -> list[dict]:
+    """Die Lesetexte einer Sammlung — mit dem Stand der Übersetzung.
+
+    `uebersetzt` steht hier, weil sonst niemand weiß, wo er aufgehört
+    hat. Beim mittelhochdeutschen Bestand sind es 173 Texte mit 8912
+    Abschnitten; wer die übersetzt, tut es über Tage und braucht beim
+    nächsten Mal die Antwort auf »welcher ist dran«. Ohne die Zahl
+    bliebe nur, jeden Text einzeln zu öffnen und nachzusehen — oder
+    Arbeit doppelt zu machen.
+
+    Leerer Text zählt als nicht übersetzt: ein Abschnitt mit '' ist
+    nicht übersetzt, er sieht nur so aus.
+    """
     return dbm.zeilen(db, """
         SELECT t.id, t.titel, t.sprache, t.niveau, t.angelegt, t.notiz,
                LENGTH(t.inhalt) AS zeichen,
                (SELECT COUNT(*) FROM textabschnitt a WHERE a.text_id = t.id)
-                 AS abschnitte
+                 AS abschnitte,
+               (SELECT COUNT(*) FROM textabschnitt a
+                 WHERE a.text_id = t.id
+                   AND a.referenz IS NOT NULL AND TRIM(a.referenz) != '')
+                 AS uebersetzt
           FROM text t
          WHERE t.sammlung_id = ? AND t.typ = 'lesetext'
          ORDER BY t.angelegt DESC""", (sammlung_id,))

@@ -499,7 +499,7 @@ def test_kein_werkzeugtext_nennt_ein_werkzeug_das_es_nicht_gibt():
     erlaubt = {"lektion_nr", "sammlung_id", "lexem_id", "form_id", "text_id",
                "benutzer_id", "abschnitt_id", "wunsch_id", "aufgabe_id",
                "als_geprueft", "nur_pruefen", "ist_grundform", "genus_verbi",
-               "bedeutung_id",
+               "bedeutung_id", "lernziel_id",
                "ist_variante", "bewertung_art", "grund_sprache",
                "ungeprueft_abfragen", "ab_lektion", "bis_lektion",
                "textaufgabe_id", "formgruppe_lektion", "zielsprache_text",
@@ -580,3 +580,47 @@ def test_das_protokoll_enthaelt_keine_argumente(mcp, caplog):
     assert "vokabel_anlegen" in caplog.text
     assert "γεωμετρία" not in caplog.text
     assert "Geometrie" not in caplog.text
+
+
+def test_zuspruch_laesst_sich_ueber_den_mcp_schicken(klient, mcp):
+    """»Schick Lernende 2 einen Boost für morgen.«
+
+    Der Weg, auf dem es gedacht ist: nicht in der Oberfläche
+    herumklicken, sondern es der KI sagen, die schon am Trainer hängt.
+    """
+    kind = person_mit_token(klient, "Lernende 2")
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": kind.benutzer["id"], "name": "Französisch",
+        "sprache": "fr"}).json()
+    klient.put(f"/api/sammlungen/{s['id']}/zugriff", json={
+        "benutzer_id": mcp.benutzer["id"], "recht": "schreiben"})
+
+    z = werkzeug(mcp, "zuspruch_schicken", an="Lernende 2", art="botschaft",
+                 text="Zwanzig Wörter, dann ist gut. Du schaffst das.")
+    assert not z.get("_werkzeugfehler"), z
+    assert z["art"] == "botschaft"
+    assert z["an_name"] == "Lernende 2"
+
+    meins = klient.get(f"/api/zuspruch/{kind.benutzer['id']}").json()
+    assert len(meins["fuer_mich"]) == 1
+    assert meins["fuer_mich"][0]["von_name"] == "Verwalterin"
+
+
+def test_in_fremde_postfaecher_sieht_nur_wer_verwalten_darf(klient, mcp):
+    """»Schick Lernende 2 einen Boost« soll nicht heißen »lies, was Lernende 2
+    geschickt wurde«."""
+    kind = person_mit_token(klient, "Lernende 2")
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": kind.benutzer["id"], "name": "Französisch",
+        "sprache": "fr"}).json()
+    klient.put(f"/api/sammlungen/{s['id']}/zugriff", json={
+        "benutzer_id": mcp.benutzer["id"], "recht": "schreiben"})
+
+    # Die Verwalterin darf.
+    assert not werkzeug(mcp, "zuspruch_lesen",
+                        fuer="Lernende 2").get("_werkzeugfehler")
+    # Das Kind nicht — auch nicht in das der Verwalterin.
+    fremd = werkzeug(kind, "zuspruch_lesen", fuer="Verwalterin")
+    assert fremd.get("_werkzeugfehler"), fremd
+    # Das eigene schon.
+    assert not werkzeug(kind, "zuspruch_lesen").get("_werkzeugfehler")

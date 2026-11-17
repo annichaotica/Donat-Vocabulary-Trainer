@@ -16,6 +16,72 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### Punkte und Stufen
+
+Punkte gibt es **fürs Drankommen, nicht fürs Richtigliegen**: je
+Aufgabe und Tag einmal, gleich wie es ausging. Das ist die wichtigste
+Entscheidung an der ganzen Sache. Hingen sie am »richtig«, lohnte es
+sich, sich selbst großzügig zu bewerten — und der Schaden wäre nicht
+der erschlichene Punkt, sondern ein verdorbener Terminplan.
+
+Dieselbe Karte fünfzigmal durchzuklicken bringt deshalb genau zehn
+Punkte. Einen Tagesdeckel braucht es dafür nicht; die Form der Vergabe
+ist schon die Grenze.
+
+Am meisten bringt, was **dauerhaft sitzt** (25) — der einzige Posten,
+den kein Nachmittag holt, weil dorthin nur ein Intervall von drei
+Wochen führt. Dazu 5 fürs erste Mal und 50 fürs erreichte Tagesziel.
+
+Neun Stufen, benannt nach dem Weg durchs Lesen: *Buchstaben, Wörter,
+Sätze, Absätze, Seiten, Kapitel, Bücher, Regal, Bibliothek.* Die Stufe
+**fällt nie** — ein Rang, der sinkt, weil man krank war, ist eine
+Strafe mit Konfetti. Wie es wirklich steht, sagt weiterhin der
+Wortschatz im Fortschritt, und der geht in beide Richtungen.
+
+Gerechnet aus dem Protokoll, nichts mitgeschrieben. Darum fängt
+niemand bei null an.
+
+### Zuspruch — jemandem etwas schicken
+
+»Auch möchte ich meiner Tochter Boosts schicken können.«
+
+Unter **Zuspruch schicken** auf der Übersicht. Vier Arten:
+
+- **Botschaft** — ein Satz, der beim nächsten Öffnen oben steht.
+- **Doppelte Punkte** — für einen Tag, den sie sich selbst aussucht.
+  Wer ihn für einen großen Tag aufhebt, hat mehr davon.
+- **Joker** — ein Fehltag mehr, den die Strähne diesen Monat mitträgt.
+- **Versprechen** — »Lernziel bis Freitag → Kino«.
+
+Das Versprechen ist das Stärkste und zugleich das Dümmste: die App
+rechnet daran nichts aus und schenkt nichts. Sie merkt sich den Satz
+und sagt hinterher, dass er fällig ist. **Die Belohnung kommt nicht aus
+der App** — genau darum wirkt sie. Abhaken kann nur, wer sie gegeben
+hat.
+
+Beim Empfänger steht alles ganz oben auf der Übersicht, vor den
+fälligen Aufgaben: ein Satz von der Mutter ist wichtiger als eine Zahl.
+
+Schicken darf, wer eine Sammlung mit der Person teilt, und höchstens
+fünfmal am Tag an dieselbe — aus Zuspruch im Dutzend wird
+Hintergrundrauschen. Zurückziehen geht, solange es niemand gelesen hat;
+danach nicht mehr.
+
+Auch **über den MCP**: »Schick Lernende 2 einen Boost für morgen« genügt.
+In fremde Postfächer sehen darf dabei nur, wer verwalten darf — »schick
+Lernende 2 etwas« soll nicht heißen »lies, was Lernende 2 bekommen hat«.
+
+Weder Verdoppler noch Joker schreiben etwas ins Protokoll. Sie ändern
+nur, wie es ausgewertet wird. Es darf nie zwei Wahrheiten über
+denselben Tag geben.
+
+### Von außen 30 Tage angemeldet bleiben
+
+Die Cloudflare-Sitzung stand auf 24 Stunden — wer von außen kam,
+brauchte täglich einen neuen Mailcode. Jetzt 30 Tage, wie bei einer
+Mailbestätigung üblich. Betrifft nur den Vokabeltrainer; Fotos und
+Rezepte stehen weiter auf 24 Stunden.
+
 ### Ein Ring für den Tag, eine Zahl für die Tage
 
 »Wir brauchen auf jeden Fall einen Streak.«

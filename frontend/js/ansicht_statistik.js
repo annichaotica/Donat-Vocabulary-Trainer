@@ -46,10 +46,12 @@ export async function zeichnen(behaelter) {
 
   let d;
   let sammlungen = [];
+  let spielstand = null;
   try {
-    [d, sammlungen] = await Promise.all([
+    [d, sammlungen, spielstand] = await Promise.all([
       api.statistik(zustand.benutzerId, zustand.statistikSammlung || null),
       api.sammlungen(zustand.benutzerId).catch(() => []),
+      api.spiel(zustand.benutzerId).catch(() => null),
     ]);
   } catch (fehler) {
     el.append(h('p', { class: 'leise', text: fehler.message }));
@@ -67,8 +69,8 @@ export async function zeichnen(behaelter) {
     return;
   }
 
-  anfuegen(el, teilZahlen(d), teilTaetigkeit(d), teilVorschau(d),
-           teilWortschatz(d), teilTempo(d));
+  anfuegen(el, teilStufe(spielstand), teilZahlen(d), teilTaetigkeit(d),
+           teilVorschau(d), teilWortschatz(d), teilTempo(d));
 }
 
 
@@ -84,6 +86,42 @@ function teilAuswahl(behaelter, sammlungen) {
     zeichnen(behaelter);
   });
   return h('p', {}, wahl);
+}
+
+
+/** Stufe und Punkte.
+ *
+ * Steht ÜBER den Zahlen, aber als schmale Karte: die Punkte sind das
+ * Spiel, die Zahlen darunter sind die Sache. Wer nur die Punkte
+ * ansieht, soll wenigstens an den Zahlen vorbeikommen.
+ *
+ * Der Balken zeigt den Weg zur nächsten Stufe. Auf der letzten gibt es
+ * keinen — ein Balken, der nie voll wird, ist eine Enttäuschung mit
+ * Ansage.
+ */
+function teilStufe(spielstand) {
+  if (!spielstand) return null;
+  const p = spielstand.punkte;
+  const st = p.stufe;
+  const karte = h('div', { class: 'karte' },
+    h('div', { class: 'stufe-kopf' },
+      h('b', { class: 'stufe-name', text: `Stufe ${st.nummer}: ${st.name}` }),
+      h('span', { class: 'leise',
+                  text: `${p.gesamt.toLocaleString('de-DE')} Punkte` })));
+  if (st.anteil !== null) {
+    karte.append(
+      h('div', { class: 'zielbalken' },
+        h('i', { style: `width:${Math.round(st.anteil * 100)}%` })),
+      h('p', { class: 'leise', style: 'margin:.3rem 0 0',
+               text: `Noch ${(st.naechste - p.gesamt).toLocaleString('de-DE')}`
+                   + ' Punkte bis zur nächsten Stufe.' }));
+  }
+  karte.append(h('p', { class: 'leise', style: 'margin:.5rem 0 0',
+    text: 'Punkte gibt es fürs Drankommen, nicht fürs Richtigliegen: je '
+        + 'Aufgabe und Tag einmal, egal wie es ausging. Am meisten bringt, '
+        + 'was dauerhaft sitzt — und dorthin führt kein Nachmittag, '
+        + 'sondern nur Zeit.' }));
+  return karte;
 }
 
 

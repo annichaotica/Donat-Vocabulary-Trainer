@@ -225,8 +225,25 @@ export const api = {
 
   stand: (benutzerId, sammlungId) =>
     ruf('/lernen/stand', { frage: { benutzer_id: benutzerId, sammlung_id: sammlungId } }),
-  // Tagesziel und Strähne. Ohne Sammlung — beides gilt für die Person.
+  // Tagesziel, Strähne und Punkte. Ohne Sammlung — alles gilt für die
+  // Person.
   spiel: (benutzerId) => ruf(`/spiel/${benutzerId}`),
+  zuspruch: (benutzerId, alle = false) =>
+    ruf(`/zuspruch/${benutzerId}`, { frage: { alle: alle || null } }),
+  zuspruchSchicken: (daten) =>
+    ruf('/zuspruch', { methode: 'POST', daten }),
+  zuspruchGesehen: (id, benutzerId) =>
+    ruf(`/zuspruch/${id}/gesehen`,
+        { methode: 'POST', frage: { benutzer_id: benutzerId } }),
+  zuspruchEinloesen: (id, benutzerId) =>
+    ruf(`/zuspruch/${id}/einloesen`,
+        { methode: 'POST', frage: { benutzer_id: benutzerId } }),
+  zuspruchErledigt: (id, benutzerId) =>
+    ruf(`/zuspruch/${id}/erledigt`,
+        { methode: 'POST', frage: { benutzer_id: benutzerId } }),
+  zuspruchZurueck: (id, benutzerId) =>
+    ruf(`/zuspruch/${id}`,
+        { methode: 'DELETE', frage: { benutzer_id: benutzerId } }),
   naechste: (frage) => ruf('/lernen/naechste', { frage }),
   pruefen: (daten) => ruf('/lernen/pruefen', { methode: 'POST', daten }),
   tipp: (frage) => ruf('/lernen/tipp', { frage }),

@@ -157,6 +157,34 @@ export async function zeichnen(behaelter) {
     h('p', { class: 'leise' }, 'Wie viele Fragen am Tag und wie viel Neues '
       + 'dazwischen, stellst du unter Einstellungen ein.')));
 
+  el.append(abschnitt('Punkte, Stufen und Zuspruch',
+    h('p', {}, h('b', { text: 'Punkte gibt es fürs Drankommen. ' }),
+      'Je Aufgabe und Tag einmal — gleich, ob die Antwort stimmte. Das ist '
+      + 'Absicht: hingen Punkte am »richtig«, lohnte es sich, sich selbst '
+      + 'großzügig zu bewerten, und dann stimmt der Terminplan nicht mehr. '
+      + 'Am meisten bringt, was dauerhaft sitzt, und dorthin führt kein '
+      + 'Nachmittag, sondern nur Zeit.'),
+    h('p', {}, h('b', { text: 'Dieselbe Karte fünfzigmal bringt nichts. ' }),
+      'Gezählt wird je Aufgabe, nicht je Antwort. Wer mehr Punkte will, '
+      + 'muss mehr verschiedene Wörter anfassen.'),
+    h('p', {}, h('b', { text: 'Die Stufe fällt nie. ' }),
+      'Sie hängt an der Summe aller Punkte, und die wird nur größer. Wie '
+      + 'es wirklich steht, sagt der Wortschatz im Fortschritt — der geht '
+      + 'in beide Richtungen.'),
+    h('p', {}, h('b', { text: 'Zuspruch schicken. ' }),
+      'An Leute, mit denen du eine Sammlung teilst, höchstens fünfmal am '
+      + 'Tag an dieselbe Person. Vier Arten: eine Botschaft, die beim '
+      + 'nächsten Öffnen dasteht; doppelte Punkte für einen Tag, den der '
+      + 'andere sich aussucht; ein Joker, der einen Fehltag der Strähne '
+      + 'trägt; und ein Versprechen.'),
+    h('p', {}, h('b', { text: 'Das Versprechen ist das Stärkste. ' }),
+      '»Lernziel bis Freitag → Kino.« Die App rechnet daran nichts aus '
+      + 'und schenkt nichts — sie merkt sich den Satz und sagt, wenn er '
+      + 'fällig ist. Abhaken kann nur, wer ihn gegeben hat.'),
+    h('p', { class: 'leise' }, 'Alles außer dem Zuspruch wird aus deinem '
+      + 'Protokoll gerechnet. Darum fängt niemand bei null an — wer schon '
+      + 'gelernt hat, hat auch schon Punkte.')));
+
   el.append(abschnitt('Lernziele: ein Block mit Termin',
     h('p', {}, 'Ein Lernziel ist ein Ausschnitt mit einem Ziel davor: ',
       h('b', { text: 'Lektion 3 bis Freitag' }), '. Du sagst, was dazugehört '

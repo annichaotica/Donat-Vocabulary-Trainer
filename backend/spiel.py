@@ -155,16 +155,27 @@ def straehne(db: sqlite3.Connection, benutzer_id: int,
     Drohung und kein Anreiz.
     """
     import lernen as lernmodul
+    import zuspruch as zuspruchmodul
     e = lernmodul.benutzer_einstellungen(db, benutzer_id)
     ziel = _ziel_je_tag(e)
     tage = _tage(db, benutzer_id)
     heute = _heute()
     heute_text = heute.isoformat()
 
+    # Geschenkte Joker heben die Zahl der Fehltage, die eine Strähne
+    # trägt — für den Monat, in dem sie geschickt wurden. Sie schreiben
+    # KEINEN Lerntag ins Protokoll: der Zuspruch ändert nicht, was
+    # geschehen ist, nur wie es gezählt wird.
+    geschenkt = zuspruchmodul.geschenkte_joker(db, benutzer_id)
+
+    def erlaubt(monat: str) -> int:
+        return TAGE_JOKER + geschenkt.get(monat, 0)
+
     if not tage:
         return {"laufend": 0, "laengste": 0, "ziel": ziel,
-                "joker_frei": TAGE_JOKER, "joker_benutzt": [],
-                "heute_geschafft": False}
+                "joker_frei": erlaubt(heute_text[:7]),
+                "joker_geschenkt": geschenkt.get(heute_text[:7], 0),
+                "joker_benutzt": [], "heute_geschafft": False}
 
     # Nur für heute ist bekannt, ob überhaupt noch etwas offen war.
     if stand is None:
@@ -193,7 +204,7 @@ def straehne(db: sqlite3.Connection, benutzer_id: int,
             # Kein Joker, solange die Strähne noch nicht angefangen hat:
             # sonst verbrennt ein Rückblick auf zwei faule Tage die
             # Freitage für eine Strähne, die es gar nicht gibt.
-            if laufend and joker.get(monat, 0) < TAGE_JOKER:
+            if laufend and joker.get(monat, 0) < erlaubt(monat):
                 joker[monat] = joker.get(monat, 0) + 1
                 geschuetzt.append(text)
             else:
@@ -219,7 +230,7 @@ def straehne(db: sqlite3.Connection, benutzer_id: int,
             laengste = max(laengste, lauf)
         elif text != heute_text:
             monat = text[:7]
-            if lauf and joker_lauf.get(monat, 0) < TAGE_JOKER:
+            if lauf and joker_lauf.get(monat, 0) < erlaubt(monat):
                 joker_lauf[monat] = joker_lauf.get(monat, 0) + 1
             else:
                 lauf = 0
@@ -230,7 +241,9 @@ def straehne(db: sqlite3.Connection, benutzer_id: int,
         "laufend": laufend,
         "laengste": max(laengste, laufend),
         "ziel": ziel,
-        "joker_frei": max(0, TAGE_JOKER - joker.get(heute_text[:7], 0)),
+        "joker_frei": max(0, erlaubt(heute_text[:7])
+                            - joker.get(heute_text[:7], 0)),
+        "joker_geschenkt": geschenkt.get(heute_text[:7], 0),
         # Welche Tage der Joker getragen hat — damit die Anzeige nicht
         # behaupten muss, an diesen Tagen wäre gelernt worden.
         "joker_benutzt": sorted(geschuetzt),
@@ -238,16 +251,174 @@ def straehne(db: sqlite3.Connection, benutzer_id: int,
     }
 
 
-def stand(db: sqlite3.Connection, benutzer_id: int) -> dict:
-    """Beides in einem Aufruf — die Kopfzeile fragt bei jedem Wechsel.
+# ----------------------------------------------------------------- XP
+#
+# Was Punkte gibt — und warum GENAU das.
+#
+# XP_TAG  ist der Kern: eine Aufgabe, an einem Tag bearbeitet. EINMAL je
+#         Aufgabe und Tag, und darin steckt der ganze Schutz vor dem
+#         Schinden von Punkten. Wer dieselbe Karte fünfzigmal
+#         durchklickt, bekommt zehn Punkte. Mehr holt nur, wer mehr
+#         verschiedene Aufgaben anfasst — und davon gibt es nur so viele,
+#         wie der Bestand hergibt. Ein Tagesdeckel erübrigt sich damit;
+#         er wäre eine zweite Regel für dieselbe Sache.
+#
+#         Es zählt NICHT, ob die Antwort stimmte. Das ist die Grundregel
+#         dieses Moduls: belohnt wird Erscheinen. Gäbe es Punkte für
+#         »richtig«, entstünde ein Anreiz, sich großzügig zu bewerten —
+#         und der Schaden wäre ein verdorbener Terminplan.
+#
+# XP_NEU  für die erste Begegnung mit einer Aufgabe. Klein gehalten:
+#         Neues anfangen ist leicht, Neues behalten ist die Arbeit.
+#
+# XP_REIF für den Sprung auf »sitzt dauerhaft«. Das ist der einzige
+#         Posten, den man nicht an einem Nachmittag holen kann — dorthin
+#         führt nur ein Intervall von drei Wochen, und das vergeht in
+#         drei Wochen. Darum ist er der größte.
+#
+# XP_ZIEL fürs erreichte Tagesziel. Belohnt das Zuendemachen.
+XP_TAG = 10
+XP_NEU = 5
+XP_REIF = 25
+XP_ZIEL = 50
 
-    Der Lernstand wird EINMAL geholt und an beide weitergegeben. Sonst
-    stünde er zweimal in derselben Antwort, mit allen Zählabfragen
-    doppelt.
+# Die Stufen. Die Abstände wachsen, damit die ersten schnell kommen und
+# die späteren etwas bedeuten. Die Namen sind eine Leiter durchs Lesen —
+# gemeint als Vorschlag: wer sich eigene ausdenkt, hat mehr davon.
+#
+# Nach oben offen: über der letzten Schwelle bleibt die Stufe stehen und
+# die Punkte zählen weiter. Eine Stufe »Meister«, hinter der nichts mehr
+# kommt, wäre ein Schlusspunkt, und Lernen hat keinen.
+STUFEN = [
+    (0, "Buchstaben"),
+    (250, "Wörter"),
+    (750, "Sätze"),
+    (1750, "Absätze"),
+    (3500, "Seiten"),
+    (7000, "Kapitel"),
+    (14000, "Bücher"),
+    (28000, "Regal"),
+    (56000, "Bibliothek"),
+]
+
+
+def _xp_je_tag(db: sqlite3.Connection, benutzer_id: int) -> dict[str, int]:
+    """Die Punkte, nach Tagen aufgeschlüsselt.
+
+    Nach Tagen und nicht als eine Summe, weil ein geschenkter
+    Verdoppler (siehe `zuspruch`) an einem TAG hängt. Außerdem lässt
+    sich so zeigen, wann etwas verdient wurde.
+
+    Alles aus `wiederholung` gerechnet. Der Übergang auf »sitzt
+    dauerhaft« steht dort nicht als Wort, aber als Zahl: `intervall_tage`
+    ist genau dann über der Reifegrenze, wenn der Lernkern »reif«
+    gesetzt hat (`fsrs.bewerten` entscheidet an derselben Zahl). Mit
+    LAG wird verglichen, was bei derselben Aufgabe davor galt — ein
+    Sprung zählt, ein Verbleiben nicht.
+    """
+    import fsrs
+    tage: dict[str, int] = {}
+
+    def dazu(tag: str, wert: int) -> None:
+        tage[tag] = tage.get(tag, 0) + wert
+
+    # Eine Aufgabe, an einem Tag angefasst.
+    for z in dbm.zeilen(db, """
+            SELECT tag, COUNT(*) AS n FROM (
+                SELECT DISTINCT aufgabe_id, substr(zeitpunkt, 1, 10) AS tag
+                  FROM wiederholung WHERE benutzer_id = ?)
+             GROUP BY tag""", (benutzer_id,)):
+        dazu(z["tag"], XP_TAG * z["n"])
+
+    # Erste Begegnung.
+    for z in dbm.zeilen(db, """
+            SELECT substr(zeitpunkt, 1, 10) AS tag, COUNT(*) AS n
+              FROM wiederholung
+             WHERE benutzer_id = ? AND stabilitaet_vor IS NULL
+             GROUP BY tag""", (benutzer_id,)):
+        dazu(z["tag"], XP_NEU * z["n"])
+
+    # Der Sprung auf »sitzt dauerhaft«. Ein Rückfall und ein erneutes
+    # Erreichen zählen wieder — es ist dieselbe Arbeit noch einmal.
+    for z in dbm.zeilen(db, """
+            SELECT tag, COUNT(*) AS n FROM (
+                SELECT substr(zeitpunkt, 1, 10) AS tag,
+                       bewertung > 1 AND intervall_tage >= ?2 AS reif,
+                       LAG(bewertung > 1 AND intervall_tage >= ?2) OVER (
+                           PARTITION BY aufgabe_id ORDER BY zeitpunkt, id
+                       ) AS reif_davor
+                  FROM wiederholung WHERE benutzer_id = ?1)
+             WHERE reif = 1 AND COALESCE(reif_davor, 0) = 0
+             GROUP BY tag""", (benutzer_id, fsrs.REIF_AB_TAGEN)):
+        dazu(z["tag"], XP_REIF * z["n"])
+
+    # Das erreichte Tagesziel.
+    import lernen as lernmodul
+    ziel = _ziel_je_tag(lernmodul.benutzer_einstellungen(db, benutzer_id))
+    for tag, anzahl in _tage(db, benutzer_id).items():
+        if anzahl >= ziel:
+            dazu(tag, XP_ZIEL)
+
+    return tage
+
+
+def stufe(punkte: int) -> dict:
+    """Welche Stufe, und wie weit bis zur nächsten."""
+    nummer, name, ab = 1, STUFEN[0][1], 0
+    for i, (schwelle, bezeichnung) in enumerate(STUFEN):
+        if punkte >= schwelle:
+            nummer, name, ab = i + 1, bezeichnung, schwelle
+        else:
+            break
+    naechste = next((s for s, _ in STUFEN if s > punkte), None)
+    return {
+        "nummer": nummer,
+        "name": name,
+        "ab": ab,
+        "naechste": naechste,
+        # Wie weit zwischen dieser und der nächsten Stufe — für den
+        # Balken. Auf der letzten Stufe gibt es keinen, und dann soll
+        # auch keiner gezeichnet werden: ein Balken, der nie voll wird,
+        # ist eine Enttäuschung mit Ansage.
+        "anteil": (None if naechste is None
+                   else round((punkte - ab) / (naechste - ab), 3)),
+    }
+
+
+def punkte(db: sqlite3.Connection, benutzer_id: int,
+           verdoppelt: set[str] | None = None) -> dict:
+    """Punkte insgesamt, heute, und die Stufe dazu.
+
+    `verdoppelt` sind Tage, an denen ein geschenkter Verdoppler lief.
+    Sie werden doppelt gezählt — der Zuspruch ändert nicht das
+    Protokoll, sondern nur, wie es ausgewertet wird. Dasselbe Prinzip
+    wie überall hier: nichts Zusätzliches mitschreiben.
+    """
+    je_tag = _xp_je_tag(db, benutzer_id)
+    verdoppelt = verdoppelt or set()
+    gesamt = sum(wert * (2 if tag in verdoppelt else 1)
+                 for tag, wert in je_tag.items())
+    heute = _heute().isoformat()
+    return {
+        "gesamt": gesamt,
+        "heute": je_tag.get(heute, 0) * (2 if heute in verdoppelt else 1),
+        "heute_verdoppelt": heute in verdoppelt,
+        "stufe": stufe(gesamt),
+    }
+
+
+def stand(db: sqlite3.Connection, benutzer_id: int) -> dict:
+    """Alles in einem Aufruf — die Kopfzeile fragt bei jedem Wechsel.
+
+    Der Lernstand wird EINMAL geholt und weitergereicht. Sonst stünde er
+    dreimal in derselben Antwort, mit allen Zählabfragen dreifach.
     """
     import lernen as lernmodul
+    import zuspruch as zuspruchmodul
     roh = lernmodul.stand(db, benutzer_id)
     return {
         "tagesziel": tagesziel(db, benutzer_id, roh),
         "straehne": straehne(db, benutzer_id, roh),
+        "punkte": punkte(db, benutzer_id,
+                         zuspruchmodul.verdopplungstage(db, benutzer_id)),
     }

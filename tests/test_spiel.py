@@ -281,7 +281,9 @@ def test_ohne_protokoll_steht_alles_auf_null(klient, bestand):
     b, _ = bestand
     spiel = klient.get(f"/api/spiel/{b['id']}").json()
     assert spiel["straehne"] == {
-        "laufend": 0, "laengste": 0, "ziel": 20,
-        "joker_frei": 2, "joker_benutzt": [], "heute_geschafft": False}
+        "laufend": 0, "laengste": 0, "ziel": 20, "joker_frei": 2,
+        "joker_geschenkt": 0, "joker_benutzt": [], "heute_geschafft": False}
+    assert spiel["punkte"]["gesamt"] == 0
+    assert spiel["punkte"]["stufe"]["name"] == "Buchstaben"
     assert spiel["tagesziel"]["erledigt"] == 0
     assert spiel["tagesziel"]["geschafft"] is False

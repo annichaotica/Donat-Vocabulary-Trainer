@@ -771,6 +771,34 @@ def lernziel_anlegen(db: sqlite3.Connection, person: dict, name: str,
                                 umfang or {}, termin, ziel, notiz))
 
 
+def zuspruch_schicken(db: sqlite3.Connection, person: dict, an: str,
+                      art: str, text: str | None = None,
+                      belohnung: str | None = None,
+                      lernziel_id: int | None = None):
+    """Jemandem, der lernt, etwas schicken."""
+    import zuspruch as zuspruchmodul
+    ziel_id = _fuer_wen(db, person, an)
+    return dict(_fehler_wandeln(
+        zuspruchmodul.schicken, db, person["id"], ziel_id, art,
+        text=text, belohnung=belohnung, lernziel_id=lernziel_id))
+
+
+def zuspruch_lesen(db: sqlite3.Connection, person: dict,
+                   fuer: str | None = None):
+    """Was offen ist — an mich und von mir."""
+    import zuspruch as zuspruchmodul
+    ziel_id = _fuer_wen(db, person, fuer) if fuer else person["id"]
+    # In fremde Postfächer sieht nur, wer verwalten darf. Sonst wäre
+    # »schick Lernende 2 einen Boost« auch »lies, was Lernende 2 geschickt wurde«.
+    if ziel_id != person["id"]:
+        zugang.verwalter_pruefen(person)
+    return {
+        "fuer_mich": _fehler_wandeln(zuspruchmodul.fuer_mich, db, ziel_id),
+        "von_mir": _fehler_wandeln(zuspruchmodul.von_mir, db, ziel_id),
+        "empfaenger": _fehler_wandeln(zuspruchmodul.empfaenger, db, ziel_id),
+    }
+
+
 def abfrage_setzen(db: sqlite3.Connection, person: dict,
                    lexem_ids: list, abfrage=None):
     """Legt fest, ob Wörter abgefragt werden."""
@@ -1567,6 +1595,49 @@ WERKZEUGE: list[dict] = [
                 "fuer": _s("string", "Name des Profils"),
             },
             "required": ["lernziel_id", "fuer"],
+        },
+    },
+    {
+        "name": "zuspruch_schicken",
+        "funktion": zuspruch_schicken,
+        "description": (
+            "Schickt jemandem, der lernt, eine Aufmunterung. Vier Arten: "
+            "'botschaft' ist ein Satz, der beim nächsten Öffnen dasteht "
+            "(text nötig); 'verdoppler' gibt doppelte Punkte für einen Tag, "
+            "den der Empfänger selbst wählt; 'joker' schenkt einen Fehltag, "
+            "den die Strähne mitträgt; 'versprechen' hängt eine echte "
+            "Belohnung an ein Lernziel (belohnung nötig, lernziel_id "
+            "empfohlen) — die App ist dabei nur Zeuge, einlösen muss der "
+            "Mensch. Geht nur an Leute, mit denen man eine Sammlung teilt, "
+            "und höchstens fünfmal am Tag an dieselbe Person: Zuspruch "
+            "wirkt, wenn er selten ist. Den Text selbst schreiben, nicht "
+            "die Vorlage wiederholen — er soll nach der Person klingen, "
+            "die ihn schickt."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "an": _s("string", "Name des Profils, das ihn bekommt"),
+                "art": {"type": "string",
+                        "enum": ["botschaft", "verdoppler", "joker",
+                                 "versprechen"],
+                        "description": "welche der vier Arten"},
+                "text": _s("string", "der Satz (bei 'botschaft' nötig)"),
+                "belohnung": _s("string",
+                                "was es gibt (bei 'versprechen' nötig)"),
+                "lernziel_id": _s("integer", "woran das Versprechen hängt"),
+            },
+            "required": ["an", "art"],
+        },
+    },
+    {
+        "name": "zuspruch_lesen",
+        "funktion": zuspruch_lesen,
+        "description": "Zeigt offenen Zuspruch und an wen man schicken darf. "
+                       "Ohne Angabe das eigene; 'fuer' sieht in ein fremdes "
+                       "Profil und setzt Verwalterrechte voraus.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"fuer": _s("string", "Name des Profils")},
         },
     },
     {

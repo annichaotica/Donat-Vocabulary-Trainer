@@ -15,6 +15,7 @@ import * as wortschatz from './ansicht_wortschatz.js';
 import * as einstellungen from './ansicht_einstellungen.js';
 import * as tastatur from './tastatur.js';
 import * as spielzeichen from './spiel.js';
+import * as zuspruch from './ansicht_zuspruch.js';
 import * as ziele from './ansicht_ziele.js';
 import * as freigabe from './ansicht_freigabe.js';
 import * as einlesen from './ansicht_import.js';
@@ -103,6 +104,7 @@ async function kopfzeile() {
     neu: 'Neues Wort', lernen: 'Abfrage', ziele: 'Lernziele',
     freigabe: 'Freigabe', import: 'Datei einlesen', ueben: 'Sätze üben',
     hilfe: 'Anleitung', texte: 'Texte', statistik: 'Fortschritt',
+    zuspruch: 'Zuspruch',
     lehrgang: 'Lehrgang',
     einstellungen: 'Einstellungen',
     tastatur: 'Tastatur', profile: 'Profil wählen',
@@ -247,6 +249,8 @@ async function wegweisen() {
         return await gezielt.zeichnen(inhalt);
       case 'statistik':
         return await statistik.zeichnen(inhalt);
+      case 'zuspruch':
+        return await zuspruch.zeichnen(inhalt);
       case 'texte':
         // #/texte listet, #/texte/7 öffnet die Werkbank.
         return teile[1]

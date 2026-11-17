@@ -221,6 +221,35 @@ em, i { font-style: normal; font-weight: 600; }
   letter-spacing: normal;
 }
 
+/* Zuspruch — was jemand anderes geschickt hat.
+ *
+ * Die Karte steht ganz oben auf der Übersicht und soll dort auffallen,
+ * ohne zu schreien: ein warmer Grund, kein Alarmrot. */
+.zuspruch-karte { border-left: 3px solid var(--akzent); }
+.zuspruch {
+  display: flex; gap: .65rem; align-items: flex-start;
+  padding: .5rem 0; border-top: 1px solid var(--rand);
+}
+.zuspruch:first-of-type { border-top: none; padding-top: .2rem; }
+.zuspruch-text { flex: 1 1 auto; min-width: 0; }
+.zuspruch-punkt {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.8rem; height: 1.8rem; flex: none; border-radius: 50%;
+  color: #fff; font-weight: 650; font-size: .85rem;
+}
+.zuspruch-punkt-still { background: var(--rand-stark); }
+/* Ein fälliges Versprechen: die eine Stelle, an der etwas eingelöst
+   werden WILL. */
+.zuspruch.ist-faellig .zuspruch-text p:first-child {
+  font-weight: 650; color: var(--richtig);
+}
+
+.stufe-kopf {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: .5rem; margin-bottom: .5rem; flex-wrap: wrap;
+}
+.stufe-name { font-size: 1.05em; }
+
 /* Der Abschluss einer Runde: was sich geändert hat, nicht wie viel
    getippt wurde. Darum NICHT leise gesetzt — das ist die Stelle, die
    man lesen soll. */

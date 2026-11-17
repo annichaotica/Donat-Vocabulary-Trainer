@@ -5,6 +5,7 @@ import { h, leeren, meldung, anfuegen } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 import * as fuehrung from './fuehrung.js';
+import * as zuspruch from './ansicht_zuspruch.js';
 
 export async function zeichnenProfile(behaelter, zurueckNach = null) {
   const leute = await api.benutzer();
@@ -399,12 +400,57 @@ function lernwahlZeile(s) {
 }
 
 
+/** Stufe, Punkte und der Weg zur nächsten — eine Zeile, kein Kasten.
+ *
+ * Die Punkte sind Beiwerk, und so sollen sie auch dastehen: unter den
+ * Zahlen, die etwas über den Lernstand sagen, nicht über ihnen. Wer
+ * eine Stufe aufsteigt, merkt es trotzdem.
+ */
+function stufenzeile(spielstand) {
+  if (!spielstand) return null;
+  const p = spielstand.punkte;
+  const st = p.stufe;
+  const teile = [h('b', { text: `Stufe ${st.nummer}: ${st.name}` }),
+                 ` · ${p.gesamt.toLocaleString('de-DE')} Punkte`];
+  if (st.naechste !== null) {
+    teile.push(` · noch ${(st.naechste - p.gesamt).toLocaleString('de-DE')} `
+             + `bis »${naechsterName(st)}«`);
+  }
+  if (p.heute) {
+    teile.push(` · heute ${p.heute}`);
+    if (p.heute_verdoppelt) teile.push(' (verdoppelt)');
+  }
+  return teile;
+}
+
+
+function naechsterName(st) {
+  // Der Name der nächsten Stufe steht nicht in der Antwort — die Stufe
+  // schon, und die Reihenfolge ist fest. Ihn mitzuschicken hieße, die
+  // Leiter an zwei Orten zu führen.
+  return STUFENNAMEN[st.nummer] || '…';
+}
+
+// Nur für die Beschriftung »noch so viel bis …«. Die Wahrheit steht im
+// Server (spiel.STUFEN); hier liegt eine Abschrift der NAMEN, nicht der
+// Schwellen — die kommen mit der Antwort.
+const STUFENNAMEN = ['Buchstaben', 'Wörter', 'Sätze', 'Absätze', 'Seiten',
+                     'Kapitel', 'Bücher', 'Regal', 'Bibliothek'];
+
+
 export async function zeichnen(behaelter) {
   const el = leeren(behaelter);
   const [sammlungen, sprachen] = await Promise.all([
     api.sammlungen(zustand.benutzerId), stammdaten.sprachen(),
   ]);
   const gesamt = await api.stand(zustand.benutzerId, null);
+  // Beides zusammen, bevor gezeichnet wird: die Zuspruchkarte steht
+  // GANZ OBEN, und was oben steht, darf nicht nachträglich
+  // hineinspringen und den Rest nach unten schieben.
+  const [spielstand, post] = await Promise.all([
+    api.spiel(zustand.benutzerId).catch(() => null),
+    api.zuspruch(zustand.benutzerId).catch(() => null),
+  ]);
 
   // Der Einstieg ganz oben: Rundgänge und, solange nichts da ist, der
   // Übungskurs. Weiter unten zwischen den Sammlungen fände ihn niemand,
@@ -414,6 +460,15 @@ export async function zeichnen(behaelter) {
   // »null« in die Seite. Genau davor warnt der Kommentar bei
   // `anfuegen` — ich habe ihn überlesen und es stand oben auf
   // der Übersicht.
+  // Vor allem anderen: ein Satz von der Mutter ist wichtiger als die
+  // Zahl der fälligen Aufgaben. Wer ihn erst nach dem Scrollen fände,
+  // fände ihn nicht.
+  const zieleFuerZuspruch = await api.lernziele(zustand.benutzerId)
+    .catch(() => []);
+  anfuegen(el, post && zuspruch.karteFuerMich(
+    behaelter, post.fuer_mich, zieleFuerZuspruch,
+    () => zeichnen(behaelter)));
+
   anfuegen(el, willkommen(behaelter, sammlungen));
 
   el.append(h('h1', { text: 'Heute' }));
@@ -451,7 +506,17 @@ export async function zeichnen(behaelter) {
         'Fehler wiederholen'),
       h('button', { class: 'schlicht',
                     onclick: () => { location.hash = '#/statistik'; } },
-        'Fortschritt'))));
+        'Fortschritt'),
+      // Erst zeigen, wenn es überhaupt jemanden gibt, dem man etwas
+      // schicken darf. Ein Knopf, hinter dem »geht nicht« steht, ist
+      // schlimmer als keiner.
+      (post && post.empfaenger.length)
+        ? h('button', { class: 'schlicht',
+                        onclick: () => { location.hash = '#/zuspruch'; } },
+            'Zuspruch schicken')
+        : null),
+    anfuegen(h('p', { class: 'leise', style: 'margin:.8rem 0 0' }),
+             stufenzeile(spielstand))));
 
   // Lernziele: Ausschnitte des Bestands mit Termin, auch über Lektionen
   // und Sammlungen hinweg.

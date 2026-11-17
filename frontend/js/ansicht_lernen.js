@@ -82,6 +82,12 @@ export class Sitzung {
       this.pensum = await api.stand(zustand.benutzerId,
                                     this.optionen.sammlungId || null);
     } catch { this.pensum = null; }
+    // Der Punktestand ZU BEGINN. Am Ende wird verglichen — das ist
+    // genauer als jede Nachrechnung in der Oberfläche und hält die
+    // Regel an einem Ort: im Server.
+    try {
+      this.spielVorher = await spielzeichen.holen(zustand.benutzerId);
+    } catch { this.spielVorher = null; }
     await this.naechste();
   }
 
@@ -339,6 +345,7 @@ export class Sitzung {
              : h('p', { text: 'Es ist gerade nichts fällig. Freies Üben geht '
                             + 'trotzdem jederzeit.' })),
         this.teilErfolg(),
+        this.teilPunkte(sp),
         this.teilStraehne(sp),
         rueckstand
           ? h('p', { class: 'leise' },
@@ -387,6 +394,28 @@ export class Sitzung {
     // in diesem Trainer: ein Wort hat zwei Richtungen, und »drei
     // Wörter« wäre dann schlicht falsch.
     return h('p', { class: 'spiel-erfolg', text: teile.join(' · ') + '.' });
+  }
+
+  /** Was die Runde an Punkten gebracht hat — und ob eine Stufe fiel.
+   *
+   * Als Differenz zum Stand bei Sitzungsbeginn, nicht nachgerechnet.
+   * Eine zweite Rechnung in der Oberfläche wäre eine zweite Wahrheit,
+   * und sie würde beim ersten Mal abweichen, wenn jemand die Vergabe
+   * im Server ändert.
+   */
+  teilPunkte(sp) {
+    if (!sp || !this.spielVorher) return null;
+    const dazu = sp.punkte.gesamt - this.spielVorher.punkte.gesamt;
+    if (dazu <= 0) return null;
+    const alt = this.spielVorher.punkte.stufe;
+    const neu = sp.punkte.stufe;
+    const aufgestiegen = neu.nummer > alt.nummer;
+    return h('p', { class: aufgestiegen ? 'spiel-erfolg' : 'spiel-straehne' },
+      `+${dazu} Punkte`,
+      sp.punkte.heute_verdoppelt ? ' (heute zählt doppelt)' : '',
+      aufgestiegen
+        ? ` — Stufe ${neu.nummer} erreicht: ${neu.name}.`
+        : '.');
   }
 
   /** Tagesziel und Strähne — und was noch fehlt.

@@ -52,7 +52,8 @@ import uebung_lernen
 import uebungen
 import wache
 import zugang
-from modelle import (RegelEingabe, RegelAendern,
+import zuspruch as zuspruchmodul
+from modelle import (RegelEingabe, RegelAendern, ZuspruchEingabe,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
@@ -2107,6 +2108,80 @@ def spiel_stand(benutzer_id: int, request: Request = None,
     _wache_rumpf(db, request, benutzer_id=benutzer_id)
     _holen(db, "benutzer", benutzer_id)
     return spiel.stand(db, benutzer_id)
+
+
+# ============================================================ Zuspruch
+
+def _zuspruch_fehler(arbeit):
+    """Die drei Fehlerarten dieses Bereichs auf HTTP abbilden.
+
+    Steht als Hülle da, weil sonst sieben Endpunkte dreimal dasselbe
+    `except` tragen — und der achte es vergisst.
+    """
+    try:
+        return arbeit()
+    except zugang.NichtErlaubt as f:
+        raise HTTPException(403, str(f)) from f
+    except KeyError as f:
+        raise HTTPException(404, str(f.args[0] if f.args else f)) from f
+    except ValueError as f:
+        raise HTTPException(400, str(f)) from f
+
+
+@app.get("/api/zuspruch/{benutzer_id}")
+def zuspruch_lesen(benutzer_id: int, alle: bool = False,
+                   request: Request = None, db: sqlite3.Connection = DB):
+    """Was mir geschickt wurde, was ich geschickt habe, und an wen ich darf."""
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _holen(db, "benutzer", benutzer_id)
+    return _zuspruch_fehler(lambda: {
+        "fuer_mich": zuspruchmodul.fuer_mich(db, benutzer_id, alle=alle),
+        "von_mir": zuspruchmodul.von_mir(db, benutzer_id),
+        "empfaenger": zuspruchmodul.empfaenger(db, benutzer_id),
+    })
+
+
+@app.post("/api/zuspruch")
+def zuspruch_schicken(eingabe: ZuspruchEingabe, request: Request = None,
+                      db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=eingabe.von_id)
+    return _zuspruch_fehler(lambda: zuspruchmodul.schicken(
+        db, eingabe.von_id, eingabe.an_id, eingabe.art,
+        text=eingabe.text, belohnung=eingabe.belohnung,
+        lernziel_id=eingabe.lernziel_id, gueltig_tage=eingabe.gueltig_tage))
+
+
+@app.post("/api/zuspruch/{zuspruch_id}/gesehen")
+def zuspruch_gesehen(zuspruch_id: int, benutzer_id: int,
+                     request: Request = None, db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    return _zuspruch_fehler(
+        lambda: zuspruchmodul.gesehen(db, zuspruch_id, benutzer_id))
+
+
+@app.post("/api/zuspruch/{zuspruch_id}/einloesen")
+def zuspruch_einloesen(zuspruch_id: int, benutzer_id: int,
+                       request: Request = None, db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    return _zuspruch_fehler(
+        lambda: zuspruchmodul.einloesen(db, zuspruch_id, benutzer_id))
+
+
+@app.post("/api/zuspruch/{zuspruch_id}/erledigt")
+def zuspruch_erledigt(zuspruch_id: int, benutzer_id: int,
+                      request: Request = None, db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    return _zuspruch_fehler(
+        lambda: zuspruchmodul.erledigen(db, zuspruch_id, benutzer_id))
+
+
+@app.delete("/api/zuspruch/{zuspruch_id}", status_code=204)
+def zuspruch_zuruecknehmen(zuspruch_id: int, benutzer_id: int,
+                           request: Request = None,
+                           db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _zuspruch_fehler(
+        lambda: zuspruchmodul.zuruecknehmen(db, zuspruch_id, benutzer_id))
 
 
 @app.get("/api/lernen/stand")

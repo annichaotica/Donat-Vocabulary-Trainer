@@ -663,6 +663,57 @@ CREATE TABLE IF NOT EXISTS lernziel (
 CREATE INDEX IF NOT EXISTS idx_lernziel_benutzer ON lernziel(benutzer_id, aktiv);
 
 -- ======================================================================
+-- Zuspruch — was man jemandem schickt, der gerade lernt.
+--
+-- »Auch möchte ich meiner Tochter Boosts schicken können zur
+-- Motivation.«
+--
+-- Die einzige neue Tabelle des ganzen Vorhabens. Strähne, Punkte und
+-- Stufen werden aus dem Protokoll gerechnet; was hier steht, kann man
+-- nirgends herleiten, weil es von einem MENSCHEN kommt.
+--
+-- Vier Arten, und die letzte ist die, auf die es ankommt:
+--
+--   botschaft    ein Satz, der beim nächsten Öffnen dasteht.
+--   verdoppler   doppelte Punkte für einen Tag, den der Empfänger
+--                selbst wählt. Harmlos, weil Punkte nichts kosten und
+--                nichts am Terminplan ändern.
+--   joker        ein geschenkter Schutztag für die Strähne. Klein,
+--                konkret, echte Hilfe.
+--   versprechen  »Lernziel bis Freitag → Kino«. Die App ist hier nur
+--                Zeuge: die Belohnung kommt nicht aus ihr, sondern von
+--                der Mutter. Keine Punktzahl schlägt das — und ein
+--                Zeuge, der mitzählt, wirkt erstaunlich.
+--
+-- ziel_text steht als TEXT daneben, nicht nur als Verweis: wird das
+-- Lernziel gelöscht, soll das Versprechen lesbar bleiben. Ein
+-- Versprechen, das plötzlich »zu nichts« gehört, wäre schlimmer als
+-- eines, dessen Ziel es nicht mehr gibt.
+--
+-- gesehen/eingeloest/erledigt sind getrennt, weil sie drei
+-- verschiedene Dinge sind: zur Kenntnis genommen, in Anspruch genommen,
+-- abgegolten.
+CREATE TABLE IF NOT EXISTS zuspruch (
+    id           INTEGER PRIMARY KEY,
+    von_id       INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    an_id        INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    art          TEXT NOT NULL
+                 CHECK (art IN ('botschaft', 'verdoppler', 'joker',
+                                'versprechen')),
+    text         TEXT,
+    belohnung    TEXT,
+    ziel_text    TEXT,
+    lernziel_id  INTEGER REFERENCES lernziel(id) ON DELETE SET NULL,
+    gueltig_bis  TEXT,
+    gesehen      TEXT,
+    eingeloest   TEXT,
+    erledigt     TEXT,
+    angelegt     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_zuspruch_an ON zuspruch(an_id, art);
+CREATE INDEX IF NOT EXISTS idx_zuspruch_von ON zuspruch(von_id);
+
+-- ======================================================================
 -- Grammatikregeln — das "Warum ist das so?" an der Frage.
 --
 -- Beim Üben steht die Regel zur Verfügung, die gerade greift: beim

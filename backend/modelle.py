@@ -457,6 +457,22 @@ class EintragPruefen(BaseModel):
     nur_mangelhafte: bool = True
 
 
+class ZuspruchEingabe(BaseModel):
+    """Was man jemandem schickt, der gerade lernt.
+
+    `lernziel_id` nur beim Versprechen: woran es hängt. Der Name des
+    Ziels wird beim Anlegen als Text mitgenommen, damit das Versprechen
+    lesbar bleibt, wenn das Ziel gelöscht wird.
+    """
+    von_id: int
+    an_id: int
+    art: Literal["botschaft", "verdoppler", "joker", "versprechen"]
+    text: str | None = Field(default=None, max_length=400)
+    belohnung: str | None = Field(default=None, max_length=400)
+    lernziel_id: int | None = None
+    gueltig_tage: int | None = Field(default=None, ge=1, le=365)
+
+
 class LernzielAnlegen(BaseModel):
     """Ein Ausschnitt des Bestands mit einem Termin.
 

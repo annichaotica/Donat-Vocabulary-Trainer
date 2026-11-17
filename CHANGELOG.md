@@ -16,6 +16,43 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### »Ein« ist keine Frage
+
+»Eine, eines, mia, ena, enas, ta, to — die ganzen Artikel. Ich weiß
+sie, aber anhand der Fragen weiß ich nie, welcher gemeint ist.«
+
+Nachgesehen: sie hat recht, und es lag nicht an ihr. Die Frage lautete
+wörtlich **»ein«** — richtig war je nach Geschlecht ένας, μία oder
+ένα. **»die«** führte auf sieben verschiedene Wörter. Was zur
+Unterscheidung dastand, war entweder nichts, oder ein Kürzel (»n«,
+»m«), oder dieser Satz:
+
+> ihr: ihr (2. Person Plural, Subjekt); Sie: Sie (höflich) / ihr
+
+Das ist keine Wissenslücke, das ist eine unbeantwortbare Frage — und
+der Lernplan hat daraus gelernt, dass sie die Wörter nicht kann.
+
+Jetzt steht die **Bestimmung in der Frage**: »ein *(Nominativ Singular
+neutrum)*«, »die *(Nominativ Plural neutrum)*«, »ihr *(2. Person
+Plural)*«. Sie kommt aus den Merkmalen des Wortes, wird beschriftet wie
+überall sonst und folgt dem eingestellten Stil — wer »einfach«
+eingestellt hat, liest »wer oder was?, Mehrzahl, sächlich«.
+
+Drei Regeln dahinter:
+
+- **Nur wenn es etwas zu verwechseln gibt.** Bei »das Haus« wäre
+  »neutrum« Lärm; das sagt der deutsche Artikel schon.
+- **Die Merkmale schlagen den Freitext.** Sagen sie es, verschwindet
+  der Kontext aus der Frage — sonst stünde beides nebeneinander.
+- **Was die Frage nicht sagt, darf die Wertung nicht verlangen.** μία
+  und μια sind beide Nominativ Singular feminin; dort gelten weiterhin
+  beide Antworten. Und ein Wort, bei dem die Merkmale noch fehlen,
+  bleibt gültig — es macht die Frage für die anderen aber nicht wieder
+  blind.
+
+Dazu sind die Merkmale für die griechischen Artikel und Pronomen
+nachgetragen: 41 Wörter, das ganze Paradigma.
+
 ### Punkte und Stufen
 
 Punkte gibt es **fürs Drankommen, nicht fürs Richtigliegen**: je

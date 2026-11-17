@@ -543,6 +543,125 @@ def gleichbedeutende(db: sqlite3.Connection, lexem: dict, bedeutung_id: int,
     return treffer
 
 
+def _merkmale(zeile: dict) -> dict:
+    return dbm.j_lesen(zeile["merkmale"] or "{}") or {}
+
+
+def nicht_unterschieden(db: sqlite3.Connection, lexem: dict,
+                        bedeutung: dict, grundsprache: str) -> list[dict]:
+    """Welche gleichbedeutenden Wörter die Frage NICHT ausschließt.
+
+    Die Gegenseite zu `unterscheidung`: was dort nicht gesagt wird,
+    darf die Wertung nicht verlangen.
+
+    Der erste Entwurf fragte das in einem Zug — »unterscheiden die
+    Merkmale von ALLEN, ja oder nein« —, und das war zu grob. Bei »die«
+    stehen im griechischen Bestand sieben Wörter; τους hatte noch keine
+    Merkmale eingetragen. Ein einziges unbestimmtes Wort machte damit
+    die Frage für alle übrigen wieder mehrdeutig, obwohl »Nominativ
+    Plural neutrum« η, την und τις sehr wohl ausschließt.
+
+    Also je Wort einzeln: wen die Bestimmung trifft, der fällt weg;
+    wen sie nicht erreicht, der bleibt eine gültige Antwort. Das ist
+    auch der Weg, auf dem sich der Bestand von selbst verbessert —
+    jedes nachgetragene Merkmalsbündel macht eine Frage schärfer, ohne
+    dass die anderen fertig sein müssten.
+    """
+    andere = gleichbedeutende(db, lexem, bedeutung["id"], grundsprache)
+    if not andere:
+        return []
+    fm = _merkmale(lexem)
+    if not fm:
+        # Ohne Merkmale entscheidet wie bisher der Kontext: steht einer
+        # da, ist gesagt, welches Wort gemeint ist.
+        return [] if (bedeutung["kontext"] or "").strip() else andere
+    ids = [x["lexem_id"] for x in andere]
+    platz = ",".join("?" * len(ids))
+    fremde = {z["id"]: _merkmale(z) for z in dbm.zeilen(
+        db, f"SELECT id, merkmale FROM lexem WHERE id IN ({platz})", ids)}
+    return [x for x in andere
+            if not _unterscheidet(fm, fremde.get(x["lexem_id"], {}))]
+
+
+def _unterscheidet(meine: dict, fremde: dict) -> bool:
+    """Sagen diese Merkmale, welches der beiden Wörter gemeint ist?
+
+    Verglichen werden NUR die Dimensionen, die beide tragen. Das ist der
+    springende Punkt und war im ersten Entwurf falsch:
+
+      το (Artikel) hat {Nominativ, Singular, neutrum},
+      αυτό (Pronomen) hat {3. Person, Singular, neutrum}.
+
+    Die Bündel sind verschieden — die Beschriftungen »Nominativ
+    Singular neutrum« und »3. Person Singular neutrum« unterscheiden
+    aber nichts, was jemand bei der Frage »es« entscheiden könnte.
+    Gemeinsam haben sie Numerus und Genus, und darin stimmen sie
+    überein. Also bleibt die Frage mehrdeutig, und beide Antworten
+    gelten.
+
+    Ohne gemeinsame Dimension lässt sich nichts entscheiden — dann
+    ebenfalls nein.
+    """
+    gemeinsam = set(meine) & set(fremde)
+    return bool(gemeinsam) and any(meine[d] != fremde[d] for d in gemeinsam)
+
+
+def unterscheidung(db: sqlite3.Connection, lexem: dict, bedeutung: dict,
+                   grundsprache: str, code: str,
+                   stil: str = "fach") -> str | None:
+    """Woran man erkennt, WELCHES Wort gefragt ist — oder None.
+
+    »ich weiß sie, aber anhand der Fragen weiß ich nie, welcher gemeint
+    ist.« Gemessen an ihrem Bestand: die Frage lautete »ein«, und
+    richtig waren je nach Geschlecht ένας, μία oder ένα. »die« führte
+    auf sechs verschiedene Artikel. Das ist keine Wissenslücke, das ist
+    eine unbeantwortbare Frage.
+
+    ZWEI QUELLEN, und die MERKMALE GEWINNEN:
+
+      Die Merkmale des Lexems — »Nominativ Plural neutrum«, beschriftet
+      wie überall sonst und im eingestellten Stil (»wer oder was?,
+      Mehrzahl, sächlich«). Verlässlich, weil aus dem Paradigma und
+      nicht von Hand getippt.
+
+      Der Kontext der Bedeutung — »klein, Körpergröße«. Freitext von
+      einem Menschen oder einem Agenten. Hilfreich, wo er gut ist; in
+      ihrem Bestand stand dort aber auch »n«, »f, betont« und einmal
+      »ihr: ihr (2. Person Plural, Subjekt); Sie: Sie (höflich) / ihr«.
+
+    Beides nebeneinanderzustellen war der erste Entwurf und war falsch:
+    aus »2. Person Plural« wurde dann »2. Person Plural · ihr: ihr
+    (2. Person Plural, Subjekt); Sie: …«. Sagen die Merkmale es schon,
+    ist der Freitext Lärm. Wo sie schweigen — bei »klein« etwa, das
+    keine Merkmale hat, sondern eine Bedeutungsnuance —, bleibt der
+    Kontext die einzige Quelle und wird gezeigt.
+
+    NUR WENN ES ETWAS ZU VERWECHSELN GIBT. Bei »das Haus« wäre
+    »neutrum« Lärm anderer Art — das steht im deutschen Artikel schon
+    drin. Erst wenn ein zweites Wort derselben Sammlung dieselbe
+    Übersetzung hat, muss die Frage sagen, welches gemeint ist.
+
+    UND NUR, WENN DIE MERKMALE WIRKLICH UNTERSCHEIDEN (siehe
+    `_unterscheidet`). μία und μια sind beide Nominativ Singular
+    feminin; dort hülfe die Beschriftung nichts. Dann bleibt die Frage
+    mehrdeutig — und `pruefen` lässt beide Antworten gelten.
+    """
+    fm = _merkmale(lexem)
+    if fm and bedeutung and gleichbedeutende(db, lexem, bedeutung["id"],
+                                             grundsprache):
+        # `mk.beschriften` und NICHT `sprachen.beschriften_form`: das
+        # sucht eine passende Formgruppe und stellt deren Namen voran.
+        # Bei den griechischen Artikeln kam dabei »maskulin Nominativ
+        # Singular« heraus — die Gruppe heißt »maskulin«, und der Rest
+        # hing hinten dran. Hier geht es nicht um eine Formgruppe,
+        # sondern um die Bestimmung des Wortes selbst.
+        beschriftung = mk.beschriften(fm, stil=stil)
+        if beschriftung:
+            return beschriftung
+    kontext = (bedeutung or {})["kontext"] if bedeutung else None
+    return (kontext or "").strip() or None
+
+
 def stamm_fuer_aufgabe(db: sqlite3.Connection, aufgabe_id: int) -> str:
     """Der Wortstamm für die Zerlegung — in dieser Reihenfolge:
 
@@ -748,7 +867,11 @@ def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
         return {**kopf,
                 "frage_text": ue[0]["text"] if ue else "(keine Übersetzung)",
                 "frage_sprache": grund,
-                "frage_zusatz": b["kontext"],
+                # Nicht mehr bloß der Kontext: auch die Merkmale, wenn
+                # es ohne sie mehrdeutig wäre. »ein« allein ist keine
+                # Frage, »ein (Nominativ Singular neutrum)« schon.
+                "frage_zusatz": unterscheidung(db, lexem, b, grund, code,
+                                               stil=stil),
                 "antwort_sprache": code,
                 "vorlesen": None}
 
@@ -887,12 +1010,15 @@ def antwort_pruefen(db: sqlite3.Connection, aufgabe_id: int, eingabe,
     if typ == "bedeutung_deutsch_fremd":
         gueltig = [lexem["lemma"]]
         b = dbm.zeile(db, "SELECT * FROM bedeutung WHERE id = ?", (a["ziel_id"],))
-        # Steht in der Frage ein Kontext (»klein, Körpergröße«), ist gesagt,
-        # welches Wort gemeint ist — dann gilt nur dieses. Ohne Kontext ist
-        # die Frage mehrdeutig, und jedes Wort mit derselben Übersetzung
-        # ist eine richtige Antwort.
-        auch = ([] if (b and b["kontext"])
-                else gleichbedeutende(db, lexem, a["ziel_id"], grund))
+        # Steht in der Frage eine Unterscheidung — ein Kontext wie
+        # »klein, Körpergröße« oder die Merkmale wie »Nominativ Plural
+        # neutrum« —, ist gesagt, welches Wort gemeint ist; dann gilt
+        # nur dieses. Fehlt sie, ist die Frage mehrdeutig, und jedes
+        # Wort mit derselben Übersetzung ist eine richtige Antwort.
+        #
+        # DIESELBE Funktion wie in der Frage, und das ist der Punkt:
+        # was die Frage nicht sagt, darf die Wertung nicht verlangen.
+        auch = nicht_unterschieden(db, lexem, b, grund) if b else []
         gueltig += [x["lemma"] for x in auch]
         vw = [(t, bs) for t, bs in
               _verwechslungen(db, lexem, code, ausser_text=lexem["lemma"])

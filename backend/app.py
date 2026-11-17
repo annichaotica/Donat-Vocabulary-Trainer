@@ -1924,6 +1924,13 @@ def lernziel_aendern(lernziel_id: int, eingabe: LernzielAendern,
     if eingabe.aktiv is not None:
         felder.append("aktiv = ?")
         werte.append(int(eingabe.aktiv))
+    if eingabe.benutzer_id is not None:
+        # Umhängen. Der Fortschritt rechnet sich danach aus dem
+        # Lernstand der NEUEN Person — er wandert also nicht mit, und
+        # das ist richtig so: gekonnt hat es, wer geübt hat.
+        _holen(db, "benutzer", eingabe.benutzer_id)
+        felder.append("benutzer_id = ?")
+        werte.append(eingabe.benutzer_id)
     if felder:
         db.execute(f"UPDATE lernziel SET {', '.join(felder)} WHERE id = ?",
                    (*werte, lernziel_id))

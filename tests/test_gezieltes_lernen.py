@@ -223,3 +223,94 @@ def test_lernziel_nicht_ueber_fremden_bestand(klient):
                 umfang={"lexeme": [fremdes_wort["id"]]})
     finally:
         db.close()
+
+
+def test_lernziel_fuer_jemand_anderen(klient):
+    """»Kannst du es bitte zu Lernende 2 umhängen.«
+
+    Der KI-Konnektor hängt an EINEM Profil, die Ziele sind aber meist
+    für die Kinder. Deshalb darf ein Ziel gleich für jemand anderen
+    angelegt und ein bestehendes umgehängt werden.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+    import mcp_dienst
+
+    anni, s = _aufbau(klient, sprache="fr")          # erste Person = Verwalterin
+    kathi = klient.post("/api/benutzer", json={"name": "Lernende 2"}).json()
+    w = _wort(klient, s["id"], "le tandem")
+
+    db = dbm.verbindung()
+    try:
+        person = dict(dbm.zeile(db, "SELECT * FROM benutzer WHERE id = ?",
+                                (anni["id"],)))
+        gleich = mcp_dienst.lernziel_anlegen(
+            db, person, name="Vokabeltest", umfang={"lexeme": [w["id"]]},
+            fuer="Lernende 2")
+        assert gleich["benutzer_id"] == kathi["id"]
+
+        # Und ein bestehendes umhängen.
+        meins = mcp_dienst.lernziel_anlegen(
+            db, person, name="Meins", umfang={"lexeme": [w["id"]]})
+        assert meins["benutzer_id"] == anni["id"]
+        db.commit()
+        umgehaengt = mcp_dienst.lernziel_umhaengen(db, person, meins["id"],
+                                                   "kathi")
+        db.commit()
+        assert umgehaengt["benutzer_id"] == kathi["id"]
+    finally:
+        db.close()
+
+    # Bei Lernende 2 stehen jetzt beide, bei Annuschka keines.
+    assert len(klient.get("/api/lernziele",
+                          params={"benutzer_id": kathi["id"]}).json()) == 2
+    assert klient.get("/api/lernziele",
+                      params={"benutzer_id": anni["id"]}).json() == []
+
+
+def test_nur_der_verwalter_darf_fremde_ziele_setzen(klient):
+    """Sonst könnte jeder jedem Pflichten in den Plan schreiben.
+
+    Der Test muss am EIGENEN Bestand ansetzen. Setzte er fremden
+    Bestand ein, schlüge schon die Sammlungsprüfung zu — der Test
+    bestünde dann auch ohne die Rechteprüfung, und zwar aus dem
+    falschen Grund. Genau so war er zuerst gebaut, und die Gegenprobe
+    hat es gezeigt.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+    import mcp_dienst
+    import zugang
+
+    _erste, _s = _aufbau(klient, sprache="fr")        # wird Verwalterin
+    annuschka = klient.post("/api/benutzer",
+                            json={"name": "Annuschka"}).json()
+    kathi = klient.post("/api/benutzer", json={"name": "Lernende 2"}).json()
+    ihre = klient.post("/api/sammlungen", json={
+        "besitzer_id": kathi["id"], "name": "Lernende 2s Französisch",
+        "sprache": "fr"}).json()
+    ihr_wort = _wort(klient, ihre["id"], "le hasard")
+
+    db = dbm.verbindung()
+    try:
+        kathi_person = dict(dbm.zeile(
+            db, "SELECT * FROM benutzer WHERE id = ?", (kathi["id"],)))
+        assert not kathi_person["verwalter"]
+
+        # Ihr eigener Bestand, ihr eigenes Profil: erlaubt.
+        eigenes = mcp_dienst.lernziel_anlegen(
+            db, kathi_person, name="für mich",
+            umfang={"lexeme": [ihr_wort["id"]]})
+        assert eigenes["benutzer_id"] == kathi["id"]
+
+        # Ihr eigener Bestand, FREMDES Profil: nicht erlaubt. Am
+        # Umfang kann es hier nicht mehr scheitern.
+        with pytest.raises(zugang.NichtErlaubt):
+            mcp_dienst.lernziel_anlegen(
+                db, kathi_person, name="für Mama",
+                umfang={"lexeme": [ihr_wort["id"]]}, fuer="Annuschka")
+        assert annuschka["id"] != kathi["id"]
+    finally:
+        db.close()

@@ -16,6 +16,37 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### Wiederholen, ohne dass Neues dazukommt
+
+»Haben wir eigentlich auch eine Art Wiederholungsmodus?«
+
+Halb: **Frei üben** und **Fehler wiederholen** standen schon in der
+Übersicht, und der Lernkern konnte zusätzlich »nur Fälliges, nichts
+Neues« — nur führte dorthin kein Knopf. Jetzt gibt es
+**Wiederholen**, mit der Zahl daneben.
+
+Der Unterschied zu »Lernen« ist nicht kosmetisch: planmäßig kommt
+Neues dazu, sobald Platz in der Tagesdosis ist. Wer vor einer Arbeit
+steht oder wenig Zeit hat, will genau das nicht — er will festigen,
+was schon angefangen ist.
+
+### Gelöschte Lernziele nehmen nichts mit
+
+»Wenn ich die mal lösche, sind sie ja quasi weg.«
+
+Sind sie nicht. Der Fortschritt eines Lernziels ist **nirgends
+gespeichert** — er wird bei jedem Aufruf aus dem Lernstand gerechnet.
+Gelöscht wird nur das Ziel selbst: Name, Ausschnitt, Termin. Keine
+Tabelle verweist darauf, kein Lernstand hängt daran. Ein Test hält
+das fest: er zählt vor und nach dem Löschen und verlangt, dass sich
+nichts rührt.
+
+Allgemeine Statistiken gibt es übrigens auch schon — **Fortschritt**
+in der Übersicht, neben »Lernen«. Antworten je Tag, Trefferquote,
+Strähne, wo der Wortschatz steht, was in den nächsten Wochen fällig
+wird und wie schnell man antwortet.
+
+
 ### Die KI kann jetzt Lernziele anlegen
 
 »Könnte ich das dem angeschlossenen Claude geben, um eine Sammlung

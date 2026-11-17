@@ -498,6 +498,10 @@ class LernzielAendern(BaseModel):
     ziel: Literal["reif", "einmal_richtig"] | None = None
     aktiv: bool | None = None
     notiz: str | None = None
+    # Umhängen. Gebraucht, weil der KI-Konnektor an EINEM Profil
+    # hängt, die Ziele aber meist für jemand anderen in der Familie
+    # sind: »kannst du es bitte zu Lernende 2 umhängen«.
+    benutzer_id: int | None = None
 
 
 class ImportEingabe(BaseModel):

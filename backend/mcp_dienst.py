@@ -723,9 +723,40 @@ def lernziele_auflisten(db: sqlite3.Connection, person: dict,
     return {"lernziele": [dict(z) for z in liste]}
 
 
+def _fuer_wen(db: sqlite3.Connection, person: dict, fuer: str | None) -> int:
+    """Für wen gilt das Ziel — für mich oder für jemanden in der Familie?
+
+    Der Konnektor hängt an EINEM Profil, die Ziele sind aber meist für
+    die Kinder: »kannst du es bitte zu Lernende 2 umhängen«. Ein fremdes
+    Profil darf nur bestimmen, wer den Bestand verwaltet — sonst
+    könnte jeder jedem Pflichten in den Plan schreiben.
+    """
+    if not fuer or fuer.strip().casefold() == person["name"].casefold():
+        return person["id"]
+    zugang.verwalter_pruefen(person)
+    andere = dbm.zeile(db, "SELECT id, name FROM benutzer WHERE name = ?"
+                           " COLLATE NOCASE", (fuer.strip(),))
+    if andere is None:
+        bekannt = ", ".join(z["name"] for z in
+                            dbm.zeilen(db, "SELECT name FROM benutzer"))
+        raise WerkzeugFehler(f"Kein Profil namens {fuer!r}. Es gibt: {bekannt}")
+    return andere["id"]
+
+
+def lernziel_umhaengen(db: sqlite3.Connection, person: dict, lernziel_id: int,
+                       fuer: str):
+    """Ein bestehendes Lernziel einer anderen Person zuordnen."""
+    a = _app()
+    ziel_id = _fuer_wen(db, person, fuer)
+    return dict(_fehler_wandeln(
+        a.lernziel_aendern, lernziel_id,
+        __import__("modelle").LernzielAendern(benutzer_id=ziel_id), db=db))
+
+
 def lernziel_anlegen(db: sqlite3.Connection, person: dict, name: str,
                      umfang: dict, termin: str | None = None,
-                     ziel: str = "reif", notiz: str | None = None):
+                     ziel: str = "reif", notiz: str | None = None,
+                     fuer: str | None = None):
     """Ein Lernziel über einen Ausschnitt des Bestands."""
     import lernziele
     # Nur auf Sammlungen, die dieser Person zugänglich sind. Ohne das
@@ -735,7 +766,8 @@ def lernziel_anlegen(db: sqlite3.Connection, person: dict, name: str,
         zugang.sammlung_pruefen(db, person["id"], int(sid))
     for lid in (umfang or {}).get("lexeme") or []:
         zugang.lexem_pruefen(db, person["id"], int(lid))
-    return dict(_fehler_wandeln(lernziele.anlegen, db, person["id"], name,
+    return dict(_fehler_wandeln(lernziele.anlegen, db,
+                                _fuer_wen(db, person, fuer), name,
                                 umfang or {}, termin, ziel, notiz))
 
 
@@ -1512,8 +1544,29 @@ WERKZEUGE: list[dict] = [
                          "enum": ["reif", "einmal_richtig"],
                          "description": "Vorgabe »reif«"},
                 "notiz": _s("string", "freigestellt"),
+                "fuer": _s("string", "Name des Profils, für das das Ziel "
+                                     "gilt — ohne Angabe für dich selbst. "
+                                     "In einer Familie hängt der Zugang an "
+                                     "einem Profil, die Ziele sind aber "
+                                     "meist für die Kinder."),
             },
             "required": ["name", "umfang"],
+        },
+    },
+    {
+        "name": "lernziel_umhaengen",
+        "funktion": lernziel_umhaengen,
+        "description": "Ordnet ein bestehendes Lernziel einer anderen "
+                       "Person zu. Der Fortschritt wandert NICHT mit — er "
+                       "rechnet sich aus dem Lernstand der neuen Person, "
+                       "und gekonnt hat es, wer geübt hat.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lernziel_id": _s("integer", "welches Ziel"),
+                "fuer": _s("string", "Name des Profils"),
+            },
+            "required": ["lernziel_id", "fuer"],
         },
     },
     {

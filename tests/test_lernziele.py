@@ -321,3 +321,55 @@ def test_der_tagesvorrat_zaehlt_woerter_nicht_formen(klient):
     # Zwei Wörter, aber deren sämtliche Aufgaben — nicht zwei Aufgaben.
     assert len(woerter) == 2, woerter
     assert len(aufgaben) > 2, len(aufgaben)
+
+
+def test_ein_geloeschtes_lernziel_nimmt_keinen_lernstand_mit(klient):
+    """»Wenn ich die mal lösche, sind sie ja quasi weg.«
+
+    Sind sie nicht. Der Fortschritt eines Lernziels ist nirgends
+    gespeichert — er wird bei jedem Aufruf aus dem Lernstand
+    gerechnet. Gelöscht wird nur das Ziel selbst: Name, Ausschnitt,
+    Termin. Jede beantwortete Aufgabe bleibt.
+    """
+    import sys
+    sys.path.insert(0, "backend")
+    import datenbank as dbm
+
+    b = klient.post("/api/benutzer", json={"name": "Lernende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "το σπίτι", "wortart": "substantiv",
+                       "merkmale": {"genus": "n"},
+                       "bedeutungen": [{"uebersetzungen": ["das Haus"]}]}]})
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Test",
+        "umfang": {"sammlungen": [s["id"]]}}).json()
+
+    aufgabe = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "anzahl": 1}).json()[0]
+    klient.post("/api/lernen/bewerten", json={
+        "benutzer_id": b["id"], "aufgabe_id": aufgabe["aufgabe_id"],
+        "bewertung": 4})
+
+    db = dbm.verbindung()
+    try:
+        vorher = {t: dbm.wert(db, f"SELECT COUNT(*) FROM {t}")
+                  for t in ("lernzustand", "wiederholung", "aufgabe", "lexem")}
+    finally:
+        db.close()
+
+    assert klient.delete(f"/api/lernziele/{ziel['id']}").status_code == 204
+
+    db = dbm.verbindung()
+    try:
+        nachher = {t: dbm.wert(db, f"SELECT COUNT(*) FROM {t}")
+                   for t in ("lernzustand", "wiederholung", "aufgabe", "lexem")}
+        assert dbm.wert(db, "SELECT COUNT(*) FROM lernziel") == 0
+    finally:
+        db.close()
+    assert nachher == vorher, "das Löschen hat Lernstand mitgenommen"
+
+    # Und die allgemeine Statistik weiß weiterhin davon.
+    stat = klient.get("/api/statistik", params={"benutzer_id": b["id"]}).json()
+    assert stat["gesamt"]["antworten"] >= 1

@@ -430,6 +430,21 @@ export async function zeichnen(behaelter) {
         disabled: !(gesamt.faellig + gesamt.verlernt + gesamt.neu),
         onclick: () => { merken({ sammlungId: null }); location.hash = '#/lernen'; },
       }, 'Lernen'),
+      // »Haben wir eigentlich auch eine Art Wiederholungsmodus?«
+      //
+      // Der Lernkern konnte es längst (nur=faellig), es führte nur
+      // kein Knopf dorthin. Der Unterschied zu »Lernen« ist nicht
+      // kosmetisch: planmäßig kommt NEUES dazu, sobald Platz ist.
+      // Wer vor einer Arbeit steht oder wenig Zeit hat, will genau
+      // das nicht — er will festigen, was schon angefangen ist.
+      h('button', {
+        disabled: !(gesamt.faellig + gesamt.verlernt),
+        title: gesamt.faellig + gesamt.verlernt
+          ? 'Nur Fälliges und Verlerntes — nichts Neues kommt dazu.'
+          : 'Heute ist nichts fällig.',
+        onclick: () => { merken({ sammlungId: null });
+                         location.hash = '#/lernen/faellig'; },
+      }, `Wiederholen (${gesamt.faellig + gesamt.verlernt})`),
       h('button', { onclick: () => { merken({ sammlungId: null }); location.hash = '#/lernen/frei'; } },
         'Frei üben'),
       h('button', { onclick: () => { merken({ sammlungId: null }); location.hash = '#/lernen/fehler'; } },

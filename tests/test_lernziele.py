@@ -373,3 +373,75 @@ def test_ein_geloeschtes_lernziel_nimmt_keinen_lernstand_mit(klient):
     # Und die allgemeine Statistik weiß weiterhin davon.
     stat = klient.get("/api/statistik", params={"benutzer_id": b["id"]}).json()
     assert stat["gesamt"]["antworten"] >= 1
+
+
+# ------------------------------------------- Ein leeres Ziel sagt warum
+
+def _franzoesisch(klient, typen=None):
+    b = klient.post("/api/benutzer", json={"name": "Lernende 1"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Französisch", "sprache": "fr"}).json()
+    if typen is not None:
+        klient.put(f"/api/sammlungen/{s['id']}/einstellungen",
+                   json={"typen": typen})
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "travailler", "wortart": "verb",
+                       "bedeutungen": [{"uebersetzungen": ["arbeiten"]}],
+                       "formen": [{"text": "travaille", "merkmale": {
+                           "modus": "indikativ", "tempus": "praesens",
+                           "person": "1", "numerus": "sg"}}]}]})
+    return b, s
+
+
+def test_ein_lernziel_das_nichts_trifft_sagt_warum(klient):
+    """»Es kommen aber keine Übungen, obwohl eigentlich 19 Verben da
+    sein sollten.«
+
+    Das Ziel stand mit »0 von 0« da und sagte kein Wort dazu. Der Grund
+    war, dass die Sammlung die verlangte Aufgabenart gar nicht erzeugt:
+    sie war auf Vokabeln beschränkt, »Ganze Reihe« stand nicht darin.
+
+    Das ist die Eigenschaft, über die man stolpert — ein Lernziel
+    SCHRÄNKT EIN, es erzeugt nicht. Ein Ausschnitt aus nichts bleibt
+    nichts, und das muss dastehen.
+    """
+    b, s = _franzoesisch(klient, typen=["bedeutung_fremd_deutsch",
+                                        "bedeutung_deutsch_fremd"])
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "verben",
+        "umfang": {"sammlungen": [s["id"]], "wortarten": ["verb"],
+                   "typen": ["formenreihe"]}}).json()
+    f = klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
+                   params={"benutzer_id": b["id"]}).json()
+
+    assert f["gesamt"] == 0
+    assert f["warum_leer"], "ein leeres Ziel muss sagen, warum"
+    grund = " ".join(f["warum_leer"])
+    assert "Ganze Reihe" in grund, grund
+    assert "schränkt" in grund or "erzeugt" in grund, grund
+
+
+def test_ein_ziel_mit_inhalt_erklaert_nichts(klient):
+    """Keine Erklärung, wo es nichts zu erklären gibt — und keine vier
+    Abfragen dafür."""
+    b, s = _franzoesisch(klient)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "alles",
+        "umfang": {"sammlungen": [s["id"]]}}).json()
+    f = klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
+                   params={"benutzer_id": b["id"]}).json()
+    assert f["gesamt"] > 0
+    assert f["warum_leer"] == []
+
+
+def test_ein_ausschnitt_ohne_wort_sagt_das_zuerst(klient):
+    """Der äußere Grund gewinnt: wo kein Wort ist, nützt die Auskunft
+    über Aufgabenarten nichts."""
+    b, s = _franzoesisch(klient)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Hauptwörter",
+        "umfang": {"sammlungen": [s["id"]], "wortarten": ["substantiv"],
+                   "typen": ["formenreihe"]}}).json()
+    f = klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
+                   params={"benutzer_id": b["id"]}).json()
+    assert "Kein Wort" in " ".join(f["warum_leer"]), f["warum_leer"]

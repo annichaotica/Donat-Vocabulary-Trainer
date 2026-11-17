@@ -45,6 +45,17 @@ function zielkarte(behaelter, z) {
                              text: f.lage || z.termin }) : null),
     h('p', { class: 'leise', style: 'margin:.2rem 0 .5rem', text: f.umfang_text || '' }),
 
+    // Ein Ziel, das nichts trifft, stand bisher mit »0 von 0« da und
+    // sagte kein Wort dazu. Man rätselt dann an der falschen Stelle —
+    // bei den Wörtern, obwohl es an der Aufgabenart hing.
+    (f.warum_leer || []).length
+      ? h('div', { class: 'befund hinweis', style: 'margin:.4rem 0 .6rem' },
+          h('p', { style: 'margin:0 0 .3rem' },
+            h('b', { text: 'Dieses Ziel trifft keine einzige Aufgabe.' })),
+          h('ul', { style: 'margin:0;padding-left:1.2rem' },
+            f.warum_leer.map((t) => h('li', { text: t }))))
+      : null,
+
     h('div', { class: 'zielbalken', title: `${f.geschafft} von ${f.gesamt}` },
       h('i', { style: `width:${anteil}%` })),
     h('p', { class: 'leise', style: 'margin:.3rem 0 0',

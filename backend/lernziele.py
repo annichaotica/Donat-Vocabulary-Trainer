@@ -201,6 +201,99 @@ def umfang_beschreiben(db: sqlite3.Connection, umfang: dict) -> str:
     return " · ".join(teile) if teile else "der ganze zugängliche Bestand"
 
 
+def warum_leer(db: sqlite3.Connection, benutzer_id: int,
+               umfang: dict) -> list[str]:
+    """Warum trifft dieser Ausschnitt keine einzige Aufgabe?
+
+    »Da ist ein neues Lernziel, nur Verben, Reihen — es kommen aber
+    keine Übungen, obwohl eigentlich 19 Verben da sein sollten.«
+
+    Sie hat gerätselt, und zu Recht: das Ziel stand mit »0 von 0« da
+    und sagte kein Wort dazu. Der Grund war, dass die Sammlung die
+    verlangte Aufgabenart überhaupt nicht erzeugt — sie war auf
+    Vokabeln beschränkt, und »Ganze Reihe« stand nicht darin.
+
+    Das ist die wichtigste Eigenschaft eines Lernziels und zugleich
+    die, über die man stolpert: **es schränkt ein, es erzeugt nicht.**
+    Ein Ausschnitt aus nichts bleibt nichts.
+
+    Die Prüfung geht die Stufen von außen nach innen durch und hält
+    bei der ersten an, die zutrifft — mehrere Gründe gleichzeitig zu
+    nennen hilft niemandem, und der äußere ist immer der, an dem es
+    zuerst hängt.
+    """
+    import lernen as lernmodul
+    gruende: list[str] = []
+    sammlungen = umfang.get("sammlungen") or _zugaenglich(db, benutzer_id)
+    if not sammlungen:
+        return ["Keine Sammlung im Umfang, und du lernst gerade keine."]
+
+    platz = ",".join("?" * len(sammlungen))
+
+    # 1. Trifft der Ausschnitt überhaupt ein Wort?
+    bedingungen = [f"l.sammlung_id IN ({platz})"]
+    werte: list = list(sammlungen)
+    for feld, spalte in (("lektionen", "l.lektion_id"),
+                         ("wortarten", "l.wortart"),
+                         ("lexeme", "l.id")):
+        auswahl = umfang.get(feld)
+        if auswahl:
+            bedingungen.append(
+                f"{spalte} IN ({','.join('?' * len(auswahl))})")
+            werte += list(auswahl)
+    woerter = dbm.wert(db, "SELECT COUNT(*) FROM lexem l WHERE "
+                       + " AND ".join(bedingungen), werte) or 0
+    if not woerter:
+        return ["Kein Wort fällt in diesen Ausschnitt. Stimmen Lektion, "
+                "Wortart und Sammlung?"]
+
+    # 2. Erzeugt die Sammlung die verlangte Aufgabenart überhaupt?
+    verlangt = umfang.get("typen") or []
+    if verlangt:
+        for sid in sammlungen:
+            e = aufgaben.sammlung_einstellungen(db, sid)
+            fehlen = [t for t in verlangt if t not in e["typen"]]
+            if fehlen and len(sammlungen) == 1:
+                namen = ", ".join(aufgaben.TYPEN[t]["name"]
+                                  for t in fehlen if t in aufgaben.TYPEN)
+                name = dbm.wert(db, "SELECT name FROM sammlung WHERE id = ?",
+                                (sid,))
+                gruende.append(
+                    f"Die Sammlung »{name}« erzeugt »{namen}« gar nicht. "
+                    "Ein Lernziel schränkt den Bestand ein, es legt nichts "
+                    "an — die Aufgabenart muss erst in den Einstellungen "
+                    "der Sammlung angehakt werden.")
+    if gruende:
+        return gruende
+
+    # 3. Gibt es die Aufgaben, sind aber abgeschaltet?
+    bedingungen_a = list(bedingungen)
+    werte_a = list(werte)
+    for feld, spalte in (("typen", "a.typ"), ("formgruppen", "a.formgruppe")):
+        auswahl = umfang.get(feld)
+        if auswahl:
+            bedingungen_a.append(
+                f"{spalte} IN ({','.join('?' * len(auswahl))})")
+            werte_a += list(auswahl)
+    rumpf = ("""FROM aufgabe a JOIN lexem l ON l.id = a.lexem_id WHERE """
+             + " AND ".join(bedingungen_a))
+    alle = dbm.wert(db, f"SELECT COUNT(*) {rumpf}", werte_a) or 0
+    if not alle:
+        return ["Zu diesen Wörtern gibt es keine Aufgabe dieser Art. "
+                "Fehlen die Formen, oder passt die Formgruppe nicht?"]
+    aktiv = dbm.wert(db, f"SELECT COUNT(*) {rumpf} AND a.aktiv = 1",
+                     werte_a) or 0
+    if not aktiv:
+        return [f"Die {alle} Aufgaben gibt es, sie sind aber abgeschaltet — "
+                "entweder über die Einstellungen der Sammlung oder über "
+                "»Gezielt lernen«."]
+
+    # 4. Dann hält sie die Lektionsschranke zurück.
+    return ["Die Aufgaben sind da, aber dein Lehrwerk hat die Formen an "
+            "dieser Stelle noch nicht eingeführt. Unter »Lehrgang« steht, "
+            "ab welcher Lektion sie drankommen."]
+
+
 # --------------------------------------------------------------- Fortschritt
 
 def _geschafft(r: dict, ziel: str) -> bool:
@@ -293,6 +386,11 @@ def fortschritt(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
         "lernziel_id": lernziel_id,
         "name": ziel["name"],
         "umfang_text": umfang_beschreiben(db, ziel["umfang"]),
+        # Warum nichts da ist — erst gerechnet, wenn wirklich nichts da
+        # ist. Die Prüfung kostet vier Abfragen, und für ein Ziel mit
+        # Inhalt wäre sie Arbeit ohne Ergebnis.
+        "warum_leer": (warum_leer(db, benutzer_id, ziel["umfang"])
+                       if not gesamt else []),
         "ziel": ziel["ziel"],
         "termin": ziel["termin"],
         "tage_bis_termin": tage,

@@ -16,6 +16,22 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### Ein leeres Lernziel sagt jetzt, warum
+
+»Da ist ein neues Lernziel, nur Verben, Reihen — es kommen aber keine
+Übungen, obwohl eigentlich 19 Verben da sein sollten.«
+
+Das Ziel stand mit **»0 von 0«** da und schwieg. Jetzt steht die
+Begründung daneben, und sie geht von außen nach innen: kein Wort im
+Ausschnitt? Die Sammlung erzeugt diese Aufgabenart gar nicht? Die
+Aufgaben sind da, aber abgeschaltet? Oder hält sie die
+Lektionsschranke zurück?
+
+Der Satz, über den man stolpert: **ein Lernziel schränkt ein, es
+erzeugt nicht.** Ein Ausschnitt aus nichts bleibt nichts — und wer
+»Ganze Reihe« verlangt, bekommt nichts, solange die Sammlung diese
+Aufgabenart nicht anhakt.
+
 ### »Ein« ist keine Frage
 
 »Eine, eines, mia, ena, enas, ta, to — die ganzen Artikel. Ich weiß

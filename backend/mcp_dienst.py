@@ -1828,11 +1828,14 @@ WERKZEUGE: list[dict] = [
     {
         "name": "text_uebersetzen",
         "description": "Hinterlegt je Abschnitt eine Referenzübersetzung. "
-                       "Sie erscheint im Text als aufklappbarer Vorschlag "
-                       "— zum Vergleichen, NACHDEM man selbst übersetzt "
-                       "hat. Die eigene Fassung wird dabei nicht "
-                       "angerührt. Übersetze so, wie es im Unterricht "
-                       "gälte: nah am Original, aber in gutem Deutsch.",
+                       "Sie erscheint im Text wahlweise aufgeklappt neben "
+                       "dem Original — so liest man mittelhochdeutsche "
+                       "Verse — oder eingeklappt darunter, zum Vergleichen, "
+                       "NACHDEM man selbst übersetzt hat. Die eigene "
+                       "Fassung wird dabei nicht angerührt. Übersetze so, "
+                       "wie es im Unterricht gälte: nah am Original, aber "
+                       "in gutem Deutsch. Bei Versen Vers für Vers, ein "
+                       "Abschnitt ist eine Zeile.",
         "inputSchema": {
             "type": "object",
             "properties": {

@@ -130,6 +130,7 @@ export async function zeichnenText(behaelter, textId) {
 
   behaelter.append(h('h1', { text: text.titel }));
   behaelter.append(teilDeckung(deckung, textId, behaelter));
+  behaelter.append(teilLesart(text, behaelter, textId));
 
   // Die Wortfarben je Abschnitt: die Deckung liefert die Wörter in der
   // Reihenfolge des ganzen Textes, die Abschnitte schneiden ihn in
@@ -148,6 +149,49 @@ export async function zeichnenText(behaelter, textId) {
                               style: 'justify-content:flex-start' },
     h('button', { onclick: () => { location.hash = '#/texte'; } },
       'Zurück zu den Texten')));
+}
+
+
+/** Der Schalter für die Übersetzung daneben.
+ *
+ * »Für die Texte brauchen wir noch eine Option, Referenzübersetzungen
+ * daneben zu stellen. Gerade bei den mittelhochdeutschen ist das
+ * nämlich wichtig.«
+ *
+ * Und das stimmt: der Iwein steht vers für vers da, ein Abschnitt je
+ * Vers. Genau so sind die Ausgaben gedruckt — links der Vers, rechts
+ * die Übersetzung. Eingeklappt unter jedem Vers nützt sie beim Lesen
+ * nichts; man will den Blick danebenlegen können, nicht achtundvierzig
+ * Klappen öffnen.
+ *
+ * Steht hier oben und nicht in den Einstellungen: es ist eine
+ * Entscheidung über DIESE Seite, und man trifft sie, während man sie
+ * sieht.
+ */
+function teilLesart(text, behaelter, textId) {
+  const mit = text.abschnitte.filter((a) => (a.referenz || '').trim()).length;
+  const alle = text.abschnitte.length;
+  const schalter = h('button', {
+    class: zustand.textNebeneinander ? 'aktiv' : 'schlicht',
+    onclick: () => {
+      merken({ textNebeneinander: !zustand.textNebeneinander });
+      zeichnenText(behaelter, textId);
+    },
+  }, 'Übersetzung daneben');
+
+  return h('div', { class: 'frage-werkzeuge',
+                    style: 'justify-content:flex-start;margin:.6rem 0' },
+    schalter,
+    // Ehrlich sagen, wie viel überhaupt da ist. Beim Iwein ist es
+    // nichts — und dann soll nicht ein leerer Kasten den Eindruck
+    // machen, die Anzeige sei kaputt.
+    h('span', { class: 'leise' },
+      mit === alle && alle
+        ? `Alle ${alle} Abschnitte sind übersetzt.`
+        : mit
+          ? `${mit} von ${alle} Abschnitten sind übersetzt.`
+          : 'Für diesen Text ist noch keine Übersetzung hinterlegt — '
+            + 'dein Chatprogramm kann sie eintragen.'));
 }
 
 
@@ -246,14 +290,31 @@ function teilAbschnitt(a, deckung, textId, behaelter) {
     }, 800);
   });
 
+  // Wort für Wort aus dem EIGENEN Wortschatz — keine Übersetzung,
+  // und das steht auch so da. Eine echte Übersetzung kann der
+  // Trainer nicht; er hat keine Übersetzungsmaschine und soll keine
+  // erfinden. Was er hat, sind deine Einträge, und die reichen, um
+  // beim Entziffern nicht an jedem zweiten Wort hängenzubleiben.
+  const hilfe = wortFuerWort(original, mitBedeutung);
+
+  if (zustand.textNebeneinander) {
+    return h('div', { class: 'karte' },
+      h('div', { class: 'abschnitt-paar' },
+        h('div', {}, original, hilfe),
+        // Die rechte Spalte bleibt stehen, auch wenn nichts da ist:
+        // die Lücke ist die Auskunft. Beim Iwein sieht man damit auf
+        // einen Blick, welche Verse noch keine Übersetzung haben.
+        h('div', { class: 'abschnitt-referenz' },
+          a.referenz
+            ? h('p', { style: 'margin:0', text: a.referenz })
+            : h('p', { class: 'leise', style: 'margin:0',
+                       text: 'noch nicht übersetzt' }))),
+      feld);
+  }
+
   return h('div', { class: 'karte' },
     original,
-    // Wort für Wort aus dem EIGENEN Wortschatz — keine Übersetzung,
-    // und das steht auch so da. Eine echte Übersetzung kann der
-    // Trainer nicht; er hat keine Übersetzungsmaschine und soll keine
-    // erfinden. Was er hat, sind deine Einträge, und die reichen, um
-    // beim Entziffern nicht an jedem zweiten Wort hängenzubleiben.
-    wortFuerWort(original, mitBedeutung),
+    hilfe,
     feld,
     a.referenz
       ? h('details', { style: 'margin-top:.4rem' },

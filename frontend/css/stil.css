@@ -221,6 +221,32 @@ em, i { font-style: normal; font-weight: 600; }
   letter-spacing: normal;
 }
 
+/* Original und Übersetzung nebeneinander.
+ *
+ * So sind mittelhochdeutsche Ausgaben gedruckt: links der Vers, rechts
+ * die Übersetzung. Die Spalten sind gleich breit und oben ausgerichtet,
+ * damit die Zeilen beieinander stehen.
+ *
+ * Auf dem schmalen Gerät untereinander — zwei Spalten à 180 px sind
+ * keine Lesebreite. Die Übersetzung bekommt dann eine Kante, damit man
+ * sieht, wo das Original aufhört. */
+.abschnitt-paar {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: clamp(.8rem, 3vw, 2rem); align-items: start;
+}
+.abschnitt-referenz {
+  padding-left: clamp(.8rem, 2vw, 1.2rem);
+  border-left: 2px solid var(--rand);
+  color: var(--text);
+}
+@media (max-width: 44rem) {
+  .abschnitt-paar { grid-template-columns: 1fr; gap: .6rem; }
+  .abschnitt-referenz {
+    padding-left: 0; padding-top: .6rem;
+    border-left: none; border-top: 2px solid var(--rand);
+  }
+}
+
 /* Wortschatz nach Kapiteln. Die Überschrift gliedert die Liste wie das
    Glossar des Lehrwerks; der Haken davor gehört zum Verschieben. */
 .kapitelkopf {

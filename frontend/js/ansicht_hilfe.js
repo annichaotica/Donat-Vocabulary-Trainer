@@ -157,6 +157,21 @@ export async function zeichnen(behaelter) {
     h('p', { class: 'leise' }, 'Wie viele Fragen am Tag und wie viel Neues '
       + 'dazwischen, stellst du unter Einstellungen ein.')));
 
+  el.append(abschnitt('Texte lesen',
+    h('p', {}, h('b', { text: 'Übersetzung daneben. ' }),
+      'Über dem Text steht ein Schalter. Angeschaltet stehen Original '
+      + 'und Übersetzung nebeneinander — so sind mittelhochdeutsche '
+      + 'Ausgaben gedruckt, und so liest man sie auch. Ausgeschaltet '
+      + 'bleibt die Übersetzung eingeklappt unter deinem eigenen Feld: '
+      + 'zum Vergleichen, nachdem du selbst übersetzt hast.'),
+    h('p', {}, h('b', { text: 'Wo nichts steht, steht das auch da. ' }),
+      'Abschnitte ohne Übersetzung zeigen »noch nicht übersetzt«. Die '
+      + 'Lücke ist die Auskunft — so siehst du, was noch fehlt.'),
+    h('p', { class: 'leise' }, 'Die Übersetzungen trägt dein '
+      + 'Chatprogramm ein. Deine eigene Fassung wird dabei nie '
+      + 'angerührt: die Referenz gehört zum Text, dein Versuch gehört '
+      + 'dir.')));
+
   el.append(abschnitt('Punkte, Stufen und Zuspruch',
     h('p', {}, h('b', { text: 'Punkte gibt es fürs Drankommen. ' }),
       'Je Aufgabe und Tag einmal — gleich, ob die Antwort stimmte. Das ist '

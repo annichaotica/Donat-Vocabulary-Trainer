@@ -15,6 +15,11 @@ const anfang = {
   // darin hängen und sich wundern, wo die Substantive sind. Er gilt
   // für diese Sitzung und ist danach weg.
   lernmodus: null,
+  // Beim Lesen die Übersetzung daneben statt eingeklappt darunter.
+  // Wird GEMERKT, anders als der Lernmodus: wer mittelhochdeutsche
+  // Verse liest, will das beim nächsten Text wieder so — es ist eine
+  // Lesegewohnheit und keine Sitzungslaune.
+  textNebeneinander: false,
 };
 
 function laden() {
@@ -34,6 +39,7 @@ export function merken(aenderungen = {}) {
       benutzerId: zustand.benutzerId,
       sammlungId: zustand.sammlungId,
       lektionId: zustand.lektionId,
+      textNebeneinander: zustand.textNebeneinander,
     }));
   } catch { /* privates Fenster o.ä. — dann eben ohne Gedächtnis */ }
 }

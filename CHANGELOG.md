@@ -16,6 +16,31 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### Die Übersetzung daneben
+
+»Für die Texte brauchen wir noch eine Option, Referenzübersetzungen
+daneben zu stellen. Gerade bei den mittelhochdeutschen ist das nämlich
+wichtig.«
+
+Über jedem Text steht jetzt der Schalter **Übersetzung daneben**.
+Angeschaltet stehen Original und Übersetzung nebeneinander — so sind
+mittelhochdeutsche Ausgaben gedruckt, und der Iwein steht ohnehin Vers
+für Vers da, ein Abschnitt je Vers. Eingeklappt unter jedem Vers nützt
+die Übersetzung beim Lesen nichts; niemand öffnet achtundvierzig
+Klappen.
+
+Ausgeschaltet bleibt alles wie bisher: eigenes Feld, Übersetzung
+eingeklappt darunter, zum Vergleichen *nachdem* man selbst übersetzt
+hat. Die Wahl wird gemerkt — sie ist eine Lesegewohnheit.
+
+Auf dem schmalen Gerät stehen die beiden untereinander, mit einer
+Kante dazwischen.
+
+**Abschnitte ohne Übersetzung bleiben als Spalte stehen** und sagen
+»noch nicht übersetzt«. Die Lücke ist die Auskunft. Und über dem Text
+steht, wie viel überhaupt da ist — beim Iwein derzeit nichts, und das
+soll nicht nach einem Anzeigefehler aussehen.
+
 ### Der Wortschatz zeigt die Kapitel — und man kann Wörter umhängen
 
 »Bei Wortschatz müsste man auch die Kapitel sehen können, aktuell

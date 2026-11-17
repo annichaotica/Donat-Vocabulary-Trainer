@@ -221,6 +221,17 @@ em, i { font-style: normal; font-weight: 600; }
   letter-spacing: normal;
 }
 
+/* Wortschatz nach Kapiteln. Die Überschrift gliedert die Liste wie das
+   Glossar des Lehrwerks; der Haken davor gehört zum Verschieben. */
+.kapitelkopf {
+  font-size: 1em; font-weight: 650; color: var(--leise);
+  margin: 1.2rem 0 .4rem; padding-bottom: .25rem;
+  border-bottom: 1px solid var(--rand);
+}
+.kapitelkopf:first-of-type { margin-top: .4rem; }
+.eintrag-zeile { display: flex; align-items: center; gap: .6rem; }
+.eintrag-haken { flex: none; width: 1.1rem; height: 1.1rem; }
+
 /* Zuspruch — was jemand anderes geschickt hat.
  *
  * Die Karte steht ganz oben auf der Übersicht und soll dort auffallen,

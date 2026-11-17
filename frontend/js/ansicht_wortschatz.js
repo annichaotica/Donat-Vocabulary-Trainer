@@ -19,6 +19,21 @@ async function sammlungSichern() {
 
 /* -------------------------------------------------------------- Liste */
 
+/* Welche Kapitel gerade gewählt sind, und was angehakt ist.
+ *
+ * Außerhalb der Zeichenfunktion, damit die Auswahl einen Sprung in ein
+ * Wort und zurück übersteht — sonst verliert man dreißig Haken, weil
+ * man eine Bedeutung nachsehen wollte. */
+let filter = { lektion: '', wortart: '' };
+let angehakt = new Set();
+// Zu WELCHER Sammlung Filter und Haken gehören. Ohne das zeigte ein
+// Wechsel der Sammlung eine leere Liste: die Kapitelkennung der alten
+// Sammlung gibt es in der neuen nicht, und gefiltert wurde trotzdem
+// danach. Die Haken wären obendrein fremde Wörter gewesen.
+let gemerkteSammlung = null;
+
+const OHNE_KAPITEL = 'ohne';
+
 export async function zeichnen(behaelter) {
   const sammlungId = await sammlungSichern();
   const el = leeren(behaelter);
@@ -30,6 +45,14 @@ export async function zeichnen(behaelter) {
     return;
   }
 
+  if (gemerkteSammlung !== sammlungId) {
+    gemerkteSammlung = sammlungId;
+    filter = { lektion: '', wortart: '' };
+    angehakt.clear();
+  }
+
+  const lektionen = await api.lektionen(sammlungId).catch(() => []);
+
   const kopf = h('div', { style: 'display:flex;gap:.5rem;align-items:center;flex-wrap:wrap' });
   const suche = h('input', {
     type: 'search', placeholder: 'Suchen in Wort und Bedeutung', style: 'flex:1 1 12rem',
@@ -40,37 +63,169 @@ export async function zeichnen(behaelter) {
     onclick: () => { location.hash = '#/import'; },
   }, 'Datei einlesen'));
 
-  el.append(h('h1', { text: 'Wortschatz' }), kopf);
+  // Das Kapitel ist der Hauptweg durch den Wortschatz, nicht ein
+  // Nebenfilter: die Liste zeigt höchstens 200 Wörter, und im
+  // griechischen Bestand stehen 1927. Ohne diese Auswahl sah man den
+  // Anfang des Alphabets und sonst nichts.
+  const lektionWahl = h('select', {},
+    h('option', { value: '', text: 'alle Kapitel' }),
+    lektionen.map((k) => h('option', {
+      value: String(k.id),
+      text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen')
+          + ` (${k.lexeme})`,
+    })),
+    h('option', { value: OHNE_KAPITEL, text: 'ohne Kapitel' }));
+  lektionWahl.value = filter.lektion;
+  lektionWahl.addEventListener('change', () => {
+    filter.lektion = lektionWahl.value;
+    angehakt.clear();
+    nachladen();
+  });
+
+  el.append(h('h1', { text: 'Wortschatz' }), kopf,
+    h('div', { class: 'gezielt-filter', style: 'margin-top:.6rem' },
+      lektionWahl));
+
+  const stapel = h('div', {});
   const liste = h('div', { class: 'liste', style: 'margin-top:1rem' });
-  el.append(liste);
+  el.append(stapel, liste);
 
   let uhr = null;
   let lauf = 0;
+
+  const verschieben = (zielId, nr) => tun(async () => {
+    const ids = [...angehakt];
+    const daten = { lexem_ids: ids };
+    if (zielId) daten.lektion_id = Number(zielId);
+    else if (nr !== undefined) daten.lektion_nr = nr;
+    const e = await api.lexemeVerschieben(sammlungId, daten);
+    meldung(`${e.verschoben} ${e.verschoben === 1 ? 'Wort' : 'Wörter'} `
+          + 'verschoben'
+          + (e.aufgaben_geaendert
+             ? ` — ${e.aufgaben_geaendert} Aufgaben haben sich dadurch `
+               + 'geändert.' : '.'), 4000);
+    angehakt.clear();
+    zeichnen(behaelter);
+  });
+
+  /* Was mit der Auswahl geschehen soll. Erscheint erst, wenn etwas
+   * angehakt ist — ein Kasten, der meistens leer dasteht, erzieht
+   * dazu, ihn zu übersehen. */
+  const stapelZeichnen = () => {
+    leeren(stapel);
+    if (!angehakt.size) return;
+    const wohin = h('select', {},
+      h('option', { value: '', text: 'Kapitel wählen …' }),
+      lektionen.map((k) => h('option', {
+        value: String(k.id),
+        text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen'),
+      })),
+      h('option', { value: OHNE_KAPITEL, text: 'ohne Kapitel' }));
+    const neueNr = h('input', { type: 'number', min: '0', max: '9999',
+                                placeholder: 'neue Nr.',
+                                style: 'width:7rem' });
+    stapel.append(h('div', { class: 'karte gezielt-stapel' },
+      h('b', { text: `${angehakt.size} ausgewählt` }),
+      h('div', { class: 'frage-werkzeuge',
+                 style: 'justify-content:flex-start;flex-wrap:wrap' },
+        wohin,
+        h('button', {
+          class: 'wichtig',
+          onclick: () => {
+            if (!wohin.value) { meldung('Erst ein Kapitel wählen.'); return; }
+            verschieben(wohin.value === OHNE_KAPITEL ? null : wohin.value,
+                        wohin.value === OHNE_KAPITEL ? null : undefined);
+          },
+        }, 'Verschieben'),
+        neueNr,
+        h('button', {
+          title: 'Legt das Kapitel an, falls es noch nicht da ist.',
+          onclick: () => {
+            if (neueNr.value === '') { meldung('Welche Nummer?'); return; }
+            verschieben(null, Number(neueNr.value));
+          },
+        }, 'In neues Kapitel'),
+        h('button', { class: 'schlicht',
+                      onclick: () => { angehakt.clear(); stapelZeichnen();
+                                       nachladen(); } },
+          'Auswahl aufheben')),
+      h('p', { class: 'leise', style: 'margin:.6rem 0 0',
+               text: 'Das Kapitel entscheidet mit, wann ein Wort drankommt: '
+                   + 'an ihm hängt die Lektionsschranke. Verschieben ist '
+                   + 'darum keine Beschriftung, sondern ein Eingriff in '
+                   + 'den Plan.' })));
+  };
+
   const nachladen = async () => {
     // Laufende Nummer gegen überholende Antworten: ohne sie kann die
     // Trefferliste zu "ab" unter dem Suchwort "abc" stehenbleiben.
     const meine = ++lauf;
-    const ergebnis = await api.lexeme(sammlungId, { suche: suche.value, anzahl: 200 });
+    const frage = { suche: suche.value, anzahl: 200 };
+    if (filter.lektion === OHNE_KAPITEL) frage.ohne_lektion = true;
+    else if (filter.lektion) frage.lektion_id = Number(filter.lektion);
+    const ergebnis = await api.lexeme(sammlungId, frage);
     if (meine !== lauf) return;
+    const woerter = ergebnis.lexeme;
+
     leeren(liste);
-    if (!ergebnis.lexeme.length) {
+    if (!woerter.length) {
       liste.append(h('div', { class: 'leer' },
-        h('p', { text: suche.value ? 'Nichts gefunden.' : 'Noch keine Wörter eingetragen.' })));
+        h('p', { text: suche.value ? 'Nichts gefunden.'
+                                   : 'Hier steht noch kein Wort.' })));
       return;
     }
-    liste.append(h('p', { class: 'leise', text: `${ergebnis.gesamt} Wörter` }));
-    for (const l of ergebnis.lexeme) {
-      liste.append(h('button', {
-        class: 'eintrag', onclick: () => { location.hash = `#/wort/${l.id}`; },
-      },
-        h('span', { class: 'lemma', text: l.lemma }),
-        h('span', { class: 'bedeutung', text: l.erste_bedeutung || '—' }),
-        l.formen_anzahl ? h('span', { class: 'marke', text: `${l.formen_anzahl} Formen` }) : null,
-        l.ungeprueft_anzahl
-          ? h('span', { class: 'marke warnung', text: `${l.ungeprueft_anzahl} ungeprüft` })
-          : null,
-        h('span', { class: 'marke', text: `${l.aufgaben_anzahl} Aufgaben` })));
+
+    // Ehrlich sagen, dass die Liste abgeschnitten ist. Vorher stand da
+    // »1927 Wörter« über 200 angezeigten, und man suchte den Rest.
+    const abgeschnitten = ergebnis.gesamt > ergebnis.anzahl;
+    liste.append(h('p', { class: 'leise' },
+      abgeschnitten
+        ? `${ergebnis.anzahl} von ${ergebnis.gesamt} Wörtern — nach Kapitel `
+          + 'auswählen oder suchen, um den Rest zu sehen.'
+        : `${woerter.length} ${woerter.length === 1 ? 'Wort' : 'Wörter'}`));
+
+    let letztes;
+    for (const l of woerter) {
+      // Die Kapitelüberschrift zwischen den Wörtern: so liest sich die
+      // Liste wie das Glossar des Lehrwerks, und man sieht auf einen
+      // Blick, wo ein Wort hingehört.
+      const kapitel = l.lektion_id === null ? OHNE_KAPITEL : l.lektion_id;
+      if (kapitel !== letztes && !filter.lektion) {
+        letztes = kapitel;
+        liste.append(h('h2', { class: 'kapitelkopf',
+          text: l.lektion_id === null
+            ? 'Ohne Kapitel'
+            : (l.lektion_nr !== null ? `${l.lektion_nr}. ` : '')
+              + (l.lektion_name || 'ohne Namen') }));
+      }
+
+      const kasten = h('input', { type: 'checkbox', class: 'eintrag-haken',
+                                  title: 'auswählen' });
+      kasten.checked = angehakt.has(l.id);
+      kasten.addEventListener('change', () => {
+        if (kasten.checked) angehakt.add(l.id); else angehakt.delete(l.id);
+        // Nur den Stapelkasten erneuern, nicht die Liste: beim
+        // Durchhaken von dreißig Wörtern darf die Seite nicht unter
+        // den Fingern wegspringen.
+        stapelZeichnen();
+      });
+
+      liste.append(h('div', { class: 'eintrag-zeile' },
+        kasten,
+        h('button', {
+          class: 'eintrag', style: 'flex:1 1 auto',
+          onclick: () => { location.hash = `#/wort/${l.id}`; },
+        },
+          h('span', { class: 'lemma', text: l.lemma }),
+          h('span', { class: 'bedeutung', text: l.erste_bedeutung || '—' }),
+          l.formen_anzahl
+            ? h('span', { class: 'marke', text: `${l.formen_anzahl} Formen` }) : null,
+          l.ungeprueft_anzahl
+            ? h('span', { class: 'marke warnung', text: `${l.ungeprueft_anzahl} ungeprüft` })
+            : null,
+          h('span', { class: 'marke', text: `${l.aufgaben_anzahl} Aufgaben` }))));
     }
+    stapelZeichnen();
   };
   suche.addEventListener('input', () => { clearTimeout(uhr); uhr = setTimeout(nachladen, 220); });
   // Beim Verlassen der Ansicht die wartende Suche abräumen.

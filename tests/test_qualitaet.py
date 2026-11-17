@@ -342,3 +342,42 @@ def test_getrennte_uebersetzungen_werden_nicht_gemeldet(klient):
                        params={"suche": "πώς"}).json()["lexeme"][0]
     d = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
     assert "uebersetzung_gebuendelt" not in [b["art"] for b in d["befunde"]]
+
+
+def test_der_mcp_ruft_routenfunktionen_mit_namen():
+    """Sonst verschiebt ein neuer Parameter stillschweigend alles.
+
+    Am 17.11.2026 bekam `lexeme_liste` einen Filter in der Mitte der
+    Signatur. Der MCP rief sie mit neun Stellungsargumenten auf: die
+    Lektionsnummer landete im neuen Feld, die Wortart in der
+    Lektionsnummer, und am Ende stand die Datenbankverbindung an der
+    Stelle der Seitenlänge. Vierzehn Tests fielen gleichzeitig um — das
+    war der Glücksfall. Ohne sie wäre es eine stille Fehlfunktion
+    gewesen, denn die Typen passen zufällig zusammen.
+
+    Die Regel ist darum: höchstens die KENNUNG steht an ihrem Platz,
+    alles Weitere bekommt einen Namen. Ein Name kann nicht verrutschen.
+    """
+    import ast
+    import pathlib
+
+    quelle = pathlib.Path("backend/mcp_dienst.py").read_text()
+    schlimm = []
+    for knoten in ast.walk(ast.parse(quelle)):
+        if not isinstance(knoten, ast.Call):
+            continue
+        if not (isinstance(knoten.func, ast.Name)
+                and knoten.func.id == "_fehler_wandeln"):
+            continue
+        ziel = knoten.args[0] if knoten.args else None
+        # Nur Aufrufe in die Routenfunktionen: _app().name
+        if not (isinstance(ziel, ast.Attribute)
+                and isinstance(ziel.value, ast.Call)
+                and getattr(ziel.value.func, "id", None) == "_app"):
+            continue
+        # args[0] ist die Routenfunktion selbst, args[1] die Kennung.
+        if len(knoten.args) > 2:
+            schlimm.append(f"{ziel.attr} (Zeile {knoten.lineno}): "
+                           f"{len(knoten.args) - 1} Stellungsargumente")
+    assert not schlimm, ("Routenfunktionen mit Namen aufrufen: "
+                         + "; ".join(schlimm))

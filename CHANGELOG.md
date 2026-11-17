@@ -16,6 +16,32 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### Der Wortschatz zeigt die Kapitel — und man kann Wörter umhängen
+
+»Bei Wortschatz müsste man auch die Kapitel sehen können, aktuell
+scheint das nur eine ganze Liste zu sein. Und man müsste auch die
+Vokabeln verschieben können in andere Kapitel.«
+
+Die Liste ist jetzt nach **Kapiteln gegliedert**, mit Überschrift und
+in der Reihenfolge des Lehrwerks — wie ein Glossar. Darüber steht eine
+Auswahl: *alle Kapitel*, jedes einzelne mit seiner Wortzahl, und *ohne
+Kapitel*.
+
+Das war nicht nur Schönheit. Die Liste holt höchstens 200 Wörter, im
+griechischen Bestand stehen 1927 — darüber stand bisher »1927 Wörter«,
+und man suchte den Rest. Jetzt sagt sie, dass sie abgeschnitten ist,
+und das Kapitel ist der Weg zum Rest.
+
+**Verschieben** geht über die Kästchen links: anhaken, Kapitel wählen,
+verschieben. Auch in ein Kapitel, das es noch nicht gibt — Nummer
+eintippen, es wird angelegt. Und wieder heraus, »ohne Kapitel« ist ein
+gültiges Ziel.
+
+Dabei steht ein Hinweis, der kein Kleingedrucktes ist: **das Kapitel
+entscheidet mit, wann ein Wort drankommt.** An ihm hängt die
+Lektionsschranke. Darum sagt die Meldung hinterher auch, wie viele
+Aufgaben sich dadurch geändert haben.
+
 ### Ein leeres Lernziel sagt jetzt, warum
 
 »Da ist ein neues Lernziel, nur Verben, Reihen — es kommen aber keine

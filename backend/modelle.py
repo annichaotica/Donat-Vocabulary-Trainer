@@ -457,6 +457,20 @@ class EintragPruefen(BaseModel):
     nur_mangelhafte: bool = True
 
 
+class LexemeVerschieben(BaseModel):
+    """Wörter in ein anderes Kapitel umhängen.
+
+    Entweder `lektion_id` (ein bestehendes Kapitel) oder `lektion_nr`
+    (die Nummer im Lehrwerk; fehlt das Kapitel, wird es angelegt —
+    Lehrwerke nummerieren nicht neu, die Nummer ist der Schlüssel).
+    Beides None heißt ausdrücklich »ohne Kapitel«.
+    """
+    lexem_ids: list[int] = Field(min_length=1, max_length=500)
+    lektion_id: int | None = None
+    lektion_nr: int | None = Field(default=None, ge=0, le=9999)
+    lektion_name: str | None = Field(default=None, max_length=120)
+
+
 class ZuspruchEingabe(BaseModel):
     """Was man jemandem schickt, der gerade lernt.
 

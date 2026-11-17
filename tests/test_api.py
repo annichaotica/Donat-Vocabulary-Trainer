@@ -799,3 +799,152 @@ def test_das_schema_zeigt_die_ganze_tabelle(tmp_path, monkeypatch):
         fehlt = sorted(f for f in felder if f not in da)
         assert not fehlt, f"{tabelle}: {fehlt} fehlen im Schemaskript"
     db.close()
+
+
+# ------------------------------------------------- Kapitel im Wortschatz
+
+def _mit_kapiteln(klient):
+    """Eine Sammlung mit zwei Kapiteln und einem Wort ohne Kapitel."""
+    b = klient.post("/api/benutzer", json={"name": "Lernende 1"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Französisch", "sprache": "fr"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [
+            {"lemma": "zèbre", "wortart": "substantiv", "lektion_nr": 1,
+             "reihenfolge": 2,
+             "bedeutungen": [{"uebersetzungen": ["das Zebra"]}]},
+            {"lemma": "arbre", "wortart": "substantiv", "lektion_nr": 1,
+             "reihenfolge": 1,
+             "bedeutungen": [{"uebersetzungen": ["der Baum"]}]},
+            {"lemma": "maison", "wortart": "substantiv", "lektion_nr": 2,
+             "bedeutungen": [{"uebersetzungen": ["das Haus"]}]},
+            {"lemma": "chose", "wortart": "substantiv",
+             "bedeutungen": [{"uebersetzungen": ["die Sache"]}]},
+        ]})
+    return b, s
+
+
+def test_der_wortschatz_nennt_das_kapitel_jedes_wortes(klient):
+    """»Bei Wortschatz müsste man auch die Kapitel sehen können.«
+
+    Die Liste gab nur lektion_id heraus — eine Zahl, mit der die
+    Oberfläche nichts anfangen kann, ohne sie einzeln nachzuschlagen.
+    """
+    b, s = _mit_kapiteln(klient)
+    d = klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()
+    nach = {l["lemma"]: l for l in d["lexeme"]}
+    assert nach["arbre"]["lektion_nr"] == 1
+    assert nach["maison"]["lektion_nr"] == 2
+    assert nach["chose"]["lektion_id"] is None
+    assert nach["chose"]["lektion_nr"] is None
+
+
+def test_der_wortschatz_steht_in_der_reihenfolge_des_lehrwerks(klient):
+    """Nach Kapitel, darin nach der Reihenfolge des Buches — nicht
+    alphabetisch über alles. Sonst lässt sich die Liste nicht nach
+    Kapiteln gliedern, und »zèbre« stünde vor »maison«.
+
+    Wörter ohne Kapitel kommen zuletzt: sie sind der Rest, nicht der
+    Anfang.
+    """
+    b, s = _mit_kapiteln(klient)
+    d = klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()
+    assert [l["lemma"] for l in d["lexeme"]] == \
+        ["arbre", "zèbre", "maison", "chose"]
+
+
+def test_woerter_lassen_sich_in_ein_anderes_kapitel_schieben(klient):
+    """»Man müsste auch die Vokabeln verschieben können in andere
+    Kapitel.«"""
+    b, s = _mit_kapiteln(klient)
+    d = klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()
+    nach = {l["lemma"]: l for l in d["lexeme"]}
+    ziel = nach["maison"]["lektion_id"]
+
+    a = klient.put(f"/api/sammlungen/{s['id']}/lexeme/lektion", json={
+        "lexem_ids": [nach["arbre"]["id"], nach["chose"]["id"]],
+        "lektion_id": ziel})
+    assert a.status_code == 200, a.text
+    assert a.json()["verschoben"] == 2
+
+    neu = {l["lemma"]: l for l in
+           klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()["lexeme"]}
+    assert neu["arbre"]["lektion_nr"] == 2
+    assert neu["chose"]["lektion_nr"] == 2
+
+
+def test_ein_neues_kapitel_entsteht_beim_verschieben(klient):
+    """Die Nummer ist der Schlüssel: wer nach Kapitel 7 verschiebt und
+    es gibt noch keines, bekommt eines. Sonst müsste man erst woanders
+    hingehen und es anlegen."""
+    b, s = _mit_kapiteln(klient)
+    d = klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()
+    eins = d["lexeme"][0]["id"]
+
+    klient.put(f"/api/sammlungen/{s['id']}/lexeme/lektion", json={
+        "lexem_ids": [eins], "lektion_nr": 7, "lektion_name": "Au marché"})
+    kapitel = klient.get(f"/api/sammlungen/{s['id']}/lektionen").json()
+    sieben = [k for k in kapitel if k["nr"] == 7]
+    assert sieben and sieben[0]["name"] == "Au marché", kapitel
+    assert sieben[0]["lexeme"] == 1
+
+
+def test_ohne_kapitel_ist_ein_gueltiges_ziel(klient):
+    """Ein Wort aus einem Kapitel herausnehmen muss gehen — sonst käme
+    man aus einer falschen Zuordnung nicht wieder heraus."""
+    b, s = _mit_kapiteln(klient)
+    d = klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()
+    arbre = [l for l in d["lexeme"] if l["lemma"] == "arbre"][0]
+    klient.put(f"/api/sammlungen/{s['id']}/lexeme/lektion",
+               json={"lexem_ids": [arbre["id"]]})
+    neu = klient.get(f"/api/lexeme/{arbre['id']}").json()
+    assert neu["lektion_id"] is None
+
+
+def test_fremde_woerter_werden_nicht_stillschweigend_uebergangen(klient):
+    """Still zu übergehen wäre schlimmer als ein Fehler: es sähe aus,
+    als wäre verschoben worden."""
+    b, s = _mit_kapiteln(klient)
+    b2 = klient.post("/api/benutzer", json={"name": "Lernender 2"}).json()
+    s2 = klient.post("/api/sammlungen", json={
+        "besitzer_id": b2["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s2['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "λέξη", "wortart": "substantiv",
+                       "bedeutungen": [{"uebersetzungen": ["das Wort"]}]}]})
+    fremd = klient.get(f"/api/sammlungen/{s2['id']}/lexeme").json()["lexeme"][0]
+
+    a = klient.put(f"/api/sammlungen/{s['id']}/lexeme/lektion",
+                   json={"lexem_ids": [fremd["id"]], "lektion_nr": 1})
+    assert a.status_code == 400, a.text
+    # Und nichts ist passiert.
+    assert klient.get(f"/api/lexeme/{fremd['id']}").json()["lektion_id"] is None
+
+
+def test_ohne_kapitel_wird_in_der_abfrage_gefiltert(klient):
+    """Die Bedingung gehört in die Abfrage.
+
+    Die Oberfläche hatte das zuerst nachträglich gefiltert: aus den
+    geholten 200 Zeilen die ohne Kapitel heraussuchen. Wörter ohne
+    Kapitel stehen durch die Sortierung aber ganz am ENDE — bei 1927
+    Wörtern wäre unter den ersten 200 keines davon gewesen, und die
+    Auswahl hätte immer leer ausgesehen. Dieselbe Lehre wie beim
+    Rundenfenster, bei der Lektionsschranke und bei der Statistik.
+    """
+    b, s = _mit_kapiteln(klient)
+    # Genug Wörter MIT Kapitel, dass die ohne hinten herausfielen.
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": f"mot{i}", "wortart": "substantiv",
+                       "lektion_nr": 1,
+                       "bedeutungen": [{"uebersetzungen": [f"Wort {i}"]}]}
+                      for i in range(30)]})
+
+    eng = klient.get(f"/api/sammlungen/{s['id']}/lexeme",
+                     params={"ohne_lektion": True, "anzahl": 5}).json()
+    assert [l["lemma"] for l in eng["lexeme"]] == ["chose"], eng["lexeme"]
+    assert eng["gesamt"] == 1, "gezählt wird, was die Bedingung trifft"
+
+    # Die Gegenprobe zum Nachfilter: mit einem kleinen Fenster ohne die
+    # Bedingung käme »chose« nicht vor.
+    breit = klient.get(f"/api/sammlungen/{s['id']}/lexeme",
+                       params={"anzahl": 5}).json()
+    assert "chose" not in [l["lemma"] for l in breit["lexeme"]]

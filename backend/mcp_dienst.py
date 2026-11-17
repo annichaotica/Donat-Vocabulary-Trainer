@@ -195,7 +195,7 @@ def sammlung_anlegen(db: sqlite3.Connection, person: dict, name: str,
         _app().sammlung_anlegen,
         SammlungAnlegen(besitzer_id=person["id"], name=name, sprache=sprache,
                         grundsprache=grundsprache, beschreibung=beschreibung),
-        None, db)
+        request=None, db=db)
     return {"sammlung_id": ergebnis["id"], "name": ergebnis["name"],
             "sprache": ergebnis["sprache"],
             "grundsprache": ergebnis["grundsprache"],
@@ -213,9 +213,16 @@ def vokabeln_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int,
     zugang.sammlung_pruefen(db, person["id"], sammlung_id)
     anzahl = max(1, min(int(anzahl), 200))
     ab = max(0, (max(1, int(seite)) - 1) * anzahl)
-    ergebnis = _fehler_wandeln(_app().lexeme_liste, sammlung_id, suche, None,
-                               lektion_nr, wortart, nur_ungepruefte, ab,
-                               anzahl, db)
+    # Mit NAMEN und nicht der Reihe nach. Hier stand einmal eine Kette
+    # von neun Stellungsargumenten; als die Routenfunktion einen
+    # Parameter in der Mitte dazubekam, rutschte alles um eins, und die
+    # Sammlungskennung landete im Feld für die Wortart. Aufgefallen ist
+    # es nur, weil vierzehn Tests gleichzeitig umfielen.
+    ergebnis = _fehler_wandeln(_app().lexeme_liste, sammlung_id,
+                               suche=suche, lektion_nr=lektion_nr,
+                               wortart=wortart,
+                               nur_ungepruefte=nur_ungepruefte,
+                               ab=ab, anzahl=anzahl, db=db)
     return {
         "gesamt": ergebnis["gesamt"], "seite": max(1, int(seite)),
         "anzahl": ergebnis["anzahl"],
@@ -247,7 +254,8 @@ def vokabel_aendern(db: sqlite3.Connection, person: dict, lexem_id: int,
         eingabe = LexemAendern(**aenderung)
     except Exception as f:
         raise WerkzeugFehler(f"Unbrauchbare Angaben: {f}") from f
-    ergebnis = _fehler_wandeln(_app().lexem_aendern, lexem_id, eingabe, db)
+    ergebnis = _fehler_wandeln(_app().lexem_aendern, lexem_id,
+                               eingabe=eingabe, db=db)
     return {"lexem_id": ergebnis["id"], "lemma": ergebnis["lemma"],
             "wortart": ergebnis["wortart"], "merkmale": ergebnis["merkmale"],
             "bedeutungen": [[u["text"] for u in b["uebersetzungen"]]
@@ -269,7 +277,8 @@ def form_aendern(db: sqlite3.Connection, person: dict, form_id: int,
         eingabe = FormAendern(**aenderung)
     except Exception as f:
         raise WerkzeugFehler(f"Unbrauchbare Angaben: {f}") from f
-    ergebnis = _fehler_wandeln(_app().form_teil_aendern, form_id, eingabe, db)
+    ergebnis = _fehler_wandeln(_app().form_teil_aendern, form_id,
+                               eingabe=eingabe, db=db)
     return {"form_id": ergebnis["id"], "text": ergebnis["text"],
             "merkmale": dbm.j_lesen(ergebnis["merkmale"]),
             "geprueft": bool(ergebnis["geprueft"]),
@@ -294,7 +303,7 @@ def form_loeschen(db: sqlite3.Connection, person: dict, form_id: int,
         raise WerkzeugFehler(
             f"Form {form_id} lautet {f['text']!r}, nicht {text!r}. "
             f"Zum Löschen muss der vorhandene Text genannt werden.")
-    _fehler_wandeln(_app().form_loeschen, form_id, db)
+    _fehler_wandeln(_app().form_loeschen, form_id, db=db)
     return {"geloescht": f["text"], "lexem_id": f["lexem_id"]}
 
 
@@ -323,7 +332,7 @@ def vokabel_loeschen(db: sqlite3.Connection, person: dict, lexem_id: int,
                                             JOIN aufgabe a ON a.id = w.aufgabe_id
                                            WHERE a.lexem_id = ?""", (lexem_id,)),
     }
-    _fehler_wandeln(_app().lexem_loeschen, lexem_id, db)
+    _fehler_wandeln(_app().lexem_loeschen, lexem_id, db=db)
     return {"geloescht": lexem["lemma"], **bestand,
             "hinweis": (f"Mit dem Wort sind {bestand['wiederholungen']} "
                         f"Wiederholungen verlorengegangen."
@@ -334,8 +343,9 @@ def lernstand_lesen(db: sqlite3.Connection, person: dict, sammlung_id: int,
                     anzahl: int = 40):
     """Was sitzt, und woran hakt es — für diese Person."""
     zugang.sammlung_pruefen(db, person["id"], sammlung_id)
-    return _fehler_wandeln(_app().lernstand_lesen, sammlung_id, person["id"],
-                           max(1, min(int(anzahl), 200)), db)
+    return _fehler_wandeln(_app().lernstand_lesen, sammlung_id,
+                           benutzer_id=person["id"],
+                           anzahl=max(1, min(int(anzahl), 200)), db=db)
 
 
 # ----------------------------------------------------- Grammatikregeln
@@ -474,7 +484,7 @@ def lektionen_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int):
 
 def vokabel_lesen(db: sqlite3.Connection, person: dict, lexem_id: int):
     zugang.lexem_pruefen(db, person["id"], lexem_id)
-    lexem = _fehler_wandeln(_app().lexem_lesen, lexem_id, db)
+    lexem = _fehler_wandeln(_app().lexem_lesen, lexem_id, db=db)
     return {
         "lexem_id": lexem["id"], "lemma": lexem["lemma"],
         "wortart": lexem["wortart"], "merkmale": lexem["merkmale"],
@@ -503,7 +513,8 @@ def vokabel_lesen(db: sqlite3.Connection, person: dict, lexem_id: int):
 def vokabel_nachschlagen(db: sqlite3.Connection, person: dict, sammlung_id: int,
                          suche: str, anzahl: int = 10):
     zugang.sammlung_pruefen(db, person["id"], sammlung_id)
-    ergebnis = _fehler_wandeln(_app().woerterbuch, sammlung_id, suche, anzahl, db)
+    ergebnis = _fehler_wandeln(_app().woerterbuch, sammlung_id,
+                               suche=suche, anzahl=anzahl, db=db)
     return {"suche": ergebnis["suche"], "gefunden": ergebnis["gefunden"],
             "eintraege": [{"lexem_id": e["id"], "lemma": e["lemma"],
                            "wortart": e["wortart"],
@@ -552,7 +563,8 @@ def beispiele_setzen(db: sqlite3.Connection, person: dict, lexem_id: int,
     zugang.lexem_pruefen(db, person["id"], lexem_id, schreiben=True)
     from modelle import BeispieleSetzen
     eingabe = BeispieleSetzen(beispiele=beispiele or [])
-    d = _fehler_wandeln(_app().beispiele_setzen, lexem_id, eingabe, None, db)
+    d = _fehler_wandeln(_app().beispiele_setzen, lexem_id, eingabe=eingabe,
+                        request=None, db=db)
     return {**d, "hinweis": "Beispielsätze werden nicht abgefragt und "
                             "brauchen keine Freigabe — sie stehen beim Wort "
                             "und helfen beim Verstehen."}
@@ -568,35 +580,37 @@ def erklaerung_setzen(db: sqlite3.Connection, person: dict, bedeutung_id: int,
     zugang.lexem_pruefen(db, person["id"], lexem_id, schreiben=True)
     from modelle import ErklaerungSetzen
     return _fehler_wandeln(_app().erklaerung_setzen, bedeutung_id,
-                           ErklaerungSetzen(erklaerung=erklaerung), None, db)
+                           eingabe=ErklaerungSetzen(erklaerung=erklaerung),
+                           request=None, db=db)
 
 
 def eintrag_pruefen(db: sqlite3.Connection, person: dict, lexem_id: int):
     zugang.lexem_pruefen(db, person["id"], lexem_id)
-    return _bericht_kurz(_fehler_wandeln(_app().lexem_pruefen, lexem_id, db))
+    return _bericht_kurz(_fehler_wandeln(_app().lexem_pruefen, lexem_id, db=db))
 
 
 def sammlung_pruefen(db: sqlite3.Connection, person: dict, sammlung_id: int,
                      nur_mangelhafte: bool = True):
     zugang.sammlung_pruefen(db, person["id"], sammlung_id)
     bericht = _fehler_wandeln(_app().sammlung_pruefen, sammlung_id,
-                              nur_mangelhafte, db)
+                              nur_mangelhafte=nur_mangelhafte, db=db)
     return {"geprueft": bericht["geprueft"], "zaehler": bericht["zaehler"],
             "eintraege": [{"lexem_id": e["lexem_id"], "lemma": e["lemma"],
                            **_bericht_kurz(e)} for e in bericht["eintraege"]]}
 
 
 def sprachprofil_lesen(db: sqlite3.Connection, person: dict, sprache: str):
-    return _fehler_wandeln(_app().sprachprofil_lesen, sprache, db)
+    return _fehler_wandeln(_app().sprachprofil_lesen, sprache, db=db)
 
 
 def sprachprofil_anpassen(db: sqlite3.Connection, person: dict, sprache: str,
                           profil: dict):
     from modelle import SprachprofilSetzen
     zugang.verwalter_pruefen(person)
-    return _fehler_wandeln(_app().sprachprofil_setzen, sprache,
-                           SprachprofilSetzen(profil=profil, neu_rechnen=True),
-                           None, db)
+    return _fehler_wandeln(
+        _app().sprachprofil_setzen, sprache,
+        eingabe=SprachprofilSetzen(profil=profil, neu_rechnen=True),
+        request=None, db=db)
 
 
 def sprache_einrichten(db: sqlite3.Connection, person: dict, code: str,
@@ -609,7 +623,8 @@ def sprache_einrichten(db: sqlite3.Connection, person: dict, code: str,
                                  stimme=stimme, profil=profil)
     except Exception as f:
         raise WerkzeugFehler(f"Eingabe nicht gültig: {f}") from f
-    return _fehler_wandeln(_app().sprache_anlegen, eingabe, None, db)
+    return _fehler_wandeln(_app().sprache_anlegen, eingabe,
+                           request=None, db=db)
 
 
 # ------------------------------------------- Beschreibung der Werkzeuge

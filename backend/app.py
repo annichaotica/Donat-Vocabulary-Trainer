@@ -54,6 +54,7 @@ import wache
 import zugang
 import zuspruch as zuspruchmodul
 from modelle import (RegelEingabe, RegelAendern, ZuspruchEingabe,
+                     LexemeVerschieben,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
@@ -1464,6 +1465,7 @@ def _lexem_ausbauen(db: sqlite3.Connection, lexem: dict,
 def lexeme_liste(sammlung_id: int, suche: str | None = None,
                  lektion_id: int | None = None,
                  lektion_nr: int | None = None,
+                 ohne_lektion: bool = False,
                  wortart: str | None = None,
                  nur_ungepruefte: bool = False,
                  ab: int = 0, anzahl: int = Query(default=50, le=500),
@@ -1484,6 +1486,16 @@ def lexeme_liste(sammlung_id: int, suche: str | None = None,
         bedingungen.append("""l.lektion_id IN (SELECT id FROM lektion
                                 WHERE sammlung_id = ? AND nr = ?)""")
         werte += [sammlung_id, lektion_nr]
+    if ohne_lektion:
+        # Die Bedingung gehört in die Abfrage.
+        #
+        # Die Oberfläche hat das zuerst nachträglich gefiltert — aus den
+        # 200 geholten Zeilen die ohne Kapitel heraussuchen. Bei 1927
+        # Wörtern wären das die ohne Kapitel UNTER DEN ERSTEN 200, und
+        # die stehen durch die Sortierung ganz am Ende. Es wäre also
+        # fast immer leer herausgekommen. Dieselbe Lehre wie schon beim
+        # Rundenfenster, bei der Lektionsschranke und bei der Statistik.
+        bedingungen.append("l.lektion_id IS NULL")
     if wortart:
         bedingungen.append("l.wortart = ?")
         werte.append(wortart)
@@ -1493,7 +1505,7 @@ def lexeme_liste(sammlung_id: int, suche: str | None = None,
     wo = " AND ".join(bedingungen)
     gesamt = dbm.wert(db, f"SELECT COUNT(*) FROM lexem l WHERE {wo}", werte)
     zeilen = dbm.zeilen(db, f"""
-        SELECT l.*,
+        SELECT l.*, k.nr AS lektion_nr, k.name AS lektion_name,
                (SELECT COUNT(*) FROM form f WHERE f.lexem_id = l.id) AS formen_anzahl,
                (SELECT COUNT(*) FROM form f WHERE f.lexem_id = l.id AND f.geprueft = 0)
                    AS ungeprueft_anzahl,
@@ -1503,11 +1515,76 @@ def lexeme_liste(sammlung_id: int, suche: str | None = None,
                   JOIN uebersetzung u ON u.bedeutung_id = b.id
                  WHERE b.lexem_id = l.id
                  ORDER BY b.reihenfolge, u.ist_haupt DESC LIMIT 1) AS erste_bedeutung
-          FROM lexem l WHERE {wo}
-         ORDER BY l.lemma LIMIT ? OFFSET ?""", (*werte, anzahl, ab))
+          FROM lexem l
+          LEFT JOIN lektion k ON k.id = l.lektion_id
+         WHERE {wo}
+         ORDER BY k.nr IS NULL, k.nr, l.reihenfolge, l.lemma
+         LIMIT ? OFFSET ?""", (*werte, anzahl, ab))
     for z in zeilen:
         z["merkmale"] = dbm.j_lesen(z["merkmale"])
     return {"gesamt": gesamt, "ab": ab, "anzahl": len(zeilen), "lexeme": zeilen}
+
+
+@app.put("/api/sammlungen/{sammlung_id}/lexeme/lektion")
+def lexeme_verschieben(sammlung_id: int, eingabe: LexemeVerschieben,
+                       request: Request = None, db: sqlite3.Connection = DB):
+    """Wörter in ein anderes Kapitel umhängen.
+
+    »Man müsste auch die Vokabeln verschieben können in andere
+    Kapitel.«
+
+    Als EIN Aufruf und nicht als dreißig: jedes Umhängen erzeugt die
+    Aufgaben des Wortes neu, und bei dreißig einzelnen Anfragen bliebe
+    bei einem Abbruch die Hälfte verschoben. Hier geht alles zusammen
+    hinaus oder nichts.
+
+    Das Kapitel entscheidet mit, WANN ein Wort drankommt: an ihm hängt
+    die Lektionsschranke, und die hält Formen zurück, die das Lehrwerk
+    noch nicht eingeführt hat. Verschieben ist darum keine Beschriftung,
+    sondern ein Eingriff in den Plan — die Antwort sagt deshalb, wie
+    viele Aufgaben sich dadurch geändert haben.
+    """
+    _wache_rumpf(db, request, sammlung_id=sammlung_id, schreiben=True)
+    _holen(db, "sammlung", sammlung_id)
+
+    ziel_id = eingabe.lektion_id
+    if ziel_id is None and eingabe.lektion_nr is not None:
+        ziel_id = sammelimport.lektion_sichern(
+            db, sammlung_id, eingabe.lektion_nr, eingabe.lektion_name)
+    if ziel_id is not None:
+        k = _holen(db, "lektion", ziel_id)
+        if k["sammlung_id"] != sammlung_id:
+            raise HTTPException(
+                400, "Das Kapitel gehört zu einer anderen Sammlung.")
+
+    # Fremde Wörter still zu übergehen wäre schlimmer als ein Fehler:
+    # es sähe aus, als wäre verschoben worden.
+    platz = ",".join("?" * len(eingabe.lexem_ids))
+    eigene = {z["id"] for z in dbm.zeilen(
+        db, f"SELECT id FROM lexem WHERE sammlung_id = ? AND id IN ({platz})",
+        (sammlung_id, *eingabe.lexem_ids))}
+    fremd = [i for i in eingabe.lexem_ids if i not in eigene]
+    if fremd:
+        raise HTTPException(
+            400, f"{len(fremd)} der Wörter liegen nicht in dieser Sammlung.")
+
+    db.execute("BEGIN")
+    try:
+        geaendert = 0
+        for lexem_id in eingabe.lexem_ids:
+            db.execute("""UPDATE lexem SET lektion_id = ?,
+                                 geaendert = datetime('now')
+                           WHERE id = ?""", (ziel_id, lexem_id))
+            bilanz = aufgaben.erzeugen(db, lexem_id)
+            geaendert += (bilanz.get("angelegt", 0)
+                          + bilanz.get("abgeschaltet", 0)
+                          + bilanz.get("reaktiviert", 0))
+        db.execute("COMMIT")
+    except Exception:
+        db.execute("ROLLBACK")
+        raise
+    return {"verschoben": len(eingabe.lexem_ids), "lektion_id": ziel_id,
+            "aufgaben_geaendert": geaendert}
 
 
 @app.post("/api/lexeme", status_code=201)

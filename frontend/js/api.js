@@ -104,6 +104,12 @@ export const api = {
   lexemAnlegen: (daten) => ruf('/lexeme', { methode: 'POST', daten }),
   lexemAendern: (id, daten) => ruf(`/lexeme/${id}`, { methode: 'PATCH', daten }),
   lexemLoeschen: (id) => ruf(`/lexeme/${id}`, { methode: 'DELETE' }),
+  // Als EIN Aufruf: jedes Umhängen erzeugt die Aufgaben neu, und bei
+  // dreißig einzelnen Anfragen bliebe bei einem Abbruch die Hälfte
+  // verschoben.
+  lexemeVerschieben: (sammlungId, daten) =>
+    ruf(`/sammlungen/${sammlungId}/lexeme/lektion`,
+        { methode: 'PUT', daten }),
   formAnlegen: (lexemId, daten) => ruf(`/lexeme/${lexemId}/formen`, { methode: 'POST', daten }),
   formAendern: (id, daten) => ruf(`/formen/${id}`, { methode: 'PATCH', daten }),
   // Teiländerung: was nicht genannt ist, bleibt stehen. Ändert sich

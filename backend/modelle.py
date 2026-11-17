@@ -457,6 +457,15 @@ class EintragPruefen(BaseModel):
     nur_mangelhafte: bool = True
 
 
+class TexteVerschieben(BaseModel):
+    """Texte in ein Kapitel hängen. Wie bei den Wörtern: entweder eine
+    bestehende Kennung oder eine Nummer, die notfalls angelegt wird."""
+    text_ids: list[int] = Field(min_length=1, max_length=500)
+    lektion_id: int | None = None
+    lektion_nr: int | None = Field(default=None, ge=0, le=9999)
+    lektion_name: str | None = Field(default=None, max_length=120)
+
+
 class LexemeVerschieben(BaseModel):
     """Wörter in ein anderes Kapitel umhängen.
 

@@ -18,7 +18,7 @@
  */
 
 import { api } from './api.js';
-import { h, leeren, meldung } from './hilfen.js';
+import { h, leeren, meldung, tun } from './hilfen.js';
 import { zustand, merken } from './zustand.js';
 
 const FARBE = {
@@ -31,6 +31,20 @@ const FARBE = {
 
 // ------------------------------------------------------------- Textliste
 
+/* Kapitelfilter und Auswahl — wie im Wortschatz, und bewusst gleich.
+ *
+ * »Die Texte müssten wir noch zusammenfassbar machen, also Text –
+ * Kapitel. So ist das schwer für jemand, der damit lernt.«
+ *
+ * Der Iwein liegt in 173 Stücken vor. Als flache Liste ist das keine
+ * Bedienung, sondern ein Stapel. Die Spalte text.lektion_id gab es
+ * längst — bei den griechischen Texten ist sie sogar gefüllt (390 von
+ * 392), nur sah man sie nirgends. */
+let textFilter = '';
+let textAngehakt = new Set();
+let textSammlung = null;
+const OHNE_KAPITEL = 'ohne';
+
 export async function zeichnen(behaelter) {
   leeren(behaelter);
   if (!zustand.sammlungId) {
@@ -41,23 +55,80 @@ export async function zeichnen(behaelter) {
     }, 'Zur Übersicht'));
     return;
   }
+  if (textSammlung !== zustand.sammlungId) {
+    textSammlung = zustand.sammlungId;
+    textFilter = '';
+    textAngehakt.clear();
+  }
 
   behaelter.append(h('h1', { text: 'Texte' }));
   behaelter.append(h('p', { class: 'leise',
     text: 'Einen Text einwerfen und sehen, ob du ihn schon übersetzen '
         + 'könntest. Was dir fehlt, kannst du beim Lesen anfordern.' }));
 
-  const liste = h('div', { class: 'karte-reihe' });
-  behaelter.append(liste, teilEinwerfen(behaelter));
+  const [texte, kapitel] = await Promise.all([
+    api.texte(zustand.sammlungId),
+    api.lektionen(zustand.sammlungId).catch(() => []),
+  ]);
 
-  const texte = await api.texte(zustand.sammlungId);
   if (!texte.length) {
-    liste.append(h('p', { class: 'leise', text: 'Noch kein Text.' }));
+    behaelter.append(h('p', { class: 'leise', text: 'Noch kein Text.' }),
+                     teilEinwerfen(behaelter));
     return;
   }
-  for (const t of texte) {
+
+  // Nur anbieten, wo es etwas zu ordnen gibt. Bei drei Texten ist ein
+  // Kapitelfilter Beiwerk; bei 173 ist er der einzige Weg hinein.
+  const mitKapitel = [...new Set(texte.map((t) => t.lektion_id))];
+  if (texte.length > 5 || mitKapitel.length > 1) {
+    behaelter.append(teilKapitelwahl(behaelter, texte, kapitel));
+  }
+
+  const stapel = h('div', {});
+  const liste = h('div', { class: 'karte-reihe' });
+  behaelter.append(stapel, liste, teilEinwerfen(behaelter));
+
+  const stapelZeichnen = () => {
+    leeren(stapel);
+    if (textAngehakt.size) {
+      stapel.append(teilStapel(behaelter, kapitel, stapelZeichnen));
+    }
+  };
+
+  const gezeigt = texte.filter((t) => (
+    textFilter === '' ? true
+      : textFilter === OHNE_KAPITEL ? t.lektion_id === null
+        : String(t.lektion_id) === textFilter));
+
+  if (!gezeigt.length) {
+    liste.append(h('p', { class: 'leise',
+      text: 'In diesem Kapitel liegt noch kein Text.' }));
+    return;
+  }
+
+  let letztes;
+  for (const t of gezeigt) {
+    const kennung = t.lektion_id === null ? OHNE_KAPITEL : t.lektion_id;
+    if (kennung !== letztes && !textFilter) {
+      letztes = kennung;
+      liste.append(h('h2', { class: 'kapitelkopf',
+        text: t.lektion_id === null
+          ? 'Ohne Kapitel'
+          : (t.lektion_nr !== null ? `${t.lektion_nr}. ` : '')
+            + (t.lektion_name || 'ohne Namen') }));
+    }
+    const haken = h('input', { type: 'checkbox', class: 'eintrag-haken',
+                               title: 'auswählen' });
+    haken.checked = textAngehakt.has(t.id);
+    haken.addEventListener('change', () => {
+      if (haken.checked) textAngehakt.add(t.id);
+      else textAngehakt.delete(t.id);
+      stapelZeichnen();
+    });
     liste.append(h('div', { class: 'karte' },
-      h('strong', { text: t.titel }),
+      h('div', { style: 'display:flex;align-items:center;gap:.6rem' },
+        haken,
+        h('strong', { text: t.titel })),
       h('p', { class: 'leise', style: 'margin:.2rem 0 .6rem',
                text: `${t.abschnitte} Abschnitte · ${t.zeichen} Zeichen`
                    + (t.niveau ? ` · ${t.niveau}` : '')
@@ -78,6 +149,87 @@ export async function zeichnen(behaelter) {
         h('button', { class: 'schlicht', onclick: () => entfernen(t, behaelter) },
           'Löschen'))));
   }
+  stapelZeichnen();
+}
+
+
+function teilKapitelwahl(behaelter, texte, kapitel) {
+  // Nur Kapitel, in denen auch ein Text liegt — die Vokabelkapitel
+  // einer Sammlung sind oft viel mehr, und eine Auswahl mit fünfzig
+  // leeren Einträgen hilft niemandem.
+  const zaehler = new Map();
+  for (const t of texte) {
+    const k = t.lektion_id;
+    zaehler.set(k, (zaehler.get(k) || 0) + 1);
+  }
+  const wahl = h('select', {},
+    h('option', { value: '', text: `alle Kapitel (${texte.length})` }),
+    kapitel.filter((k) => zaehler.has(k.id)).map((k) => h('option', {
+      value: String(k.id),
+      text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen')
+          + ` (${zaehler.get(k.id)})`,
+    })),
+    zaehler.has(null)
+      ? h('option', { value: OHNE_KAPITEL,
+                      text: `ohne Kapitel (${zaehler.get(null)})` })
+      : null);
+  wahl.value = textFilter;
+  wahl.addEventListener('change', () => {
+    textFilter = wahl.value;
+    textAngehakt.clear();
+    zeichnen(behaelter);
+  });
+  return h('div', { class: 'gezielt-filter', style: 'margin:.6rem 0' }, wahl);
+}
+
+
+function teilStapel(behaelter, kapitel, stapelZeichnen) {
+  const wohin = h('select', {},
+    h('option', { value: '', text: 'Kapitel wählen …' }),
+    kapitel.map((k) => h('option', {
+      value: String(k.id),
+      text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen'),
+    })),
+    h('option', { value: OHNE_KAPITEL, text: 'ohne Kapitel' }));
+  const nr = h('input', { type: 'number', min: '0', max: '9999',
+                          placeholder: 'neue Nr.', style: 'width:7rem' });
+  const name = h('input', { type: 'text', placeholder: 'Name des Kapitels',
+                            style: 'width:12rem' });
+
+  const setzen = (daten) => tun(async () => {
+    const e = await api.texteVerschieben(zustand.sammlungId,
+                                         { text_ids: [...textAngehakt], ...daten });
+    meldung(`${e.verschoben} ${e.verschoben === 1 ? 'Text' : 'Texte'} `
+          + 'umgehängt.');
+    textAngehakt.clear();
+    zeichnen(behaelter);
+  });
+
+  return h('div', { class: 'karte gezielt-stapel' },
+    h('b', { text: `${textAngehakt.size} ausgewählt` }),
+    h('div', { class: 'frage-werkzeuge',
+               style: 'justify-content:flex-start;flex-wrap:wrap' },
+      wohin,
+      h('button', {
+        class: 'wichtig',
+        onclick: () => {
+          if (!wohin.value) { meldung('Erst ein Kapitel wählen.'); return; }
+          setzen(wohin.value === OHNE_KAPITEL
+            ? {} : { lektion_id: Number(wohin.value) });
+        },
+      }, 'Umhängen'),
+      nr, name,
+      h('button', {
+        title: 'Legt das Kapitel an, falls es noch nicht da ist.',
+        onclick: () => {
+          if (nr.value === '') { meldung('Welche Nummer?'); return; }
+          setzen({ lektion_nr: Number(nr.value),
+                   lektion_name: name.value.trim() || null });
+        },
+      }, 'In neues Kapitel'),
+      h('button', { class: 'schlicht',
+                    onclick: () => { textAngehakt.clear(); zeichnen(behaelter); } },
+        'Auswahl aufheben')));
 }
 
 

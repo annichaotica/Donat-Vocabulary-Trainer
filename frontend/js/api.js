@@ -107,6 +107,9 @@ export const api = {
   // Als EIN Aufruf: jedes Umhängen erzeugt die Aufgaben neu, und bei
   // dreißig einzelnen Anfragen bliebe bei einem Abbruch die Hälfte
   // verschoben.
+  texteVerschieben: (sammlungId, daten) =>
+    ruf(`/sammlungen/${sammlungId}/texte/kapitel`,
+        { methode: 'PUT', daten }),
   lexemeVerschieben: (sammlungId, daten) =>
     ruf(`/sammlungen/${sammlungId}/lexeme/lektion`,
         { methode: 'PUT', daten }),

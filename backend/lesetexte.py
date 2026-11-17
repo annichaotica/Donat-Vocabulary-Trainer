@@ -720,9 +720,20 @@ def auflisten(db: sqlite3.Connection, sammlung_id: int) -> list[dict]:
 
     Leerer Text zählt als nicht übersetzt: ein Abschnitt mit '' ist
     nicht übersetzt, er sieht nur so aus.
+
+    GEORDNET NACH KAPITEL, darin in der Reihenfolge des Werks. Vorher
+    stand hier `ORDER BY t.angelegt DESC` — das Neueste oben, richtig
+    für eine Ablage, falsch für ein Buch: der Iwein liegt in 173
+    Stücken vor (»Verse 1–38«, »Verse 39–86«, …), und die las man dann
+    von hinten. Nach dem Titel zu ordnen wäre noch schlechter, da käme
+    »Verse 135–182« vor »Verse 39–86«.
+
+    Wer gerade einen Text eingeworfen hat, findet ihn trotzdem: das
+    Einwerfen öffnet ihn sofort.
     """
     return dbm.zeilen(db, """
         SELECT t.id, t.titel, t.sprache, t.niveau, t.angelegt, t.notiz,
+               t.lektion_id, k.nr AS lektion_nr, k.name AS lektion_name,
                LENGTH(t.inhalt) AS zeichen,
                (SELECT COUNT(*) FROM textabschnitt a WHERE a.text_id = t.id)
                  AS abschnitte,
@@ -731,8 +742,42 @@ def auflisten(db: sqlite3.Connection, sammlung_id: int) -> list[dict]:
                    AND a.referenz IS NOT NULL AND TRIM(a.referenz) != '')
                  AS uebersetzt
           FROM text t
+          LEFT JOIN lektion k ON k.id = t.lektion_id
          WHERE t.sammlung_id = ? AND t.typ = 'lesetext'
-         ORDER BY t.angelegt DESC""", (sammlung_id,))
+         ORDER BY k.nr IS NULL, k.nr, t.reihenfolge, t.angelegt, t.id""",
+        (sammlung_id,))
+
+
+def kapitel_setzen(db: sqlite3.Connection, sammlung_id: int,
+                   text_ids: list[int], lektion_id: int | None) -> dict:
+    """Texte in ein Kapitel hängen — oder wieder heraus.
+
+    »Die Texte müssten wir noch zusammenfassbar machen, also Text –
+    Kapitel. So ist das schwer für jemand, der damit lernt.«
+
+    Bei den Wörtern entscheidet das Kapitel über die Lektionsschranke;
+    hier entscheidet es gar nichts — es ordnet. Ein Text wird nicht
+    früher oder später fällig, weil er in einem Kapitel steht. Darum
+    ist das hier harmloser als beim Wortschatz, und darum steht keine
+    Warnung dabei.
+
+    Fremde Texte werden abgewiesen statt still übergangen: still
+    übergangen sähe aus, als wäre umgehängt worden.
+    """
+    if not text_ids:
+        return {"verschoben": 0, "lektion_id": lektion_id}
+    platz = ",".join("?" * len(text_ids))
+    eigene = {z["id"] for z in dbm.zeilen(
+        db, f"SELECT id FROM text WHERE sammlung_id = ? AND id IN ({platz})",
+        (sammlung_id, *text_ids))}
+    fremd = [i for i in text_ids if i not in eigene]
+    if fremd:
+        raise ValueError(
+            f"{len(fremd)} der Texte liegen nicht in dieser Sammlung.")
+    db.execute(f"""UPDATE text SET lektion_id = ?,
+                          geaendert = datetime('now')
+                    WHERE id IN ({platz})""", (lektion_id, *text_ids))
+    return {"verschoben": len(text_ids), "lektion_id": lektion_id}
 
 
 def loeschen(db: sqlite3.Connection, text_id: int) -> None:

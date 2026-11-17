@@ -923,3 +923,106 @@ def test_die_textliste_sagt_wie_weit_die_uebersetzung_ist(klient):
         str(ids[1]): "   "}})
     liste = klient.get(f"/api/sammlungen/{s['id']}/texte").json()
     assert liste[0]["uebersetzt"] == 1, liste[0]
+
+
+def _mhd(klient):
+    b = klient.post("/api/benutzer", json={"name": "Lernender 2"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Mittelhochdeutsch",
+        "sprache": "gmh"}).json()
+    ids = []
+    for titel in ["Verse 1–38", "Verse 39–86", "Verse 135–182"]:
+        t = klient.post(f"/api/sammlungen/{s['id']}/texte", json={
+            "titel": f"Iwein – {titel}", "typ": "text",
+            "inhalt": f"ein vers aus {titel}."}).json()
+        ids.append(t["id"])
+    return b, s, ids
+
+
+def test_texte_lassen_sich_in_ein_kapitel_haengen(klient):
+    """»Die Texte müssten wir noch zusammenfassbar machen, also Text –
+    Kapitel. So ist das schwer für jemand, der damit lernt.«
+
+    Der Iwein liegt in 173 Stücken vor. Als flache Liste ist das keine
+    Bedienung, sondern ein Stapel.
+    """
+    b, s, ids = _mhd(klient)
+    assert all(t["lektion_id"] is None
+               for t in klient.get(f"/api/sammlungen/{s['id']}/texte").json())
+
+    a = klient.put(f"/api/sammlungen/{s['id']}/texte/kapitel", json={
+        "text_ids": ids, "lektion_nr": 100, "lektion_name": "Iwein"})
+    assert a.status_code == 200, a.text
+    assert a.json()["verschoben"] == 3
+
+    liste = klient.get(f"/api/sammlungen/{s['id']}/texte").json()
+    assert {t["lektion_name"] for t in liste} == {"Iwein"}
+    assert {t["lektion_nr"] for t in liste} == {100}
+
+
+def test_texte_stehen_in_der_reihenfolge_des_werks(klient):
+    """Vorher stand »das Neueste oben« — richtig für eine Ablage,
+    falsch für ein Buch: der Iwein las sich dann von hinten. Nach dem
+    Titel zu ordnen wäre noch schlechter, da käme »Verse 135–182« vor
+    »Verse 39–86«.
+
+    Die Zeitstempel werden AUSEINANDERGEZOGEN. Im Test entstehen alle
+    drei Texte in derselben Sekunde, und `angelegt` hat nur
+    Sekundengenauigkeit — die erste Fassung dieses Tests lief deshalb
+    auch mit der alten Sortierung durch. Ein Test, den die Gegenprobe
+    nicht zu Fall bringt, prüft nichts.
+    """
+    import datenbank as dbm
+    b, s, ids = _mhd(klient)
+    db = dbm.verbindung()
+    try:
+        for i, text_id in enumerate(ids):
+            db.execute("UPDATE text SET angelegt = ? WHERE id = ?",
+                       (f"2026-11-{10 + i:02d} 08:00:00", text_id))
+    finally:
+        db.close()
+
+    liste = klient.get(f"/api/sammlungen/{s['id']}/texte").json()
+    assert [t["id"] for t in liste] == ids, [t["titel"] for t in liste]
+
+
+def test_kapitel_ordnen_vor_allem_anderen(klient):
+    """Erst das Kapitel, dann die Reihenfolge darin. Und was kein
+    Kapitel hat, kommt zuletzt — es ist der Rest, nicht der Anfang."""
+    b, s, ids = _mhd(klient)
+    klient.put(f"/api/sammlungen/{s['id']}/texte/kapitel", json={
+        "text_ids": [ids[2]], "lektion_nr": 1, "lektion_name": "Prolog"})
+    klient.put(f"/api/sammlungen/{s['id']}/texte/kapitel", json={
+        "text_ids": [ids[1]], "lektion_nr": 2, "lektion_name": "Pfingstfest"})
+
+    liste = klient.get(f"/api/sammlungen/{s['id']}/texte").json()
+    assert [t["id"] for t in liste] == [ids[2], ids[1], ids[0]], \
+        [(t["lektion_nr"], t["titel"]) for t in liste]
+
+
+def test_ein_text_laesst_sich_wieder_aus_dem_kapitel_nehmen(klient):
+    b, s, ids = _mhd(klient)
+    klient.put(f"/api/sammlungen/{s['id']}/texte/kapitel",
+               json={"text_ids": ids, "lektion_nr": 100, "lektion_name": "Iwein"})
+    klient.put(f"/api/sammlungen/{s['id']}/texte/kapitel",
+               json={"text_ids": [ids[0]]})
+    nach = {t["id"]: t["lektion_id"] for t in
+            klient.get(f"/api/sammlungen/{s['id']}/texte").json()}
+    assert nach[ids[0]] is None
+    assert nach[ids[1]] is not None
+
+
+def test_fremde_texte_werden_nicht_still_umgehaengt(klient):
+    """Still übergangen sähe aus, als wäre umgehängt worden."""
+    b, s, ids = _mhd(klient)
+    b2 = klient.post("/api/benutzer", json={"name": "Lernende 3"}).json()
+    s2 = klient.post("/api/sammlungen", json={
+        "besitzer_id": b2["id"], "name": "Griechisch", "sprache": "el"}).json()
+    fremd = klient.post(f"/api/sammlungen/{s2['id']}/texte", json={
+        "titel": "Το σπίτι", "typ": "text", "inhalt": "Το σπίτι."}).json()
+
+    a = klient.put(f"/api/sammlungen/{s['id']}/texte/kapitel",
+                   json={"text_ids": [fremd["id"]], "lektion_nr": 1})
+    assert a.status_code == 400, a.text
+    nach = klient.get(f"/api/sammlungen/{s2['id']}/texte").json()
+    assert nach[0]["lektion_id"] is None

@@ -16,6 +16,33 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### Texte haben jetzt Kapitel
+
+»Die Texte müssten wir noch zusammenfassbar machen, also Text –
+Kapitel. So ist das schwer für jemand, der damit lernt.«
+
+Der Iwein liegt in **173 Stücken** vor. Als flache Liste ist das keine
+Bedienung, sondern ein Stapel.
+
+Die Liste gliedert sich jetzt nach Kapiteln, mit Überschrift, und
+darüber steht eine Auswahl — nur mit den Kapiteln, in denen auch
+wirklich ein Text liegt. Umhängen geht wie beim Wortschatz: anhaken,
+Kapitel wählen, umhängen. Eine neue Nummer legt ein Kapitel an.
+
+Die Spalte dafür gab es längst, und bei den **griechischen Texten ist
+sie sogar gefüllt** — 390 von 392 hängen an ihrer Lektion. Man sah es
+nur nirgends. Beim Mittelhochdeutschen ist sie leer; dort wäre ein
+Kapitel »Iwein« der erste Griff.
+
+Anders als beim Wortschatz entscheidet das Kapitel hier über nichts —
+ein Text wird nicht früher oder später fällig. Es ordnet nur.
+
+**Die Reihenfolge stimmt jetzt auch.** Vorher stand das Neueste oben —
+richtig für eine Ablage, falsch für ein Buch: der Iwein las sich von
+hinten. Jetzt nach Kapitel und darin in der Reihenfolge des Werks.
+(Nach dem Titel zu ordnen wäre noch schlechter gewesen: da käme »Verse
+135–182« vor »Verse 39–86«.)
+
 ### Die Übersetzung daneben
 
 »Für die Texte brauchen wir noch eine Option, Referenzübersetzungen

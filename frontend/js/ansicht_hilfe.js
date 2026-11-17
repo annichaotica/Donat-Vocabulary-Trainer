@@ -164,6 +164,13 @@ export async function zeichnen(behaelter) {
       + 'Ausgaben gedruckt, und so liest man sie auch. Ausgeschaltet '
       + 'bleibt die Übersetzung eingeklappt unter deinem eigenen Feld: '
       + 'zum Vergleichen, nachdem du selbst übersetzt hast.'),
+    h('p', {}, h('b', { text: 'Kapitel. ' }),
+      'Texte lassen sich zu Kapiteln zusammenfassen — ein Werk, ein '
+      + 'Lehrbuchkapitel, was du willst. Die Liste gliedert sich danach, '
+      + 'und über ihr wählst du ein einzelnes aus. Zum Umhängen die '
+      + 'Kästchen anhaken, Kapitel wählen, umhängen; eine neue Nummer '
+      + 'legt eines an. Anders als beim Wortschatz entscheidet das '
+      + 'Kapitel hier über nichts — es ordnet nur.'),
     h('p', {}, h('b', { text: 'Wo nichts steht, steht das auch da. ' }),
       'Abschnitte ohne Übersetzung zeigen »noch nicht übersetzt«. Die '
       + 'Lücke ist die Auskunft — so siehst du, was noch fehlt.'),

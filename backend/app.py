@@ -54,7 +54,7 @@ import wache
 import zugang
 import zuspruch as zuspruchmodul
 from modelle import (RegelEingabe, RegelAendern, ZuspruchEingabe,
-                     LexemeVerschieben,
+                     LexemeVerschieben, TexteVerschieben,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
@@ -1144,6 +1144,28 @@ def text_anlegen(sammlung_id: int, eingabe: LesetextAnlegen,
         raise HTTPException(400, str(f))
     except KeyError as f:
         raise HTTPException(404, str(f))
+
+
+@app.put("/api/sammlungen/{sammlung_id}/texte/kapitel")
+def texte_verschieben(sammlung_id: int, eingabe: TexteVerschieben,
+                      request: Request = None, db: sqlite3.Connection = DB):
+    """Texte in ein Kapitel hängen — oder wieder heraus."""
+    _wache_rumpf(db, request, sammlung_id=sammlung_id, schreiben=True)
+    _holen(db, "sammlung", sammlung_id)
+    ziel_id = eingabe.lektion_id
+    if ziel_id is None and eingabe.lektion_nr is not None:
+        ziel_id = sammelimport.lektion_sichern(
+            db, sammlung_id, eingabe.lektion_nr, eingabe.lektion_name)
+    if ziel_id is not None:
+        k = _holen(db, "lektion", ziel_id)
+        if k["sammlung_id"] != sammlung_id:
+            raise HTTPException(
+                400, "Das Kapitel gehört zu einer anderen Sammlung.")
+    try:
+        return lesetexte.kapitel_setzen(db, sammlung_id, eingabe.text_ids,
+                                        ziel_id)
+    except ValueError as f:
+        raise HTTPException(400, str(f))
 
 
 @app.get("/api/texte/{text_id}")

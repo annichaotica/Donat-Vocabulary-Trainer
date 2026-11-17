@@ -46,6 +46,7 @@ import qualitaet
 import regeln as regelmodul
 import sammelimport
 import statistik
+import spiel
 import sprachen
 import uebung_lernen
 import uebungen
@@ -2089,6 +2090,21 @@ def statistik_lesen(benutzer_id: int, sammlung_id: int | None = None,
                  sammlung_id=sammlung_id)
     _holen(db, "benutzer", benutzer_id)
     return statistik.alles(db, benutzer_id, sammlung_id)
+
+
+@app.get("/api/spiel/{benutzer_id}")
+def spiel_stand(benutzer_id: int, request: Request = None,
+                db: sqlite3.Connection = DB):
+    """Tagesziel und Strähne — für die Kopfzeile und den Abschluss.
+
+    Eigener Aufruf und nicht an `/api/lernen/stand` angehängt: den holt
+    die Übersicht je Sammlung, die Strähne gilt aber für die Person.
+    Angehängt stünde sie fünfmal in derselben Seite und wäre jedes Mal
+    dieselbe Zahl.
+    """
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _holen(db, "benutzer", benutzer_id)
+    return spiel.stand(db, benutzer_id)
 
 
 @app.get("/api/lernen/stand")

@@ -139,6 +139,15 @@ export async function zeichnen(behaelter) {
     h('p', {}, h('b', { text: 'Erst jedes Wort einmal, dann das zweite Mal. ' }),
       'Auch wenn du etwas dreimal hintereinander falsch hast, kommt es '
       + 'nicht dreimal hintereinander — erst sind die anderen dran.'),
+    h('p', {}, h('b', { text: 'Der Ring oben ist dein Tagesziel. ' }),
+      'Er füllt sich mit jeder Antwort und bekommt einen Haken, wenn das '
+      + 'Pensum aufgegangen ist. Daneben steht deine Strähne: wie viele '
+      + 'Tage in Folge du sie geschafft hast.'),
+    h('p', {}, h('b', { text: 'Ein kurzer Tag zählt auch. ' }),
+      'War weniger fällig als dein Pensum, gilt der Tag als geschafft, '
+      + 'sobald nichts mehr da ist — du sollst nicht gegen deinen eigenen '
+      + 'Terminplan arbeiten, nur damit eine Zahl stehen bleibt. Und zwei '
+      + 'Fehltage im Monat trägt die Strähne mit; der dritte reißt sie.'),
     h('p', { class: 'leise' }, 'Wie viele Fragen am Tag und wie viel Neues '
       + 'dazwischen, stellst du unter Einstellungen ein.')));
 

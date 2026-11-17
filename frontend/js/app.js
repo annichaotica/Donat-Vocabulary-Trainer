@@ -14,6 +14,7 @@ import * as lehrgang from './ansicht_lehrgang.js';
 import * as wortschatz from './ansicht_wortschatz.js';
 import * as einstellungen from './ansicht_einstellungen.js';
 import * as tastatur from './tastatur.js';
+import * as spielzeichen from './spiel.js';
 import * as ziele from './ansicht_ziele.js';
 import * as freigabe from './ansicht_freigabe.js';
 import * as einlesen from './ansicht_import.js';
@@ -118,12 +119,20 @@ async function kopfzeile() {
   const istStart = (location.hash || '#/').startsWith('#/uebersicht')
                  || location.hash === '#/' || !location.hash;
   document.getElementById('zurueck').hidden = istStart;
+
+  // Tagesziel und Strähne. OHNE await: der Stand zählt über alle
+  // Aufgaben, und die Kopfzeile darf darauf nicht warten. Bis die
+  // Antwort da ist, bleibt der Ring stehen, wie er war.
+  spielzeichen.auffrischen(zustand.benutzerId);
 }
 
 function verdrahten() {
   for (const knopf of document.querySelectorAll('.kopf-knoepfe button[data-ziel]')) {
     knopf.addEventListener('click', () => { location.hash = knopf.dataset.ziel; });
   }
+  document.getElementById('kopf-spiel').addEventListener('click', () => {
+    location.hash = '#/lernen';
+  });
   document.getElementById('knopf-profil').addEventListener('click', () => {
     // Von außen gibt es nichts zu wechseln.
     location.hash = identitaet?.gebunden ? '#/einstellungen' : '#/profile';

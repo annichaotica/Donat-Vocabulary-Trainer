@@ -21,6 +21,14 @@
     <strong id="kopf-name">Vokabeltrainer</strong>
     <span id="kopf-zusatz" class="leise"></span>
   </div>
+  <!-- Das Tagesziel als Ring. Er steht in der OBEREN Leiste und nicht bei
+       den Reitern: auf dem schmalen Gerät wandern die nach unten, und ein
+       fünfter Reiter sprengt dort die Zeile. Oben ist er außerdem immer
+       sichtbar, auch während der Abfrage — ein angefangener Ring will
+       geschlossen werden, und genau das ist der Zweck.
+       Der Inhalt wird von app.js gezeichnet; leer bleibt er versteckt. -->
+  <button class="kopf-spiel" id="kopf-spiel" hidden></button>
+
   <!-- Auf schmalen Geräten rückt diese Leiste per CSS an den unteren Rand:
        vier Knöpfe nebeneinander sprengen bei 360 px jede Kopfzeile, und unten
        sind sie mit dem Daumen erreichbar. Die Zeichen sind eingebettet, damit

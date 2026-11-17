@@ -15,7 +15,7 @@
  */
 
 import { api } from './api.js';
-import { h, leeren, anfuegen } from './hilfen.js';
+import { h, leeren, anfuegen, svg } from './hilfen.js';
 import { zustand, merken } from './zustand.js';
 
 const FARBE = {
@@ -96,6 +96,22 @@ function teilZahlen(d) {
       zahl(g.quote === null ? '—' : `${g.quote} %`, 'auf Anhieb richtig'),
       zahl(g.aktive_tage, 'Tage gelernt'),
       zahl(g.straehne, g.straehne === 1 ? 'Tag am Stück' : 'Tage am Stück')),
+    // Was die Strähne bedeutet, muss dabeistehen. »4 Tage am Stück« las
+    // sich früher als »an vier Tagen etwas getippt« — und genau so war
+    // es auch gerechnet. Jetzt ist es das Tagesziel, und das ist eine
+    // andere Aussage.
+    h('p', { class: 'leise', style: 'margin:.6rem 0 0' },
+      `Ein Tag zählt, wenn das Tagesziel von ${g.straehne_ziel} `
+      + `${g.straehne_ziel === 1 ? 'Frage' : 'Fragen'} aufgeht — oder `
+      + 'wenn nichts mehr fällig war.',
+      g.straehne_laengste > g.straehne
+        ? ` Am längsten waren es ${g.straehne_laengste} Tage.` : '',
+      g.straehne_joker?.length
+        ? ` ${g.straehne_joker.length === 1
+             ? 'Ein Fehltag ist dabei überbrückt'
+             : `${g.straehne_joker.length} Fehltage sind dabei überbrückt`}`
+          + ' — zwei im Monat trägt die Strähne mit, der dritte reißt sie.'
+        : ''),
     g.fast
       ? h('p', { class: 'leise', style: 'margin:.6rem 0 0',
                  text: `Dazu ${g.fast}× »fast« — ein Zeichen daneben, beim `
@@ -261,13 +277,6 @@ function teilTempo(d) {
 
 
 // ------------------------------------------------------------------ SVG
-
-function svg(name, attribute = {}, text = null) {
-  const e = document.createElementNS('http://www.w3.org/2000/svg', name);
-  for (const [k, v] of Object.entries(attribute)) e.setAttribute(k, v);
-  if (text !== null) e.textContent = text;
-  return e;
-}
 
 /** Der Rahmen. `preserveAspectRatio=none` streckt die Balken auf die
  *  volle Breite — bei einem Balkenbild ist das richtig, die Form der

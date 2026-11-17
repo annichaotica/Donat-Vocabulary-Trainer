@@ -14,6 +14,7 @@ import { stammdaten } from './stammdaten.js';
 import { zeichenleiste, umschriftAnhaengen,
          kannUmschreiben } from './tastatur.js';
 import { zustand } from './zustand.js';
+import * as spielzeichen from './spiel.js';
 
 const NOTEN = [
   { note: 1, name: 'Nochmal', hinweis: 'Saß nicht' },
@@ -29,7 +30,7 @@ export class Sitzung {
     this.aufgabe = null;
     this.ergebnis = null;
     this.phase = 'frage';
-    this.gezaehlt = { richtig: 0, fast: 0, falsch: 0, gesamt: 0 };
+    this.zaehlerZuruecksetzen();
     this.begonnen = 0;
     this.denkzeitStart = 0;     // wann die Frage stand
     this.denkzeit = null;       // bis zum ERSTEN Tastendruck
@@ -82,6 +83,22 @@ export class Sitzung {
                                     this.optionen.sammlungId || null);
     } catch { this.pensum = null; }
     await this.naechste();
+  }
+
+  /** Die Zähler einer Runde auf null.
+   *
+   * Stand dreimal als Literal in dieser Datei — und als der Wandel
+   * dazukam (was dauerhaft sitzt, was neu angefangen ist), hätte man
+   * ihn an drei Stellen nachtragen müssen. Die vierte Stelle hätte
+   * gefehlt.
+   */
+  zaehlerZuruecksetzen() {
+    this.gezaehlt = { richtig: 0, fast: 0, falsch: 0, gesamt: 0 };
+    // Was sich am Lernstand GEÄNDERT hat, nicht wie viel getippt wurde.
+    // Das ist der Unterschied zwischen »24 Aufgaben bearbeitet« und
+    // »drei sitzen jetzt dauerhaft« — die zweite Zahl ist der Grund,
+    // warum man es gemacht hat.
+    this.wandel = { angefangen: 0, sitzt: 0, zurueck: 0 };
   }
 
   beenden() {
@@ -137,7 +154,7 @@ export class Sitzung {
         this.pensum = await api.stand(zustand.benutzerId,
                                       this.optionen.sammlungId || null);
       } catch { /* dann eben mit dem alten Stand */ }
-      this.zeichneFertig();
+      await this.zeichneFertig();
       return;
     }
     if (this.abgebrochen) return;
@@ -260,9 +277,30 @@ export class Sitzung {
         h('button', { class: 'wichtig', onclick: () => this.naechste() }, 'Nochmal versuchen')));
   }
 
-  zeichneFertig() {
+  /** Was am Ende einer Runde dasteht.
+   *
+   * Hier stand bisher, WIE VIEL getippt wurde: 24 Aufgaben, davon so
+   * und so viele richtig. Das ist eine Leistungsmessung, kein Grund
+   * weiterzumachen — und am nächsten Tag steht dieselbe Zahl da.
+   *
+   * Dazu kommt jetzt, was sich GEÄNDERT hat: was dauerhaft sitzt, was
+   * neu angefangen ist, was aus dem Verlernten zurückgeholt wurde, und
+   * wie die Strähne steht. Alles Sätze, die etwas benennen — »Super
+   * gemacht!« glaubt beim dritten Mal niemand mehr, und ein Vierzehn-
+   * jähriger beim ersten nicht.
+   */
+  async zeichneFertig() {
     const { richtig, fast, falsch, gesamt } = this.gezaehlt;
     const p = this.pensum || {};
+    // Den Spielstand FRISCH holen, nicht den mitgezählten nehmen: ob der
+    // Tag als geschafft gilt, hängt auch daran, ob überhaupt noch etwas
+    // fällig war — und das weiß nur der Server. Mitgezählt wird während
+    // der Runde, damit der Ring läuft; am Schluss zählt, was gilt.
+    let sp = spielzeichen.letzterStand();
+    try {
+      sp = (await spielzeichen.holen(zustand.benutzerId)) || sp;
+    } catch { /* dann mit dem mitgezählten Stand */ }
+    if (this.abgebrochen) return;
     // Der Rückstand wird genannt, nicht verschwiegen — aber als Zahl, die
     // sinkt, nicht als Vorwurf. Verschwiegen wäre er schlimmer: dann
     // stünde morgen wieder dieselbe Zahl da und niemand wüsste, warum.
@@ -300,6 +338,8 @@ export class Sitzung {
           : (fremdVoll ? null
              : h('p', { text: 'Es ist gerade nichts fällig. Freies Üben geht '
                             + 'trotzdem jederzeit.' })),
+        this.teilErfolg(),
+        this.teilStraehne(sp),
         rueckstand
           ? h('p', { class: 'leise' },
               `Es warten noch ${rueckstand} `
@@ -314,12 +354,72 @@ export class Sitzung {
                 onclick: () => {
                   // Die Grenze ist ein Vorschlag, kein Schloss.
                   this.ohneGrenze = true;
-                  this.gezaehlt = { richtig: 0, fast: 0, falsch: 0, gesamt: 0 };
+                  this.zaehlerZuruecksetzen();
                   this.naechste();
                 },
               }, 'Trotzdem weitermachen')
             : null,
-          h('button', { onclick: () => { this.gezaehlt = { richtig: 0, fast: 0, falsch: 0, gesamt: 0 }; this.optionen.nur = 'frei'; this.naechste(); } }, 'Frei weiterüben'))));
+          h('button', { onclick: () => { this.zaehlerZuruecksetzen(); this.optionen.nur = 'frei'; this.naechste(); } }, 'Frei weiterüben'))));
+  }
+
+  /** Was sich am Lernstand geändert hat — und nur das.
+   *
+   * Nichts geschehen heißt: kein Satz. Eine Zeile, die auch »0 Aufgaben
+   * sitzen jetzt dauerhaft« schreibt, erzieht dazu, die Stelle zu
+   * überlesen, an der später etwas Gutes steht.
+   */
+  teilErfolg() {
+    const w = this.wandel;
+    const teile = [];
+    if (w.sitzt) {
+      teile.push(`${w.sitzt} ${w.sitzt === 1 ? 'Aufgabe sitzt' : 'Aufgaben sitzen'}`
+               + ' jetzt dauerhaft');
+    }
+    if (w.zurueck) {
+      teile.push(`${w.zurueck} ${w.zurueck === 1 ? 'Aufgabe' : 'Aufgaben'}`
+               + ' aus dem Verlernten zurückgeholt');
+    }
+    if (w.angefangen) {
+      teile.push(`${w.angefangen} neu angefangen`);
+    }
+    if (!teile.length) return null;
+    // Gezählt wird in AUFGABEN und nicht in Wörtern, wie überall sonst
+    // in diesem Trainer: ein Wort hat zwei Richtungen, und »drei
+    // Wörter« wäre dann schlicht falsch.
+    return h('p', { class: 'spiel-erfolg', text: teile.join(' · ') + '.' });
+  }
+
+  /** Tagesziel und Strähne — und was noch fehlt.
+   *
+   * Der nützlichste Satz ist der letzte: »noch sechs Fragen, dann steht
+   * die Strähne bei sechs Tagen«. Er nennt, was auf dem Spiel steht,
+   * und zwar in einer Größe, die man noch heute abarbeiten kann.
+   */
+  teilStraehne(sp) {
+    if (!sp) return null;
+    const z = sp.tagesziel;
+    const f = sp.straehne;
+    const tage = (n) => `${n} ${n === 1 ? 'Tag' : 'Tage'}`;
+
+    if (z.geschafft) {
+      const teile = [z.nichts_mehr_faellig
+        ? 'Tagesziel erreicht — es war nichts mehr fällig.'
+        : 'Tagesziel geschafft.'];
+      if (f.laufend) {
+        teile.push(`Strähne: ${tage(f.laufend)} in Folge.`);
+        if (f.laengste > f.laufend) {
+          teile.push(`Am längsten waren es ${tage(f.laengste)}.`);
+        }
+      }
+      return h('p', { class: 'spiel-straehne', text: teile.join(' ') });
+    }
+    if (!z.dosis) return null;         // kein Ziel gesetzt, keine Ansage
+    const fehlt = Math.max(0, z.ziel - z.erledigt);
+    return h('p', { class: 'spiel-straehne' },
+      `Noch ${fehlt} ${fehlt === 1 ? 'Frage' : 'Fragen'} bis zum Tagesziel`,
+      f.laufend
+        ? ` — dann steht die Strähne bei ${tage(f.laufend + 1)}.`
+        : '.');
   }
 
   async zeichneEinpraegen() {
@@ -1042,6 +1142,16 @@ export class Sitzung {
         aufgedeckt: Boolean(this.aufgedeckt),
       });
       this.gezaehlt.gesamt += 1;
+      // Was sich am Lernstand geändert hat. Der Zustand VOR der Antwort
+      // steht in der Aufgabe, der danach in der Antwort — beide liegen
+      // hier vor, und keiner davon kostet eine weitere Anfrage.
+      const vorher = this.aufgabe.lernstand?.zustand || 'neu';
+      const nachher = ergebnis.zustand;
+      if (vorher === 'neu' && nachher !== 'neu') this.wandel.angefangen += 1;
+      if (vorher !== 'reif' && nachher === 'reif') this.wandel.sitzt += 1;
+      if (vorher === 'verlernt' && nachher !== 'verlernt') {
+        this.wandel.zurueck += 1;
+      }
       if (this.pensum) {
         this.pensum.heute_erledigt += 1;
         // Eine erledigte Aufgabe, die gleich wiederkommt, bleibt offen.
@@ -1053,6 +1163,9 @@ export class Sitzung {
         } else {
           this.pensum.heute_gesamt += 1;
         }
+        // Der Ring in der Kopfzeile zählt mit — ohne Rückfrage beim
+        // Server. Die Zahl liegt ja hier.
+        spielzeichen.fortschreiben(this.pensum.heute_erledigt);
       }
       // Länger als die üblichen Meldungen: hier steht die Auskunft, die
       // man wirklich lesen will — wie es gewertet wurde und wann es

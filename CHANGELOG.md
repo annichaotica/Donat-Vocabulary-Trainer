@@ -16,6 +16,71 @@ Eintrag wiederfindet.
 
 ## 17.11.2026
 
+### Ein Ring für den Tag, eine Zahl für die Tage
+
+»Wir brauchen auf jeden Fall einen Streak.«
+
+Oben in der Kopfzeile steht jetzt ein **Ring**: dein Tagesziel. Er
+füllt sich mit jeder Antwort und bekommt einen Haken, wenn das Pensum
+aufgegangen ist. Daneben die **Strähne** — wie viele Tage in Folge du
+sie geschafft hast.
+
+Die Tagesdosis war längst eingestellt und stand nirgends; man erfuhr
+erst am Ende der Abfrage, dass man sie erreicht hatte. Der Ring steht
+oben und nicht in der Übersicht, weil die Übersicht während der
+Abfrage gar nicht zu sehen ist — und gerade dann zählt er hoch.
+
+### Die Strähne zählt jetzt etwas anderes
+
+Es gab schon eine, im Fortschritt. Sie zählte Tage mit **mindestens
+einer Antwort**, innerhalb eines Fensters von dreißig Tagen. Beides
+war falsch: eine einzige Karte genügte für einen gelernten Tag, und
+über 30 kam die Zahl nie hinaus — nach zwei Monaten Disziplin stand da
+dasselbe wie nach einem.
+
+Jetzt zählt ein Tag, wenn das **Tagesziel aufgeht**. Oder wenn nichts
+mehr fällig war: an einem Tag mit drei fälligen Aufgaben darf die
+Strähne nicht reißen, sonst erzieht der Trainer dazu, gegen den
+eigenen Terminplan zu arbeiten.
+
+Und **zwei Fehltage im Monat trägt sie mit**. Ohne das reißt eine
+Strähne beim ersten Grippetag, und wer 23 Tage verloren hat, fängt
+nicht wieder bei eins an — er hört auf. Der dritte Fehltag reißt sie
+trotzdem, sonst wäre die Zahl geschenkt. Überbrückte Tage werden
+genannt und nicht verschwiegen.
+
+Gerechnet wird alles aus dem Protokoll, nichts wird mitgeschrieben.
+Darum fängt niemand bei null an: wer schon gelernt hat, hat auch schon
+eine Strähne.
+
+### Am Ende der Runde steht, was sich geändert hat
+
+Bisher stand dort, wie viel getippt wurde — 24 Aufgaben, so und so
+viele richtig. Das ist eine Leistungsmessung, kein Grund
+weiterzumachen, und morgen steht dieselbe Zahl da.
+
+Jetzt kommt dazu: was **dauerhaft sitzt**, was **neu angefangen** ist,
+was aus dem Verlernten **zurückgeholt** wurde — und wie die Strähne
+steht. Ist nichts davon passiert, steht auch nichts da; eine Zeile,
+die »0 Aufgaben sitzen jetzt dauerhaft« schreibt, erzieht dazu, die
+Stelle zu überlesen, an der später etwas Gutes steht.
+
+Der nützlichste Satz ist der letzte: *»Noch 6 Fragen bis zum
+Tagesziel — dann steht die Strähne bei 6 Tagen.«*
+
+### Keine Punkte für richtige Antworten
+
+Eine Entscheidung, die man nicht sieht, die aber alles Weitere
+bestimmt: **belohnt wird Erscheinen, nicht Trefferquote.** Gezählt
+werden bearbeitete Aufgaben, gleich wie sie ausgingen.
+
+Der Grund: bei längeren Antworten bleibt die Einschätzung beim
+Menschen. Hinge daran ein Punktestand, entstünde genau dort ein Anreiz
+zu schummeln — und der Schaden wäre nicht der erschlichene Punkt,
+sondern ein verdorbener Terminplan. Großzügig bewertete Wörter legt
+der Trainer weit weg, und vor der Arbeit ist nichts mehr da. Die
+Trefferquote wird gezeigt, aber nicht bepunktet.
+
 ### Wiederholen, ohne dass Neues dazukommt
 
 »Haben wir eigentlich auch eine Art Wiederholungsmodus?«

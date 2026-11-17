@@ -47,6 +47,18 @@ export function anfuegen(el, ...kinder) {
 
 export function leeren(el) { while (el.firstChild) el.firstChild.remove(); return el; }
 
+/** Dasselbe für SVG. `h` kann es nicht: createElement legt im HTML-Raum
+ *  an, und ein <circle> ohne Namensraum wird nie gezeichnet — es steht
+ *  dann unsichtbar in der Seite, was beim Suchen eine Stunde kostet.
+ *  Stand als lokale Hilfe in der Statistik; jetzt braucht sie auch die
+ *  Kopfzeile, und zwei Fassungen desselben Werkzeugs laufen auseinander. */
+export function svg(name, attribute = {}, text = null) {
+  const e = document.createElementNS('http://www.w3.org/2000/svg', name);
+  for (const [k, v] of Object.entries(attribute)) e.setAttribute(k, v);
+  if (text !== null) e.textContent = text;
+  return e;
+}
+
 let meldungsUhr = null;
 /* Kurze Rückmeldung am Bildschirmrand.
  *

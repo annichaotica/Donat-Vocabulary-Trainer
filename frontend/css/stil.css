@@ -194,6 +194,41 @@ em, i { font-style: normal; font-weight: 600; }
 .kopf-zeichen { width: 1.25em; height: 1.25em; flex: none; }
 .kopf-wort { white-space: nowrap; }
 
+/* Das Tagesziel als Ring, daneben die Strähne.
+ *
+ * Steht zwischen Titel und Reitern und bleibt dort auch auf dem schmalen
+ * Gerät — die Reiter wandern dann nach unten, der Ring nicht. Während
+ * der Abfrage ist das die einzige Stelle, an der man den Tagesstand
+ * sieht, und genau dann zählt er hoch. */
+.kopf-spiel {
+  display: inline-flex; align-items: center; gap: .15rem;
+  flex: none; min-height: var(--tipp); padding: 0 .35rem;
+  background: none; border: 1px solid transparent; border-radius: var(--rund-klein);
+  color: var(--leise); cursor: pointer;
+}
+.kopf-spiel[hidden] { display: none; }
+.kopf-spiel.ist-geschafft { color: var(--richtig); }
+.kopf-ring { width: 1.65rem; height: 1.65rem; flex: none; }
+.kopf-ring-bogen, .kopf-ring-voll, .kopf-ring-haken { color: var(--akzent); }
+.kopf-spiel.ist-geschafft .kopf-ring-voll,
+.kopf-spiel.ist-geschafft .kopf-ring-haken { color: var(--richtig); }
+.kopf-flamme { width: 1.2rem; height: 1.2rem; flex: none; margin-left: .25rem; }
+/* Die Zahl der Strähne steht in rem, nicht in em: sie soll im
+   Legastheniemodus nicht die Kopfzeile sprengen — gelesen wird sie
+   ohnehin als Zeichen und nicht als Text. */
+.kopf-spiel-zahl {
+  font-size: .9rem; font-weight: 650; font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+}
+
+/* Der Abschluss einer Runde: was sich geändert hat, nicht wie viel
+   getippt wurde. Darum NICHT leise gesetzt — das ist die Stelle, die
+   man lesen soll. */
+.spiel-erfolg {
+  margin: .7rem 0 .2rem; font-weight: 600; color: var(--richtig);
+}
+.spiel-straehne { margin: .2rem 0 0; }
+
 .profil-knopf {
   display: inline-flex; align-items: center; justify-content: center;
   width: 2.2rem; height: 2.2rem; min-height: 0; flex: none;
@@ -673,6 +708,10 @@ table.paradigma .marke { align-self: auto; }
 
   .kopf { gap: .25rem; padding-block: .25rem; }
   .kopf-titel strong { font-size: .98em; }
+  /* Der Ring bleibt oben; nur schmaler, damit der Sammlungsname nicht
+     unter die Ellipse fällt. */
+  .kopf-spiel { padding: 0 .15rem; }
+  .kopf-ring { width: 1.5rem; height: 1.5rem; }
 
   .kopf-knoepfe {
     position: fixed; inset: auto 0 0 0;

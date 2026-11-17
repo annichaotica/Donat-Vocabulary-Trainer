@@ -212,18 +212,19 @@ def alles(db: sqlite3.Connection, benutzer_id: int,
     fast = sum(t["fast"] for t in tage)
     aktive_tage = sum(1 for t in tage if t["gesamt"])
 
-    # Die laufende Strähne: wie viele Tage bis heute ohne Lücke. Vom
-    # Ende her gezählt, und der heutige Tag zählt nur mit, wenn heute
-    # schon etwas war — sonst stünde morgens früh immer eine Null.
-    straehne = 0
-    for t in reversed(tage):
-        if t["gesamt"]:
-            straehne += 1
-        elif straehne or t["tag"] == _heute().isoformat():
-            if t["tag"] != _heute().isoformat():
-                break
-        else:
-            break
+    # Die Strähne kommt aus `spiel` und wird hier NICHT noch einmal
+    # gerechnet. Sie stand früher an dieser Stelle und zählte Tage mit
+    # mindestens einer Antwort innerhalb des Monatsfensters — damit
+    # genügte eine einzige Karte für einen gelernten Tag, und über 30
+    # konnte die Zahl nie hinaus. Dieselbe Zahl zweimal verschieden zu
+    # rechnen wäre der schlimmere Fehler: in der Kopfzeile stünde
+    # »Strähne 12« und im Fortschritt »Strähne 30«, und man wüsste bei
+    # keiner mehr, was sie bedeutet.
+    #
+    # Sie gilt für die PERSON, auch wenn diese Seite auf eine Sammlung
+    # eingeschränkt ist — so wie die Tagesdosis, an der sie hängt.
+    import spiel
+    folge = spiel.straehne(db, benutzer_id)
 
     return {
         "taetigkeit": tage,
@@ -237,7 +238,10 @@ def alles(db: sqlite3.Connection, benutzer_id: int,
             # Ohne Antworten keine Quote. 0 % wäre gelogen.
             "quote": round(100 * richtig / gesamt) if gesamt else None,
             "aktive_tage": aktive_tage,
-            "straehne": straehne,
+            "straehne": folge["laufend"],
+            "straehne_laengste": folge["laengste"],
+            "straehne_ziel": folge["ziel"],
+            "straehne_joker": folge["joker_benutzt"],
             "tage_betrachtet": TAGE_ZURUECK,
         },
     }

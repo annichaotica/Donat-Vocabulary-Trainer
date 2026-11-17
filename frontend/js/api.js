@@ -225,6 +225,8 @@ export const api = {
 
   stand: (benutzerId, sammlungId) =>
     ruf('/lernen/stand', { frage: { benutzer_id: benutzerId, sammlung_id: sammlungId } }),
+  // Tagesziel und Strähne. Ohne Sammlung — beides gilt für die Person.
+  spiel: (benutzerId) => ruf(`/spiel/${benutzerId}`),
   naechste: (frage) => ruf('/lernen/naechste', { frage }),
   pruefen: (daten) => ruf('/lernen/pruefen', { methode: 'POST', daten }),
   tipp: (frage) => ruf('/lernen/tipp', { frage }),

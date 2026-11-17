@@ -99,6 +99,11 @@ class SammlungEinstellungen(BaseModel):
     formgruppen: list[str] | None = None
     typen: list[str] | None = None
     ungeprueft_abfragen: bool | None = None
+    # Benannte Auswahlpakete, auf die beim Anlegen verwiesen werden
+    # kann: »nachschlagen« statt einer ausgeschriebenen Einstellung.
+    # Der Sinn ist die spätere Änderung — wer die Bedeutung eines
+    # Namens ändert, ändert alle Wörter mit, ohne eines anzufassen.
+    abfragevorlagen: dict[str, dict[str, Any]] | None = None
 
 
 class LektionAnlegen(BaseModel):
@@ -509,6 +514,18 @@ class ImportEingabe(BaseModel):
     zuordnung: dict[str, str] | None = None
     hat_kopfzeile: bool | None = None
     doppelte: Literal["ueberspringen", "ergaenzen", "trotzdem"] = "ueberspringen"
+
+
+class AbfrageSetzen(BaseModel):
+    """Wird dieses Wort abgefragt?
+
+    `abfrage` nimmt dreierlei an, weil drei Stellen es schreiben: einen
+    Vorlagennamen (»nachschlagen«, von der KI), einen Wahrheitswert
+    (der Schalter in der Oberfläche) oder ein Objekt.
+    """
+
+    lexem_ids: list[int] = Field(min_length=1, max_length=5000)
+    abfrage: bool | str | dict[str, Any] | None = None
 
 
 class WunschZuordnung(BaseModel):

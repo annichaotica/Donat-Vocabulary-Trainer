@@ -81,6 +81,7 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
         "beschreibung": "TEXT",
     },
     "lexem": {
+        "abfrage": "TEXT",
         "reihenfolge": "INTEGER NOT NULL DEFAULT 0",
         "kennung": "TEXT",
         "luecken": "TEXT NOT NULL DEFAULT '[]'",

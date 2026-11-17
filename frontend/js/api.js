@@ -110,6 +110,18 @@ export const api = {
   // Text oder Merkmalsbündel, fällt die Form von selbst auf »ungeprüft«
   // zurück — was geändert wurde, ist nicht mehr das, was jemand
   // freigegeben hat.
+  abfrageUebersicht: (sammlungId, filter = {}) =>
+    ruf(`/sammlungen/${sammlungId}/abfrage`, { frage: {
+      ...(filter.lektion_nr !== null && filter.lektion_nr !== undefined
+          ? { lektion_nr: filter.lektion_nr } : {}),
+      ...(filter.wortart ? { wortart: filter.wortart } : {}),
+      ...(filter.suche ? { suche: filter.suche } : {}),
+      ...(filter.nur_aus ? { nur_aus: true } : {}),
+    } }),
+  abfrageSetzen: (lexemIds, abfrage) =>
+    ruf('/abfrage', { methode: 'PUT',
+                      daten: { lexem_ids: lexemIds, abfrage } }),
+
   abtippenReihe: (sammlungId, lektionId = null) =>
     ruf(`/sammlungen/${sammlungId}/abtippen`,
         { frage: lektionId ? { lektion_id: lektionId } : {} }),

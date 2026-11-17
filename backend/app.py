@@ -63,6 +63,7 @@ from modelle import (RegelEingabe, RegelAendern,
                      SammelimportEingabe,
                      McpTokenAnlegen, OAuthClientAnlegen,
                      AbtippenEingabe, WuenscheAbhaken,
+                     AbfrageSetzen,
                      FormAendern, FreigabeEingabe,
                      LexemAendern, LexemEingabe,
                      PruefenEingabe, SammlungAendern, SammlungAnlegen,
@@ -814,13 +815,23 @@ def sammlung_einstellungen_setzen(sammlung_id: int, eingabe: SammlungEinstellung
     s = _holen(db, "sammlung", sammlung_id)
     alt = dbm.j_lesen(s["einstellungen"])
     neu = dict(alt)
-    for feld in ("formgruppen", "typen", "ungeprueft_abfragen"):
+    for feld in ("formgruppen", "typen", "ungeprueft_abfragen",
+                 "abfragevorlagen"):
         wert = getattr(eingabe, feld)
         if wert is not None:
             neu[feld] = wert
     unbekannt = set(neu.get("typen") or []) - set(aufgaben.TYPEN)
     if unbekannt:
         raise HTTPException(400, f"Unbekannte Aufgabentypen: {sorted(unbekannt)}")
+    # Eine Vorlage, die nichts Bekanntes sagt, wäre eine Falle: sie
+    # ließe sich angeben und täte nichts.
+    for name, inhalt in (neu.get("abfragevorlagen") or {}).items():
+        fremd = set(inhalt) - set(aufgaben.VORLAGEN_FELDER)
+        if fremd:
+            raise HTTPException(
+                400, f"Abfragevorlage »{name}«: unbekannte Angaben "
+                     f"{sorted(fremd)}. Möglich: "
+                     f"{', '.join(aufgaben.VORLAGEN_FELDER)}")
     db.execute("UPDATE sammlung SET einstellungen = ? WHERE id = ?",
                (dbm.j_schreiben(neu), sammlung_id))
     bilanz = aufgaben.erzeugen_fuer_sammlung(db, sammlung_id)
@@ -2438,6 +2449,90 @@ def wortwuensche_abhaken(benutzer_id: int, eingabe: WuenscheAbhaken,
     return lesetexte.wuensche_abhaken(
         db, benutzer_id, [z.model_dump() for z in eingabe.zuordnungen],
         zugang.beschreibbare_sammlungen(db, benutzer_id))
+
+
+# ======================================================= Gezieltes Lernen
+
+@app.get("/api/sammlungen/{sammlung_id}/abfrage")
+def abfrage_uebersicht(sammlung_id: int, lektion_nr: int | None = None,
+                       wortart: str | None = None, nur_aus: bool = False,
+                       suche: str | None = None,
+                       ab: int = 0, anzahl: int = Query(default=200, le=1000),
+                       db: sqlite3.Connection = DB):
+    """Wort für Wort: wird es abgefragt, und wie viele Aufgaben hängen dran?
+
+    Eine eigene Liste statt der Wortschatzansicht, weil hier etwas
+    anderes gesucht wird: nicht EIN Wort, sondern eine Auswahl. »Genau
+    die Vokabeln lernen, die sie mir als Liste gegeben hat« heißt, aus
+    tausend Einträgen dreißig zu bestimmen — das braucht Filter und
+    die Möglichkeit, viele auf einmal umzuschalten.
+    """
+    _holen(db, "sammlung", sammlung_id)
+    bedingungen, werte = ["l.sammlung_id = ?"], [sammlung_id]
+    if lektion_nr is not None:
+        bedingungen.append("""l.lektion_id IN (SELECT id FROM lektion
+                               WHERE sammlung_id = ? AND nr = ?)""")
+        werte += [sammlung_id, lektion_nr]
+    if wortart:
+        bedingungen.append("l.wortart = ?")
+        werte.append(wortart)
+    if suche:
+        bedingungen.append("l.lemma LIKE ?")
+        werte.append(f"%{suche}%")
+    if nur_aus:
+        bedingungen.append("json_extract(l.abfrage, '$.an') = 0")
+    wo = " AND ".join(bedingungen)
+    gesamt = dbm.wert(db, f"SELECT COUNT(*) FROM lexem l WHERE {wo}", werte)
+    zeilen = dbm.zeilen(db, f"""
+        SELECT l.id, l.lemma, l.wortart, l.abfrage, k.nr AS lektion_nr,
+               (SELECT COUNT(*) FROM aufgabe a
+                 WHERE a.lexem_id = l.id AND a.aktiv = 1) AS aufgaben,
+               (SELECT u.text FROM bedeutung b
+                  JOIN uebersetzung u ON u.bedeutung_id = b.id
+                 WHERE b.lexem_id = l.id
+                 ORDER BY b.reihenfolge, b.id, u.ist_haupt DESC, u.id
+                 LIMIT 1) AS bedeutung
+          FROM lexem l LEFT JOIN lektion k ON k.id = l.lektion_id
+         WHERE {wo}
+         ORDER BY COALESCE(k.nr, 9999), l.reihenfolge, l.id
+         LIMIT ? OFFSET ?""", (*werte, anzahl, ab))
+    woerter = []
+    for z in zeilen:
+        a = dbm.j_lesen(z["abfrage"] or "{}")
+        woerter.append({"lexem_id": z["id"], "lemma": z["lemma"],
+                        "wortart": z["wortart"], "lektion_nr": z["lektion_nr"],
+                        "bedeutung": z["bedeutung"],
+                        "aufgaben": z["aufgaben"],
+                        "an": bool(a.get("an", True)),
+                        "vorlage": a.get("vorlage")})
+    return {"sammlung_id": sammlung_id, "gesamt": gesamt,
+            "stillgelegt": dbm.wert(db, f"""SELECT COUNT(*) FROM lexem l
+                WHERE {wo} AND json_extract(l.abfrage, '$.an') = 0""", werte),
+            "vorlagen": aufgaben.abfragevorlagen(db, sammlung_id),
+            "woerter": woerter}
+
+
+@app.put("/api/abfrage")
+def abfrage_setzen(eingabe: AbfrageSetzen, db: sqlite3.Connection = DB):
+    """Für viele Wörter auf einmal festlegen, ob sie abgefragt werden.
+
+    Gesammelt, weil es gesammelt gebraucht wird: eine Vokabelliste für
+    die nächste Arbeit umfasst dreißig Wörter, und der Rest der
+    Sammlung soll so lange ruhen.
+    """
+    geaendert = 0
+    for lexem_id in eingabe.lexem_ids:
+        lexem = _holen(db, "lexem", lexem_id)
+        vorlagen = aufgaben.abfragevorlagen(db, lexem["sammlung_id"])
+        try:
+            wert = aufgaben.abfrage_deuten(eingabe.abfrage, vorlagen)
+        except KeyError as fehler:
+            raise HTTPException(400, str(fehler))
+        db.execute("UPDATE lexem SET abfrage = ? WHERE id = ?",
+                   (dbm.j_schreiben(wert) if wert else None, lexem_id))
+        aufgaben.erzeugen(db, lexem_id)
+        geaendert += 1
+    return {"geaendert": geaendert}
 
 
 # ============================================================== Abtippen

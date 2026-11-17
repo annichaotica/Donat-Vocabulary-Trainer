@@ -712,6 +712,22 @@ def offene_woerter_abhaken(db: sqlite3.Connection, person: dict,
         zugang.beschreibbare_sammlungen(db, person["id"]))
 
 
+def abfrage_setzen(db: sqlite3.Connection, person: dict,
+                   lexem_ids: list, abfrage=None):
+    """Legt fest, ob Wörter abgefragt werden."""
+    geaendert = 0
+    for lexem_id in lexem_ids:
+        zugang.lexem_pruefen(db, person["id"], int(lexem_id), schreiben=True)
+        lexem = dbm.zeile(db, "SELECT * FROM lexem WHERE id = ?", (lexem_id,))
+        vorlagen = aufgaben.abfragevorlagen(db, lexem["sammlung_id"])
+        wert = _fehler_wandeln(aufgaben.abfrage_deuten, abfrage, vorlagen)
+        db.execute("UPDATE lexem SET abfrage = ? WHERE id = ?",
+                   (dbm.j_schreiben(wert) if wert else None, lexem_id))
+        aufgaben.erzeugen(db, lexem_id)
+        geaendert += 1
+    return {"geaendert": geaendert}
+
+
 def texte_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int):
     """Welche Lesetexte liegen in dieser Sammlung?"""
     zugang.sammlung_pruefen(db, person["id"], sammlung_id)
@@ -915,6 +931,13 @@ WERKZEUGE: list[dict] = [
             "• **Geprüftes bleibt unangetastet**: hat ein Mensch eine Form "
             "bestätigt, wird sie nie überschrieben — die Abweichung wird "
             "gemeldet.\n\n"
+            "Je Eintrag darf **abfrage** dabeistehen: der Name einer "
+            "Abfragevorlage der Sammlung. »nachschlagen« legt das Wort "
+            "still — es steht dann im Wortschatz und deckt den Lesetext, "
+            "erzeugt aber keine Abfrage. Genau richtig für Eigennamen, "
+            "Abkürzungen und Zahlwörter, von denen in einem "
+            "Zeitungsartikel schnell fünfzig zusammenkommen. Welche "
+            "Namen es gibt, sagt sammlungen_auflisten.\n\n"
             "Je Eintrag dasselbe Format wie bei vokabel_anlegen, dazu "
             "wahlweise lektion_nr, lektion_titel, reihenfolge und kennung. "
             "Berichtet wird knapp: nur Einträge, zu denen es etwas zu sagen "
@@ -1418,6 +1441,37 @@ WERKZEUGE: list[dict] = [
                                         "Vorgabe 40, höchstens 200")},
         },
         "funktion": offene_woerter_lesen,
+    },
+    {
+        "name": "abfrage_setzen",
+        "funktion": abfrage_setzen,
+        "description": "Legt fest, ob Wörter abgefragt werden — gezieltes "
+                       "Lernen Wort für Wort.\n\n"
+                       "ZWEI FÄLLE, und beide kommen oft vor: Wörter, die "
+                       "gerade nicht dran sind — jemand lernt genau die "
+                       "Liste für die nächste Arbeit, der Rest der "
+                       "Sammlung soll ruhen. Und Wörter, die man "
+                       "nachschlagen können will, ohne sie je zu pauken: "
+                       "Eigennamen, Abkürzungen, Zahlwörter. Für beides "
+                       "die Vorlage »nachschlagen«.\n\n"
+                       "Stillgelegt heißt NICHT gelöscht: die Aufgaben "
+                       "werden abgeschaltet, der Lernstand bleibt. Wer das "
+                       "Wort später wieder dazunimmt, fängt nicht von vorn "
+                       "an.\n\n"
+                       "Welche Vorlagen eine Sammlung kennt, sagt "
+                       "sammlungen_auflisten. Beim Anlegen geht es auch "
+                       "direkt: vokabeln_importieren nimmt je Eintrag ein "
+                       "Feld »abfrage«.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "lexem_ids": {"type": "array", "items": {"type": "integer"},
+                              "description": "welche Wörter"},
+                "abfrage": _s("string", "Name einer Vorlage, etwa "
+                                        "»nachschlagen« oder »voll«"),
+            },
+            "required": ["lexem_ids", "abfrage"],
+        },
     },
     {
         "name": "offene_woerter_abhaken",

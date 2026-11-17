@@ -872,3 +872,25 @@ input[type="file"] { max-width: 100%; }
 .abtippfeld.richtig {
   border-color: var(--richtig); background: #e8f5e9; color: #1b5e20;
 }
+
+
+/* Gezieltes Lernen: eine Liste zum Durchhaken, keine Kartei.
+   Vier Spalten, die letzte schmal — der Schalter ist das, wofür man
+   herkommt, und soll überall auf derselben Höhe stehen. */
+.gezielt-filter { display: flex; flex-wrap: wrap; gap: .5rem; }
+.gezielt-filter input[type=search] { flex: 1 1 12rem; }
+.gezielt-liste { margin-top: .8rem; }
+.gezielt-zeile {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr 4rem 5rem;
+  align-items: center; gap: .6rem;
+  padding: .4rem .6rem;
+  border-bottom: 1px solid rgba(0, 0, 0, .07);
+}
+.gezielt-kopf { border-bottom-width: 2px; }
+.gezielt-zeile:hover { background: rgba(0, 0, 0, .03); }
+/* Ausgeschaltetes bleibt lesbar, tritt aber zurück: es steht ja
+   weiter im Wortschatz und deckt die Lesetexte. */
+.gezielt-zeile.ist-aus b { color: var(--leise, #667); font-weight: 500; }
+.gezielt-zeile button { width: 100%; }
+.gezielt-stapel { position: sticky; top: .5rem; z-index: 2; }

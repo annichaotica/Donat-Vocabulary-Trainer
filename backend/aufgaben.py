@@ -93,6 +93,68 @@ TYPEN_STANDARD = ["bedeutung_fremd_deutsch", "bedeutung_deutsch_fremd",
 
 # ------------------------------------------------------------- Einstellungen
 
+# Was eine Abfragevorlage bedeuten kann. Heute nur das Anschalten und
+# Abschalten — mehr wollte sie je Wort ausdrücklich nicht, und ein
+# Feld, das niemand füllt, ist schlimmer als keines.
+VORLAGEN_FELDER = ("an",)
+
+# Vorlagen, die jede Sammlung kennt, ohne dass jemand sie anlegt.
+# Eigene Vorlagen in den Sammlungseinstellungen überschreiben sie.
+VORLAGEN_STANDARD = {
+    "voll": {"an": True},
+    # Im Wortschatz, aber nicht in der Abfrage. Zwei Fälle, und beide
+    # kommen oft vor: Wörter, die gerade NICHT dran sind (»genau die
+    # Vokabeln, die sie mir als Liste gegeben hat«), und solche, die
+    # man nachschlagen können will, ohne sie je zu pauken —
+    # Eigennamen, Abkürzungen, Zahlwörter.
+    "nachschlagen": {"an": False},
+}
+
+
+def abfragevorlagen(db: sqlite3.Connection, sammlung_id: int) -> dict:
+    """Die benannten Auswahlpakete dieser Sammlung."""
+    s = dbm.zeile(db, "SELECT einstellungen FROM sammlung WHERE id = ?",
+                  (sammlung_id,))
+    eigen = (dbm.j_lesen(s["einstellungen"]) if s else {}).get(
+        "abfragevorlagen") or {}
+    return {**VORLAGEN_STANDARD, **eigen}
+
+
+def abfrage_deuten(wert, vorlagen: dict) -> dict:
+    """Macht aus dem, was jemand hinschreibt, eine Einstellung.
+
+    Angenommen wird dreierlei, weil drei verschiedene Stellen das
+    schreiben: ein Vorlagenname (»nachschlagen«, von der KI beim
+    Anlegen), ein Wahrheitswert (der Schalter in der Oberfläche) oder
+    ein Objekt. Zurück kommt immer ein Objekt — und `vorlage` bleibt
+    darin stehen, damit man später sieht, WARUM ein Wort stillliegt.
+    """
+    if wert is None or wert == "":
+        return {}
+    if isinstance(wert, bool):
+        return {"an": wert}
+    if isinstance(wert, str):
+        vorlage = vorlagen.get(wert)
+        if vorlage is None:
+            raise KeyError(f"Unbekannte Abfragevorlage {wert!r}. "
+                           f"Bekannt: {', '.join(sorted(vorlagen))}")
+        return {**vorlage, "vorlage": wert}
+    if isinstance(wert, dict):
+        name = wert.get("vorlage")
+        grund = dict(vorlagen.get(name) or {}) if name else {}
+        grund.update({k: v for k, v in wert.items()
+                      if k in VORLAGEN_FELDER})
+        if name:
+            grund["vorlage"] = name
+        return grund
+    raise KeyError(f"Mit {wert!r} ist nichts anzufangen")
+
+
+def wird_abgefragt(lexem: dict) -> bool:
+    """Soll dieses Wort überhaupt Aufgaben haben?"""
+    return bool(dbm.j_lesen(lexem["abfrage"] or "{}").get("an", True))
+
+
 def sammlung_einstellungen(db: sqlite3.Connection, sammlung_id: int) -> dict:
     """Einstellungen einer Sammlung, mit den Vorgaben der Sprache aufgefüllt."""
     s = dbm.zeile(db, "SELECT * FROM sammlung WHERE id = ?", (sammlung_id,))
@@ -173,6 +235,13 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
         raise KeyError(f"Lexem {lexem_id} gibt es nicht")
     e = sammlung_einstellungen(db, lexem["sammlung_id"])
     code, wortart = e["sprache"], lexem["wortart"]
+
+    # Stillgelegt heißt: gar keine Aufgaben. Nicht gelöscht, nur
+    # abgeschaltet — weiter unten wird abgeschaltet, was nicht
+    # gewünscht ist, und damit bleibt der Lernstand erhalten, falls
+    # das Wort später wieder dazukommt.
+    if not wird_abgefragt(lexem):
+        return _abgleichen(db, lexem_id, {})
     lex_merkmale = dbm.j_lesen(lexem["merkmale"])
 
     formen = dbm.zeilen(db, "SELECT * FROM form WHERE lexem_id = ?", (lexem_id,))
@@ -333,6 +402,17 @@ def erzeugen(db: sqlite3.Connection, lexem_id: int) -> dict:
         gewuenscht[_schluessel("genus", lexem_id, "lexem", "")] = \
             ("genus", "lexem", None, None)
 
+    return _abgleichen(db, lexem_id, gewuenscht)
+
+
+def _abgleichen(db: sqlite3.Connection, lexem_id: int,
+                gewuenscht: dict) -> dict:
+    """Bringt die Aufgaben eines Lexems auf die gewünschte Menge.
+
+    Abgeschaltet statt gelöscht: so bleibt der Lernstand erhalten,
+    wenn eine Formgruppe nur zeitweise abgewählt ist — oder wenn ein
+    Wort stillgelegt und später wieder dazugenommen wird.
+    """
     vorhanden = {a["schluessel"]: a for a in
                  dbm.zeilen(db, "SELECT * FROM aufgabe WHERE lexem_id = ?", (lexem_id,))}
 

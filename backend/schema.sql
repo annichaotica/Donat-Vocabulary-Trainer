@@ -207,6 +207,17 @@ CREATE TABLE IF NOT EXISTS lexem (
     -- Stamm je Formgruppe, von Hand gesetzt. Überschreibt die Ableitung
     -- aus den Formen — nötig, wo die nicht trägt.
     staemme      TEXT NOT NULL DEFAULT '{}',
+    -- Wird dieses Wort abgefragt? JSON, leer heißt »wie die Sammlung
+    -- es vorsieht«. {"an": false} legt es still, ohne es zu löschen
+    -- und ohne den Lernstand zu verwerfen — die Aufgaben werden nur
+    -- abgeschaltet. »vorlage« hält fest, WARUM.
+    --
+    -- Der Anlass: »meine Tochter, die genau die Vokabeln lernen muss,
+    -- die sie mir als Liste gegeben hat«. Eine Sammlung wächst mit der
+    -- Zeit; die Liste für Freitag ist ein Ausschnitt daraus. Ohne
+    -- diese Spalte bliebe nur, den Rest zu löschen oder eine zweite
+    -- Sammlung anzulegen — beides verliert, was schon gelernt ist.
+    abfrage      TEXT,
     -- Kennung aus der Quelle, falls es eine gibt. Sie entscheidet beim
     -- wiederholten Import, ob ein Eintrag derselbe ist. Ohne sie dient
     -- lemma + wortart als Schlüssel — was bei Gleichlautern (φορά "Mal"

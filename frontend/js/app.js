@@ -7,6 +7,7 @@ import { zustand, merken, darstellungSetzen } from './zustand.js';
 import * as uebersicht from './ansicht_uebersicht.js';
 import * as lernansicht from './ansicht_lernen.js';
 import * as texte from './ansicht_texte.js';
+import * as gezielt from './ansicht_gezielt.js';
 import * as abtippen from './ansicht_abtippen.js';
 import * as statistik from './ansicht_statistik.js';
 import * as lehrgang from './ansicht_lehrgang.js';
@@ -233,6 +234,8 @@ async function wegweisen() {
           teile[2] !== undefined ? Number(teile[2]) : null);
       case 'abtippen':
         return await abtippen.zeichnen(inhalt);
+      case 'gezielt':
+        return await gezielt.zeichnen(inhalt);
       case 'statistik':
         return await statistik.zeichnen(inhalt);
       case 'texte':

@@ -270,6 +270,7 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
     if s is None:
         raise ImportFehler(f"Sammlung {sammlung_id} gibt es nicht")
     code, grundsprache = s["sprache"], s["grundsprache"]
+    vorlagen = aufgaben.abfragevorlagen(db, sammlung_id)
 
     ergebnis = {"sammlung_id": sammlung_id, "nur_pruefen": nur_pruefen,
                 "eingereicht": len(eintraege), "angelegt": 0, "aktualisiert": 0,
@@ -303,13 +304,27 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
             merkmale = sprachen.pruefen_lexemmerkmale(
                 code, wortart, eintrag.get("merkmale") or {})
 
+            # »abfrage« darf ein Vorlagenname sein (»nachschlagen«),
+            # ein Wahrheitswert oder ein Objekt. Ein unbekannter Name
+            # ist ein Fehler und kein stilles Übergehen: sonst stünde
+            # ein Wort später abfragbar da, obwohl es ausdrücklich
+            # nicht sollte.
+            try:
+                abfrage = aufgaben.abfrage_deuten(eintrag.get("abfrage"),
+                                                  vorlagen)
+            except KeyError as fehler:
+                ergebnis["abgelehnt"] += 1
+                ergebnis["eintraege"].append(
+                    {"nr": nr, "lemma": eintrag.get("lemma"),
+                     "zustand": "abgelehnt", "befunde": [str(fehler)]})
+                continue
             alt = _vorhandenes_lexem(db, sammlung_id, eintrag)
             if alt is None:
                 cur = db.execute("""INSERT INTO lexem
                                       (sammlung_id, lektion_id, lemma, wortart,
                                        merkmale, notiz, reihenfolge, kennung,
-                                       luecken, staemme)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                       luecken, staemme, abfrage)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                                  (sammlung_id, lektion_id, eintrag["lemma"].strip(),
                                   wortart, dbm.j_schreiben(merkmale),
                                   eintrag.get("notiz"),
@@ -317,12 +332,16 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
                                   (eintrag.get("kennung") or "").strip() or None,
                                   dbm.j_schreiben(
                                       mk.luecken_pruefen(eintrag.get("luecken"))),
-                                  dbm.j_schreiben(eintrag.get("staemme") or {})))
+                                  dbm.j_schreiben(eintrag.get("staemme") or {}),
+                                  dbm.j_schreiben(abfrage) if abfrage else None))
                 lexem_id = cur.lastrowid
                 zustand = "angelegt"
                 ergebnis["angelegt"] += 1
             else:
                 lexem_id = alt["id"]
+                if abfrage:
+                    db.execute("UPDATE lexem SET abfrage = ? WHERE id = ?",
+                               (dbm.j_schreiben(abfrage), alt["id"]))
                 db.execute("""UPDATE lexem
                                  SET lektion_id = COALESCE(?, lektion_id),
                                      merkmale = ?, reihenfolge = ?,

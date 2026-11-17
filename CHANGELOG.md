@@ -14,6 +14,44 @@ Eintrag wiederfindet.
 
 ---
 
+## 17.11.2026
+
+### Gezielt lernen: Wort für Wort an und aus
+
+»Meine Tochter muss genau die Vokabeln lernen, die sie mir als Liste
+gegeben hat.«
+
+Eine Sammlung wächst mit der Zeit; die Liste für die nächste Arbeit
+ist ein Ausschnitt daraus. Bisher blieb nur, den Rest zu löschen oder
+eine zweite Sammlung anzulegen — beides wirft weg, was schon gelernt
+ist.
+
+Neu in der Übersicht der Knopf **Auswahl**. Dort steht die Sammlung
+Wort für Wort, mit Filtern nach Lektion, Wortart und »nur die
+ausgeschalteten«, dazu Kästchen zum Stapelweise-Umschalten. Was
+ausgeschaltet ist, bleibt im Wortschatz und deckt die Lesetexte
+weiter ab — es wird nur nicht mehr abgefragt, und **der Lernstand
+bleibt stehen**. Dieselbe Zusage wie bei einer abgewählten Zeitform.
+
+Beim Anlegen kann die KI es gleich mitgeben: je Eintrag ein Feld
+`abfrage` mit dem Namen einer **Abfragevorlage**. Zwei kennt jede
+Sammlung von sich aus — `voll` und `nachschlagen` —, eigene lassen
+sich in den Sammlungseinstellungen hinterlegen. Der Sinn der Namen
+ist die spätere Änderung: wer die Bedeutung eines Namens ändert,
+ändert alle Wörter mit, ohne eines anzufassen.
+
+### Ein doppelter Schlüssel, der nichts sagte
+
+Die neue Spalte kam auf einer bestehenden Datenbank nicht an: »no
+such column«. In der Nachrüstliste stand `lexem` **zweimal**, und bei
+einem doppelten Schlüssel im Wörterbuch gewinnt lautlos der spätere.
+Auf einer frischen Testdatenbank war nichts zu sehen, weil die Spalte
+dort aus dem Schemaskript kommt — der Fehler konnte nur im Betrieb
+auffallen.
+
+Zusammengeführt, und ein Test liest die Liste jetzt im Quelltext
+nach: keine Tabelle darf zweimal darin stehen.
+
 ## 16.11.2026
 
 ### »wie geht es euch« galt als falsch

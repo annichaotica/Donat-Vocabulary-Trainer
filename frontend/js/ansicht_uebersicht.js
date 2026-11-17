@@ -548,6 +548,11 @@ export async function zeichnen(behaelter) {
         }, 'Texte'),
         h('button', { onclick: () => modusWaehlen(behaelter, s) }, 'Gezielt üben'),
         h('button', {
+          onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/gezielt'; },
+          title: 'Wort für Wort festlegen, was abgefragt wird — Eigennamen '
+               + 'und Abkürzungen stillegen, ohne sie zu löschen.',
+        }, 'Auswahl'),
+        h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/import'; },
         }, 'Einlesen'),
         wartendes(s).length

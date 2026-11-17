@@ -517,6 +517,8 @@ def benutzer_aendern(benutzer_id: int, eingabe: BenutzerAendern,
         e["neu_je_sitzung"] = eingabe.neu_je_sitzung
     if eingabe.fragen_je_tag is not None:
         e["fragen_je_tag"] = eingabe.fragen_je_tag
+    if eingabe.tagesziel is not None:
+        e["tagesziel"] = eingabe.tagesziel
     if eingabe.neues_einstreuen is not None:
         e["neues_einstreuen"] = eingabe.neues_einstreuen
     if eingabe.beschriftung is not None:

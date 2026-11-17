@@ -476,6 +476,8 @@ async function teilLernen(behaelter) {
   const neu = h('input', { type: 'number', min: '0', max: '200', value: String(e.neu_je_sitzung) });
   const dosis = h('input', { type: 'number', min: '0', max: '2000',
                              value: String(e.fragen_je_tag ?? 80) });
+  const ziel = h('input', { type: 'number', min: '1', max: '2000',
+                            value: String(e.tagesziel) });
 
   kasten.append(h('div', { class: 'regler' },
     h('label', { text: 'Wie sicher soll etwas sitzen, wenn es wieder dran ist?' }),
@@ -498,6 +500,17 @@ async function teilLernen(behaelter) {
         + 'auch nach einer Pause. Die Hälfte davon ist für Neues reserviert, '
         + 'damit es trotz Rückstand vorangeht. Weitermachen darfst du immer. '
         + '0 heißt: keine Grenze.' }));
+
+  kasten.append(h('div', { class: 'regler' },
+    h('label', { text: 'Tagesziel für die Strähne' }), h('span', {}), ziel,
+    h('span', {})));
+  kasten.append(h('p', { class: 'leise',
+    text: 'Ab so vielen Antworten gilt ein Tag als gelernt — das ist der '
+        + 'Ring oben und die Zahl daneben. Nicht zu verwechseln mit der '
+        + 'Grenze darüber: die sagt, wie viel der Trainer höchstens '
+        + 'vorlegt, das hier, was du dir vornimmst. Mehr als die Grenze '
+        + 'kann es nicht sein. War an einem Tag weniger fällig, zählt er '
+        + 'trotzdem, sobald nichts mehr da ist.' }));
 
   const umschrift = h('input', {
     type: 'checkbox', checked: e.tastatur_umschrift !== false,
@@ -545,7 +558,7 @@ async function teilLernen(behaelter) {
   // eingefroren, auch nach Abschalten des Modus. Darum wird nur gesendet,
   // was wirklich bewegt wurde.
   const ausgangswerte = { retention: e.wunschretention, neu: e.neu_je_sitzung,
-                          dosis: e.fragen_je_tag,
+                          dosis: e.fragen_je_tag, ziel: e.tagesziel,
                           stil: e.beschriftung || 'fach',
                           einstreuen: Boolean(e.neues_einstreuen),
                           umschrift: e.tastatur_umschrift !== false };
@@ -567,6 +580,9 @@ async function teilLernen(behaelter) {
       }
       if (Number(dosis.value) !== ausgangswerte.dosis) {
         aenderungen.fragen_je_tag = Number(dosis.value);
+      }
+      if (Number(ziel.value) !== ausgangswerte.ziel) {
+        aenderungen.tagesziel = Number(ziel.value);
       }
       if (umschrift.checked !== ausgangswerte.umschrift) {
         aenderungen.tastatur_umschrift = umschrift.checked;

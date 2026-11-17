@@ -38,7 +38,15 @@ war falsch: eine einzige Karte genügte für einen gelernten Tag, und
 über 30 kam die Zahl nie hinaus — nach zwei Monaten Disziplin stand da
 dasselbe wie nach einem.
 
-Jetzt zählt ein Tag, wenn das **Tagesziel aufgeht**. Oder wenn nichts
+Jetzt zählt ein Tag, wenn das **Tagesziel aufgeht** — eine neue
+Einstellung, vorbelegt mit 20 Antworten. Das ist ausdrücklich **nicht**
+die »Fragen je Tag höchstens«, die es schon gab: die ist eine
+Obergrenze und steht absichtlich hoch (bei einem Lernziel mit nahem
+Termin setzt der Helfer sie noch höher, bei Lernende 2 auf 224). Der erste
+Entwurf hat die Strähne daran gemessen und fiel an den echten Daten
+sofort durch: Strähne 0, obwohl an vier Tagen hintereinander 29 bis 123
+Fragen beantwortet worden waren. Eine Latte, die niemand erreicht, ist
+keine. Oder wenn nichts
 mehr fällig war: an einem Tag mit drei fälligen Aufgaben darf die
 Strähne nicht reißen, sonst erzieht der Trainer dazu, gegen den
 eigenen Terminplan zu arbeiten.

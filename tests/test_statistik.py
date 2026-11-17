@@ -23,7 +23,8 @@ import pytest
 @pytest.fixture()
 def gelernt(klient):
     b = klient.post("/api/benutzer", json={"name": "Lernender 1"}).json()
-    klient.patch(f"/api/benutzer/{b['id']}", json={"fragen_je_tag": 0})
+    klient.patch(f"/api/benutzer/{b['id']}",
+                 json={"fragen_je_tag": 0, "tagesziel": 5})
     s = klient.post("/api/sammlungen", json={
         "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
     klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
@@ -65,7 +66,12 @@ def test_nach_einem_tag_steht_schon_etwas_da(gelernt, klient):
     d = _stat(klient, b)
     assert d["gesamt"]["antworten"] == 5
     assert d["gesamt"]["aktive_tage"] == 1
+    # Eine Strähne von 1 heißt jetzt: das TAGESZIEL ist aufgegangen —
+    # hier fünf Antworten bei einem Ziel von fünf. Früher genügte eine
+    # einzige Antwort dafür, und genau das war der Fehler. Darum steht
+    # das Ziel im Vorspann dieses Tests ausdrücklich da.
     assert d["gesamt"]["straehne"] == 1
+    assert d["gesamt"]["straehne_ziel"] == 5
     assert d["gesamt"]["quote"] is not None
 
 

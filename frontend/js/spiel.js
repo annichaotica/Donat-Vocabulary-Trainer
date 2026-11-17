@@ -89,13 +89,8 @@ export function zeichnen() {
 
   const z = stand.tagesziel;
   const f = stand.straehne;
-  const mitRing = Boolean(z.dosis);
-  // Ohne Ring und ohne Strähne gibt es nichts zu zeigen — dann soll da
-  // auch kein leerer Knopf stehen, der sich anfassen lässt.
-  if (!mitRing && !f.laufend) { knopf.hidden = true; return; }
   knopf.hidden = false;
-
-  if (mitRing) knopf.append(ring(z));
+  knopf.append(ring(z));
   if (f.laufend) {
     knopf.append(flamme(), Object.assign(document.createElement('span'),
       { className: 'kopf-spiel-zahl', textContent: String(f.laufend) }));
@@ -164,16 +159,14 @@ function flamme() {
  *  zeigt nur die Richtung, und wer es wissen will, soll nicht rechnen. */
 function beschriftung(z, f) {
   const teile = [];
-  if (z.dosis) {
-    if (z.nichts_mehr_faellig) {
-      teile.push(`Tagesziel erreicht — es war nichts mehr fällig `
-               + `(${z.erledigt} von ${z.ziel}).`);
-    } else if (z.geschafft) {
-      teile.push(`Tagesziel geschafft: ${z.erledigt} von ${z.ziel} Fragen.`);
-    } else {
-      teile.push(`${z.erledigt} von ${z.ziel} Fragen heute — noch `
-               + `${z.ziel - z.erledigt}.`);
-    }
+  if (z.nichts_mehr_faellig) {
+    teile.push('Tagesziel erreicht — es war nichts mehr fällig '
+             + `(${z.erledigt} von ${z.ziel}).`);
+  } else if (z.geschafft) {
+    teile.push(`Tagesziel geschafft: ${z.erledigt} von ${z.ziel} Fragen.`);
+  } else {
+    teile.push(`${z.erledigt} von ${z.ziel} Fragen heute — noch `
+             + `${z.ziel - z.erledigt}.`);
   }
   if (f.laufend) {
     teile.push(`Strähne: ${f.laufend} ${f.laufend === 1 ? 'Tag' : 'Tage'} in Folge`

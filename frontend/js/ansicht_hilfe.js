@@ -143,8 +143,14 @@ export async function zeichnen(behaelter) {
       'Er füllt sich mit jeder Antwort und bekommt einen Haken, wenn das '
       + 'Pensum aufgegangen ist. Daneben steht deine Strähne: wie viele '
       + 'Tage in Folge du sie geschafft hast.'),
+    h('p', {}, h('b', { text: 'Ziel und Grenze sind zweierlei. ' }),
+      'Die Grenze sagt, wie viele Fragen der Trainer an einem Tag '
+      + 'höchstens vorlegt — sie steht absichtlich hoch, und für ein '
+      + 'Lernziel mit nahem Termin wird sie noch höher gesetzt. Das '
+      + 'Tagesziel ist das, was du dir vornimmst. Beides stellst du '
+      + 'unter Einstellungen ein.'),
     h('p', {}, h('b', { text: 'Ein kurzer Tag zählt auch. ' }),
-      'War weniger fällig als dein Pensum, gilt der Tag als geschafft, '
+      'War weniger fällig als dein Ziel, gilt der Tag als geschafft, '
       + 'sobald nichts mehr da ist — du sollst nicht gegen deinen eigenen '
       + 'Terminplan arbeiten, nur damit eine Zahl stehen bleibt. Und zwei '
       + 'Fehltage im Monat trägt die Strähne mit; der dritte reißt sie.'),

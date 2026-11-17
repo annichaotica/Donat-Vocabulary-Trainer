@@ -36,6 +36,11 @@ class BenutzerAendern(BaseModel):
     neu_je_sitzung: int | None = Field(default=None, ge=0, le=500)
     # Die Tagesdosis in Fragen; 0 heißt ausdrücklich ohne Grenze.
     fragen_je_tag: int | None = Field(default=None, ge=0, le=2000)
+    # Die Latte für einen gelernten Tag — anders als die Dosis darüber
+    # keine Obergrenze, sondern ein Vorsatz. Ohne 0: ein Ziel von null
+    # wäre keines, und »ohne Ziel« heißt schlicht, die Strähne nicht
+    # anzusehen.
+    tagesziel: int | None = Field(default=None, ge=1, le=2000)
     # Neues durchgehend untermischen statt erst nach allem Fälligen.
     neues_einstreuen: bool | None = None
     # Wie eine Form benannt wird: "Genitiv Singular", "wessen?, Einzahl"

@@ -117,6 +117,56 @@ def test_die_straehne_ist_nicht_auf_dreissig_tage_begrenzt(
     assert folge["laufend"] == 45, f"das Fenster steckt noch drin: {folge}"
 
 
+def test_die_obergrenze_ist_nicht_die_latte(klient, db_des_klienten):
+    """Der Fehler, den erst die echten Daten gezeigt haben.
+
+    Die Strähne hing zuerst an der Tagesdosis — sie stand ja schon da,
+    und eine zweite Zahl wollte ich vermeiden. Dann die Messung am
+    laufenden Bestand: Strähne 0, obwohl an vier Tagen hintereinander
+    zwischen 29 und 123 Fragen beantwortet worden waren.
+
+    Die Dosis ist eine OBERGRENZE und wird absichtlich hoch gesetzt;
+    der Lernzielhelfer setzt sie noch höher, damit genug Neues
+    durchkommt (bei Lernende 2 auf 224). Als Latte ist sie unerreichbar,
+    und eine Latte, die niemand erreicht, ist keine.
+
+    Hier also beides zugleich: eine hohe Grenze und ein erreichbares
+    Ziel.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lernender 3"}).json()
+    klient.patch(f"/api/benutzer/{b['id']}",
+                 json={"fragen_je_tag": 224, "tagesziel": 20})
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Französisch", "sprache": "fr"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": f"mot{i}", "wortart": "substantiv",
+                       "bedeutungen": [{"uebersetzungen": [f"Wort {i}"]}]}
+                      for i in range(60)]})
+
+    heute = dt.date.today()
+    for zurueck, anzahl in enumerate([39, 29, 123, 32]):
+        _antworten(db_des_klienten, b["id"],
+                   heute - dt.timedelta(days=zurueck), anzahl)
+
+    folge = _folge(klient, b)
+    assert folge["ziel"] == 20, "die Grenze darf die Latte nicht sein"
+    assert folge["laufend"] == 4, f"vier gelernte Tage am Stück: {folge}"
+
+
+def test_die_latte_kann_die_grenze_nicht_ueberschreiten(klient):
+    """Mehr als serviert wird, kann niemand beantworten.
+
+    Wer seine Grenze auf zehn stellt, hat damit auch sein Ziel auf zehn
+    gestellt — sonst stünde eine Latte da, die der Trainer selbst
+    verhindert.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lernender 4"}).json()
+    klient.patch(f"/api/benutzer/{b['id']}",
+                 json={"fragen_je_tag": 10, "tagesziel": 20})
+    e = klient.get(f"/api/benutzer/{b['id']}/einstellungen").json()
+    assert e["tagesziel"] == 10, e
+
+
 # --------------------------------------------------------------- Milde
 
 def test_heute_reisst_die_straehne_nie(klient, bestand, db_des_klienten):

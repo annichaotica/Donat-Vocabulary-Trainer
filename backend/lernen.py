@@ -38,6 +38,24 @@ NEU_JE_SITZUNG = 20
 # die Stabilität wird aus dem tatsächlichen Abstand gerechnet.
 FRAGEN_JE_TAG = 80
 
+# Das Tagesziel: wie viele Antworten einen Tag zu einem gelernten Tag
+# machen. NICHT dasselbe wie die Tagesdosis darüber, auch wenn beides
+# eine Zahl von Fragen am Tag ist:
+#
+#   Die Dosis ist eine OBERGRENZE — so viel serviert der Trainer
+#   höchstens. Sie wird absichtlich hoch gesetzt, und der Lernzielhelfer
+#   setzt sie noch höher, damit genug Neues durchkommt (bei einem Ziel
+#   mit nahem Termin waren es schon 224).
+#
+#   Das Ziel ist eine LATTE — so viel nimmt man sich vor.
+#
+# Die Strähne an der Dosis zu messen war der erste Entwurf, und an den
+# echten Daten fiel er sofort durch: bei einer Grenze von 120 stand die
+# Strähne auf 0, obwohl an vier Tagen hintereinander 29 bis 123 Fragen
+# beantwortet worden waren. Eine Latte, die niemand reißt, weil sie
+# niemand erreicht, ist keine.
+TAGESZIEL = 20
+
 # Welcher Anteil des Tages dem Neuen offensteht.
 #
 # Ohne diese Reserve fräße ein Rückstand den ganzen Tag auf: Fälliges
@@ -133,12 +151,20 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
     dosis = FRAGEN_JE_TAG if dosis is None else max(0, int(dosis))
     if lg["aktiv"] and lg.get("weniger_neues") and "fragen_je_tag" not in e:
         dosis = min(dosis, 40) if dosis else 40
+    # Das Tagesziel kann die Dosis nicht überschreiten: mehr als serviert
+    # wird, kann niemand beantworten. Wer seine Grenze auf zehn stellt,
+    # hat damit auch sein Ziel auf zehn gestellt.
+    ziel = max(1, int(e.get("tagesziel", TAGESZIEL)))
+    if dosis:
+        ziel = min(ziel, dosis)
     stil = e.get("beschriftung", "fach")
     return {
         "wunschretention": retention,
         "neu_je_sitzung": neu,
         # Die Tagesdosis in Fragen. 0 = ohne Grenze.
         "fragen_je_tag": dosis,
+        # Die Latte für einen gelernten Tag — siehe TAGESZIEL oben.
+        "tagesziel": ziel,
         "name": b["name"],
         "legasthenie": lg,
         # Neues durchgehend untermischen statt erst nach allem Fälligen?

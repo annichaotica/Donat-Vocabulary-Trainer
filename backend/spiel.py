@@ -63,13 +63,19 @@ def _heute() -> dt.date:
 def _ziel_je_tag(einstellungen: dict) -> int:
     """Wie viele Antworten einen Tag zu einem gelernten Tag machen.
 
-    Die Tagesdosis, die ohnehin schon eingestellt ist. Wer sie auf 0
-    stellt — »ohne Grenze« —, hat sich keine Latte gelegt; dann genügt
-    eine Antwort, denn ohne Grenze gibt es kein »geschafft«, das die
-    App behaupten dürfte.
+    Das Tagesziel, nicht die Tagesdosis. Der erste Entwurf nahm die
+    Dosis — sie stand ja schon da, und eine zweite Zahl wollte ich
+    vermeiden. An den echten Daten fiel das sofort durch: die Dosis ist
+    eine Obergrenze und wird absichtlich hoch gesetzt, vom
+    Lernzielhelfer noch höher. Bei 120 stand die Strähne auf 0, obwohl
+    an vier Tagen hintereinander 29 bis 123 Fragen beantwortet worden
+    waren.
+
+    Zwei Zahlen sind hier also richtig, weil es zwei Dinge sind: wie
+    viel der Trainer höchstens serviert, und wie viel man sich vornimmt.
+    Die Begrenzung auf die Dosis steckt in `benutzer_einstellungen`.
     """
-    dosis = einstellungen["fragen_je_tag"]
-    return dosis if dosis else 1
+    return einstellungen["tagesziel"]
 
 
 def _tage(db: sqlite3.Connection, benutzer_id: int) -> dict[str, int]:

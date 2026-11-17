@@ -413,7 +413,6 @@ export class Sitzung {
       }
       return h('p', { class: 'spiel-straehne', text: teile.join(' ') });
     }
-    if (!z.dosis) return null;         // kein Ziel gesetzt, keine Ansage
     const fehlt = Math.max(0, z.ziel - z.erledigt);
     return h('p', { class: 'spiel-straehne' },
       `Noch ${fehlt} ${fehlt === 1 ? 'Frage' : 'Fragen'} bis zum Tagesziel`,

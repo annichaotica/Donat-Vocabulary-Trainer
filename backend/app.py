@@ -57,7 +57,7 @@ import zuspruch as zuspruchmodul
 from modelle import (RegelEingabe, RegelAendern, ZuspruchEingabe,
                      LexemeVerschieben, TexteVerschieben,
                      BuchAnlegen, BuchAendern, TexteZuordnen,
-                     BedeutungAendern,
+                     BedeutungAendern, NeuAufteilen,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
@@ -1224,7 +1224,8 @@ def text_anlegen(sammlung_id: int, eingabe: LesetextAnlegen,
         return lesetexte.anlegen(db, sammlung_id, eingabe.titel,
                                  eingabe.inhalt, niveau=eingabe.niveau,
                                  notiz=eingabe.notiz,
-                                 uebersetzung=eingabe.uebersetzung)
+                                 uebersetzung=eingabe.uebersetzung,
+                                 aufteilung=eingabe.aufteilung)
     except ValueError as f:
         raise HTTPException(400, str(f))
     except KeyError as f:
@@ -1305,6 +1306,25 @@ def fassung_sichern(abschnitt_id: int, eingabe: FassungSichern,
                                          eingabe.benutzer_id, eingabe.fassung)
     except KeyError as f:
         raise HTTPException(404, str(f))
+
+
+@app.put("/api/texte/{text_id}/aufteilung")
+def text_neu_aufteilen(text_id: int, eingabe: NeuAufteilen,
+                       request: Request = None,
+                       db: sqlite3.Connection = DB):
+    """Einen bestehenden Text anders zerlegen — Übersetzungen bleiben.
+
+    Mit `nur_pruefen` wird nur gerechnet und nichts geschrieben.
+    """
+    t = _holen(db, "text", text_id)
+    _wache_rumpf(db, request, sammlung_id=t["sammlung_id"], schreiben=True)
+    try:
+        return lesetexte.neu_aufteilen(db, text_id, eingabe.aufteilung,
+                                       nur_pruefen=eingabe.nur_pruefen)
+    except KeyError as f:
+        raise HTTPException(404, str(f))
+    except ValueError as f:
+        raise HTTPException(400, str(f))
 
 
 @app.put("/api/texte/{text_id}/referenz")

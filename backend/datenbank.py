@@ -110,6 +110,7 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
         # `buecher.loeschen` darum selbst auf.
         "buch_id": "INTEGER",
         "kapitel": "TEXT",
+        "aufteilung": "TEXT NOT NULL DEFAULT 'auto'",
     },
     "textabschnitt": {
         "varianten": "TEXT NOT NULL DEFAULT '[]'",

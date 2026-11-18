@@ -639,10 +639,12 @@ def anlegen(db: sqlite3.Connection, sammlung_id: int, titel: str,
     """Einen Text einwerfen. Mehr braucht es nicht: Titel und Inhalt.
 
     Die Abschnitte entstehen gleich mit, denn ohne sie gäbe es keine
-    Einheit zum Übersetzen. Zerlegt wird an Leerzeilen (Absätze) und
-    sonst an Satzenden — ein Absatz ist die natürliche Einheit, ein
-    einzelner Satz die kleinere Ausweichmöglichkeit, wenn kein Absatz
-    erkennbar ist.
+    Einheit zum Übersetzen. `aufteilung` sagt, wie zerlegt wird;
+    voreingestellt ist `auto` — Absätze, ersatzweise Sätze.
+
+    Für Verse gehört ausdrücklich `zeilen` dazu. Ohne das greift bei
+    einem Block aus einfachen Zeilenumbrüchen die Satzregel, und im
+    Mittelhochdeutschen steht der Punkt mitten im Vers.
     """
     s = dbm.zeile(db, "SELECT * FROM sammlung WHERE id = ?", (sammlung_id,))
     if s is None:
@@ -650,42 +652,236 @@ def anlegen(db: sqlite3.Connection, sammlung_id: int, titel: str,
     if not (inhalt or "").strip():
         raise ValueError("Der Text ist leer.")
 
+    aufteilung = rest.get("aufteilung") or "auto"
+    if aufteilung not in AUFTEILUNGEN:
+        raise ValueError(
+            f"Aufteilung muss eins von {', '.join(AUFTEILUNGEN)} sein")
+
     cur = db.execute("""INSERT INTO text (sammlung_id, titel, sprache, inhalt,
                                           uebersetzung, niveau, quelle, notiz,
-                                          typ, geprueft)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'lesetext', 1)""",
+                                          typ, geprueft, aufteilung)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'lesetext', 1, ?)""",
                      (sammlung_id, titel.strip() or "Ohne Titel",
                       rest.get("sprache") or s["sprache"], inhalt.strip(),
                       rest.get("uebersetzung"), rest.get("niveau"),
-                      rest.get("quelle", "manuell"), rest.get("notiz")))
+                      rest.get("quelle", "manuell"), rest.get("notiz"),
+                      aufteilung))
     text_id = cur.lastrowid
-    _abschnitte_schreiben(db, text_id, inhalt)
+    _abschnitte_schreiben(db, text_id, inhalt, aufteilung)
     return lesen(db, text_id)
 
 
 def _abschnitte_schreiben(db: sqlite3.Connection, text_id: int,
-                          inhalt: str) -> None:
+                          inhalt: str, aufteilung: str = "auto") -> None:
     db.execute("DELETE FROM textabschnitt WHERE text_id = ?", (text_id,))
-    for i, stueck in enumerate(abschnitte_zerlegen(inhalt)):
+    for i, stueck in enumerate(abschnitte_zerlegen(inhalt, aufteilung)):
         db.execute("""INSERT INTO textabschnitt (text_id, reihenfolge, original)
                       VALUES (?, ?, ?)""", (text_id, i, stueck))
 
 
-def abschnitte_zerlegen(inhalt: str) -> list[str]:
-    """Absätze, und nur ersatzweise Sätze.
+# Wie ein Text in Abschnitte zerfällt.
+#
+#   auto     Absätze, und nur ersatzweise Sätze (bisheriges Verhalten)
+#   absatz   nur an Leerzeilen
+#   zeilen   jede Zeile ein Abschnitt
+#   saetze   an Satzenden
+#   keine    der ganze Text als EIN Abschnitt
+AUFTEILUNGEN = ("auto", "absatz", "zeilen", "saetze", "keine")
 
-    Ein Absatz ist die Einheit, in der man übersetzt — Satz für Satz
-    zerreißt den Zusammenhang, auf den es beim Übersetzen gerade
-    ankommt. Nur wenn jemand einen Block ohne Leerzeilen einwirft, wird
-    an Satzenden getrennt, sonst stünde der ganze Text in einem Feld.
+
+def abschnitte_zerlegen(inhalt: str, aufteilung: str = "auto") -> list[str]:
+    """Zerlegt einen Text in die Einheiten, in denen übersetzt wird.
+
+    DER ANLASS: »Wir haben einen Segmentierungsfehler.« Mittelhochdeutsche
+    Verse kamen zeilenweise herein, aber durch EINFACHE Zeilenumbrüche —
+    also als ein Block ohne Leerzeilen. Damit griff die Ersatzregel »an
+    Satzenden trennen«, und im Mittelhochdeutschen steht der Punkt
+    mitten im Vers:
+
+        11  dô truoc . unde noch sîn name treit .
+
+    wurde zu zwei Abschnitten. Gemessen am Bestand: 7684 Zeilen im
+    Original, 8906 gespeicherte Abschnitte — 1222 zu viel, bei 144 von
+    172 Texten.
+
+    `auto` bleibt, wie es war. Es ist für Prosa gedacht, die jemand
+    einwirft, und dort ist die Zeile keine Einheit: sie entsteht aus
+    dem Zeilenumbruch des Editors. Eine Regel, die beides errät, gibt
+    es nicht — Vers und umbrochene Prosa sehen gleich aus. Darum sagt
+    es jetzt, wer den Text einträgt.
     """
     roh = (inhalt or "").strip()
+    if not roh:
+        return []
+    if aufteilung not in AUFTEILUNGEN:
+        raise ValueError(
+            f"Aufteilung muss eins von {', '.join(AUFTEILUNGEN)} sein")
+
+    if aufteilung == "keine":
+        return [roh]
+    if aufteilung == "zeilen":
+        return [z.strip() for z in roh.splitlines() if z.strip()]
+    if aufteilung == "saetze":
+        return _nach_saetzen(roh)
+
     absaetze = [a.strip() for a in re.split(r"\n\s*\n", roh) if a.strip()]
+    if aufteilung == "absatz":
+        return absaetze or [roh]
     if len(absaetze) > 1:
         return absaetze
     # Ein Block: an Satzenden trennen, das Satzzeichen bleibt dabei stehen.
+    return _nach_saetzen(roh)
+
+
+def _nach_saetzen(roh: str) -> list[str]:
     saetze = [s.strip() for s in re.split(r"(?<=[.!?;·])\s+", roh) if s.strip()]
     return saetze or [roh]
+
+
+def _stellen(inhalt: str, stuecke: list[str]) -> list[tuple[int, int]]:
+    """Wo jedes Stück im Urtext steht — der Reihe nach gesucht.
+
+    Der Reihe nach und nicht per `find` von vorn: »der« kommt in einem
+    Text hundertmal vor, und das zweite Stück steht hinter dem ersten.
+    Wird ein Stück nicht gefunden (von Hand geändert), bekommt es eine
+    leere Stelle am laufenden Zeiger — es geht dann an den Abschnitt,
+    bei dem man gerade ist, und nicht verloren.
+    """
+    stellen = []
+    zeiger = 0
+    for stueck in stuecke:
+        gefunden = inhalt.find(stueck, zeiger) if stueck else -1
+        if gefunden < 0:
+            stellen.append((zeiger, zeiger))
+            continue
+        stellen.append((gefunden, gefunden + len(stueck)))
+        zeiger = gefunden + len(stueck)
+    return stellen
+
+
+def neu_aufteilen(db: sqlite3.Connection, text_id: int, aufteilung: str,
+                  nur_pruefen: bool = False) -> dict:
+    """Einen bestehenden Text anders zerlegen — und die Übersetzungen
+    mitnehmen.
+
+    »Momentan gibt es kein Werkzeug, mit dem ich die Segmentierung
+    vorhandener Lesetexte nachträglich ändern kann.« Stimmt, und es
+    ist das heikelste Stück an der ganzen Sache: an den
+    Abschnittskennungen hängen die Referenzübersetzungen und die
+    eigenen Fassungen.
+
+    ZUGEORDNET WIRD ÜBER DIE STELLE IM URTEXT, nicht über die
+    Reihenfolge. `text.inhalt` steht unverändert da; alte wie neue
+    Abschnitte sind Ausschnitte daraus. Jeder alte Abschnitt geht an
+    den neuen, in dessen Bereich er anfängt. Fallen zwei alte in einen
+    neuen — der Normalfall beim Zusammenführen zerschnittener Verse —,
+    werden ihre Übersetzungen in der richtigen Reihenfolge
+    aneinandergehängt.
+
+    Ändert sich nichts, wird auch nichts angefasst: dieselben
+    Kennungen bleiben, und niemand verliert etwas, nur weil er die
+    Funktion zweimal aufgerufen hat.
+
+    `nur_pruefen` rechnet alles aus und schreibt nichts. Bei 173
+    Texten mit Übersetzungen daran will man das vorher sehen.
+    """
+    t = dbm.zeile(db, "SELECT * FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise KeyError(f"Text {text_id} gibt es nicht")
+    if aufteilung not in AUFTEILUNGEN:
+        raise ValueError(
+            f"Aufteilung muss eins von {', '.join(AUFTEILUNGEN)} sein")
+
+    inhalt = t["inhalt"] or ""
+    alt = dbm.zeilen(db, """SELECT * FROM textabschnitt WHERE text_id = ?
+                             ORDER BY reihenfolge, id""", (text_id,))
+    neu = abschnitte_zerlegen(inhalt, aufteilung)
+
+    if [a["original"] for a in alt] == neu:
+        return {"text_id": text_id, "aufteilung": aufteilung,
+                "geaendert": False, "abschnitte_vorher": len(alt),
+                "abschnitte_nachher": len(neu),
+                "hinweis": "Die Aufteilung ergibt dieselben Abschnitte — "
+                           "nichts angefasst."}
+
+    alt_stellen = _stellen(inhalt, [a["original"] for a in alt])
+    neu_stellen = _stellen(inhalt, neu)
+
+    # Eigene Fassungen je Abschnitt und Person.
+    versuche: dict[int, dict[int, str]] = {}
+    for z in dbm.zeilen(db, """SELECT v.abschnitt_id, v.benutzer_id, v.fassung
+                                 FROM uebersetzungsversuch v
+                                 JOIN textabschnitt a ON a.id = v.abschnitt_id
+                                WHERE a.text_id = ?""", (text_id,)):
+        versuche.setdefault(z["abschnitt_id"], {})[z["benutzer_id"]] = \
+            z["fassung"]
+
+    # Jeden alten Abschnitt dem neuen zuordnen, in dessen Bereich er
+    # anfängt. Der letzte neue fängt alles auf, was dahinter liegt.
+    zuordnung: list[list[int]] = [[] for _ in neu]
+    for i, (anfang, _) in enumerate(alt_stellen):
+        ziel = 0
+        for j, (n_anfang, _) in enumerate(neu_stellen):
+            if n_anfang <= anfang:
+                ziel = j
+            else:
+                break
+        zuordnung[ziel].append(i)
+
+    fassungen = []
+    zusammengefuegt = 0
+    for j, _ in enumerate(neu):
+        teile = zuordnung[j]
+        if len(teile) > 1:
+            zusammengefuegt += 1
+        referenz = " ".join(
+            (alt[i]["referenz"] or "").strip() for i in teile
+            if (alt[i]["referenz"] or "").strip()) or None
+        eigene: dict[int, list[str]] = {}
+        for i in teile:
+            for benutzer_id, fassung in versuche.get(alt[i]["id"], {}).items():
+                if (fassung or "").strip():
+                    eigene.setdefault(benutzer_id, []).append(fassung.strip())
+        fassungen.append({"referenz": referenz,
+                          "eigene": {b: " ".join(x) for b, x in eigene.items()}})
+
+    bericht = {
+        "text_id": text_id, "titel": t["titel"], "aufteilung": aufteilung,
+        "geaendert": True,
+        "abschnitte_vorher": len(alt), "abschnitte_nachher": len(neu),
+        "uebersetzungen_vorher": sum(
+            1 for a in alt if (a["referenz"] or "").strip()),
+        "uebersetzungen_nachher": sum(
+            1 for f in fassungen if f["referenz"]),
+        "zusammengefuegt": zusammengefuegt,
+        "beispiel": [{"original": neu[j],
+                      "referenz": fassungen[j]["referenz"]}
+                     for j in range(min(3, len(neu)))],
+    }
+    if nur_pruefen:
+        return {**bericht, "geschrieben": False}
+
+    db.execute("BEGIN")
+    try:
+        db.execute("DELETE FROM textabschnitt WHERE text_id = ?", (text_id,))
+        for j, stueck in enumerate(neu):
+            cur = db.execute(
+                """INSERT INTO textabschnitt (text_id, reihenfolge, original,
+                                              referenz)
+                   VALUES (?, ?, ?, ?)""",
+                (text_id, j, stueck, fassungen[j]["referenz"]))
+            for benutzer_id, fassung in fassungen[j]["eigene"].items():
+                db.execute("""INSERT INTO uebersetzungsversuch
+                                (abschnitt_id, benutzer_id, fassung)
+                              VALUES (?, ?, ?)""",
+                           (cur.lastrowid, benutzer_id, fassung))
+        db.execute("UPDATE text SET aufteilung = ?, geaendert = datetime('now')"
+                   " WHERE id = ?", (aufteilung, text_id))
+        db.execute("COMMIT")
+    except Exception:
+        db.execute("ROLLBACK")
+        raise
+    return {**bericht, "geschrieben": True}
 
 
 def lesen(db: sqlite3.Connection, text_id: int,

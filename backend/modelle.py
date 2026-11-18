@@ -457,6 +457,12 @@ class EintragPruefen(BaseModel):
     nur_mangelhafte: bool = True
 
 
+class NeuAufteilen(BaseModel):
+    """Einen bestehenden Text anders zerlegen."""
+    aufteilung: Literal["auto", "absatz", "zeilen", "saetze", "keine"]
+    nur_pruefen: bool = False
+
+
 class BedeutungAendern(BaseModel):
     """EINE Bedeutung ändern, ohne die anderen anzufassen.
 
@@ -707,6 +713,11 @@ class LesetextAnlegen(BaseModel):
     niveau: str | None = None
     notiz: str | None = None
     uebersetzung: str | None = None
+    # Wie der Text zerfällt. Für Verse gehört »zeilen« hierher: sonst
+    # greift bei einfachen Zeilenumbrüchen die Satzregel, und im
+    # Mittelhochdeutschen steht der Punkt mitten im Vers.
+    aufteilung: Literal["auto", "absatz", "zeilen", "saetze",
+                        "keine"] = "auto"
 
 
 class FassungSichern(BaseModel):

@@ -498,7 +498,12 @@ CREATE TABLE IF NOT EXISTS text (
     -- Das Kapitel als NAME, nicht als Verweis — siehe die Begründung
     -- an der Tabelle `buch`.
     buch_id       INTEGER REFERENCES buch(id) ON DELETE SET NULL,
-    kapitel       TEXT
+    kapitel       TEXT,
+    -- Wie der Text in Abschnitte zerfällt: auto | absatz | zeilen |
+    -- saetze | keine. Steht AM TEXT und nicht nur im Aufruf, damit ein
+    -- späteres Neuaufteilen weiß, was gemeint war — und damit man
+    -- nachsehen kann, warum ein Text so zerlegt ist, wie er ist.
+    aufteilung    TEXT NOT NULL DEFAULT 'auto'
 );
 CREATE INDEX IF NOT EXISTS idx_text_sammlung ON text(sammlung_id);
 -- Der Index auf buch_id steht NICHT hier, sondern in datenbank.wandern:

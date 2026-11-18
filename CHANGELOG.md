@@ -16,6 +16,49 @@ Eintrag wiederfindet.
 
 ## 18.11.2026
 
+### Der Segmentierungsfehler bei Versen
+
+Mittelhochdeutsche Verse kamen zeilenweise herein — aber durch
+*einfache* Zeilenumbrüche, also als ein Block ohne Leerzeilen. Damit
+griff die Ersatzregel »an Satzenden trennen«, und im
+Mittelhochdeutschen steht der Punkt mitten im Vers:
+
+```
+1,1  UNS. IST. Inalten mæren. wnd͛s vil geſeit.
+```
+
+wurde zu **vier** Abschnitten — und jeder einzeln übersetzt: »Uns« /
+»ist« / »in alten Erzählungen« / »viel Wunderbares berichtet worden.«
+
+Gemessen am Bestand: **7684 Zeilen im Original, 8906 gespeicherte
+Abschnitte** — 1222 zu viel, bei 144 von 172 Texten. Dazu versprach
+der Werkzeugtext etwas anderes, als der Code tat: »Absätze durch
+Leerzeilen trennen« — von Sätzen stand da nichts.
+
+Jetzt sagt beim Anlegen, wer den Text einträgt, was ein Abschnitt ist:
+`auto` (wie bisher), `absatz`, **`zeilen`**, `saetze`, `keine`. Für
+Versdichtung gehört `zeilen` dazu. `auto` bleibt unverändert — es ist
+für eingeworfene Prosa gedacht, und dort ist die Zeile keine Einheit,
+sondern der Umbruch des Editors. Vers und umbrochene Prosa sehen
+gleich aus; eine Regel, die beides errät, gibt es nicht.
+
+### Bestehende Texte neu aufteilen, ohne Übersetzungen zu verlieren
+
+Das heikle Stück: an den Abschnittskennungen hängen die
+Referenzübersetzungen und die eigenen Fassungen.
+
+`text_neu_aufteilen` ordnet **über die Stelle im Urtext** zu, nicht
+über die Reihenfolge. Fallen zwei alte Abschnitte in einen neuen —
+der Normalfall beim Zusammenführen zerschnittener Verse —, werden ihre
+Übersetzungen in der richtigen Reihenfolge aneinandergehängt. Aus den
+vier Bruchstücken oben wird wieder:
+
+> Uns ist in alten Erzählungen viel Wunderbares berichtet worden.
+
+Ändert sich nichts, wird nichts angefasst — niemand verliert
+Kennungen, weil er zweimal aufgerufen hat. Und `nur_pruefen` rechnet
+alles durch, ohne zu schreiben.
+
 ### Eine Bedeutung berichtigen, ohne den Lernstand zu verlieren
 
 Für das Aufräumen der 116 Fälle von oben fehlte das richtige Werkzeug.

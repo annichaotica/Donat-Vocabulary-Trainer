@@ -891,13 +891,16 @@ def texte_auflisten(db: sqlite3.Connection, person: dict, sammlung_id: int):
 
 def text_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
                  titel: str, inhalt: str, niveau: str | None = None,
-                 notiz: str | None = None):
+                 notiz: str | None = None, aufteilung: str = "auto"):
     """Einen Text hinterlegen, den sie dann lesen und übersetzen kann."""
     zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
     t = _fehler_wandeln(lesetexte.anlegen, db, sammlung_id, titel, inhalt,
-                        niveau=niveau, notiz=notiz, quelle="ki")
+                        niveau=niveau, notiz=notiz, quelle="ki",
+                        aufteilung=aufteilung)
     return {"text_id": t["id"], "titel": t["titel"],
-            "abschnitte": len(t["abschnitte"])}
+            "aufteilung": t["aufteilung"],
+            "abschnitte": len(t["abschnitte"]),
+            "erste_abschnitte": [a["original"] for a in t["abschnitte"][:3]]}
 
 
 def buecher_auflisten(db: sqlite3.Connection, person: dict):
@@ -933,6 +936,21 @@ def texte_zuordnen(db: sqlite3.Connection, person: dict, text_ids: list,
     return _fehler_wandeln(buecher.texte_zuordnen, db, person["id"],
                            [int(i) for i in text_ids], buch_id,
                            kapitel=kapitel)
+
+
+def text_neu_aufteilen(db: sqlite3.Connection, person: dict, text_id: int,
+                       aufteilung: str, nur_pruefen: bool = False):
+    """Einen bestehenden Text anders zerlegen."""
+    from modelle import NeuAufteilen
+    t = dbm.zeile(db, "SELECT sammlung_id FROM text WHERE id = ?", (text_id,))
+    if t is None:
+        raise WerkzeugFehler(f"Text {text_id} gibt es nicht")
+    zugang.sammlung_pruefen(db, person["id"], t["sammlung_id"],
+                            schreiben=True)
+    eingabe = _fehler_wandeln(NeuAufteilen, aufteilung=aufteilung,
+                              nur_pruefen=nur_pruefen)
+    return _fehler_wandeln(_app().text_neu_aufteilen, text_id,
+                           eingabe=eingabe, db=db)
 
 
 def text_lesen(db: sqlite3.Connection, person: dict, text_id: int):
@@ -1941,21 +1959,58 @@ WERKZEUGE: list[dict] = [
     },
     {
         "name": "text_anlegen",
-        "description": "Einen Lesetext hinterlegen. Absätze durch Leerzeilen "
-                       "trennen — daran entstehen die Abschnitte, in denen "
-                       "übersetzt wird. Danach text_deckung_lesen aufrufen: "
-                       "es sagt, welche Wörter ihr dafür noch fehlen.",
+        "description": (
+            "Einen Lesetext hinterlegen. 'aufteilung' bestimmt, was ein "
+            "Abschnitt ist — die Einheit, in der übersetzt wird: 'auto' "
+            "(Vorgabe) nimmt Absätze und ersatzweise Sätze; 'zeilen' macht "
+            "jede Zeile zu einem Abschnitt; 'absatz' trennt nur an "
+            "Leerzeilen; 'saetze' an Satzenden; 'keine' lässt den Text in "
+            "einem Stück. FÜR VERSDICHTUNG IMMER 'zeilen' — sonst greift "
+            "bei einfachen Zeilenumbrüchen die Satzregel, und im "
+            "Mittelhochdeutschen steht der Punkt mitten im Vers ('dô truoc "
+            ". unde noch sîn name treit .' wird sonst zu zwei Abschnitten). "
+            "Die Antwort nennt die ersten Abschnitte zum Nachsehen. Danach "
+            "text_deckung_lesen aufrufen: es sagt, welche Wörter ihr dafür "
+            "noch fehlen."),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
                 "titel": _s("string", "kurz, zum Wiederfinden"),
                 "inhalt": _s("string", "der Text in der Lernsprache"),
+                "aufteilung": {"type": "string",
+                               "enum": ["auto", "absatz", "zeilen", "saetze",
+                                        "keine"],
+                               "description": "was ein Abschnitt ist"},
                 "niveau": _s("string", "A1 … C2, frei"),
                 "notiz": _s("string", "woher er stammt, worum es geht")},
             "required": ["sammlung_id", "titel", "inhalt"],
         },
         "funktion": text_anlegen,
+    },
+    {
+        "name": "text_neu_aufteilen",
+        "description": (
+            "Zerlegt einen BESTEHENDEN Text neu. Die Referenzübersetzungen "
+            "und die eigenen Fassungen bleiben erhalten: zugeordnet wird "
+            "über die Stelle im Urtext, und wo zwei alte Abschnitte in "
+            "einen neuen fallen, werden ihre Übersetzungen in der "
+            "richtigen Reihenfolge aneinandergehängt. Ändert sich an den "
+            "Abschnitten nichts, wird nichts angefasst. Mit "
+            "nur_pruefen=true wird gerechnet und nicht geschrieben — bei "
+            "Texten mit Übersetzungen erst so ansehen."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text_id": _s("integer", "aus texte_auflisten"),
+                "aufteilung": {"type": "string",
+                               "enum": ["auto", "absatz", "zeilen", "saetze",
+                                        "keine"],
+                               "description": "was ein Abschnitt sein soll"},
+                "nur_pruefen": _s("boolean", "nur rechnen, nichts ändern")},
+            "required": ["text_id", "aufteilung"],
+        },
+        "funktion": text_neu_aufteilen,
     },
     {
         "name": "text_deckung_lesen",

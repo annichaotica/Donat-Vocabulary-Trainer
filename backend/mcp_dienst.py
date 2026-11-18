@@ -590,11 +590,12 @@ def eintrag_pruefen(db: sqlite3.Connection, person: dict, lexem_id: int):
 
 
 def sammlung_pruefen(db: sqlite3.Connection, person: dict, sammlung_id: int,
-                     nur_mangelhafte: bool = True):
+                     nur_mangelhafte: bool = True, art: str | None = None):
     zugang.sammlung_pruefen(db, person["id"], sammlung_id)
     bericht = _fehler_wandeln(_app().sammlung_pruefen, sammlung_id,
-                              nur_mangelhafte=nur_mangelhafte, db=db)
+                              nur_mangelhafte=nur_mangelhafte, art=art, db=db)
     return {"geprueft": bericht["geprueft"], "zaehler": bericht["zaehler"],
+            "nach_art": bericht["nach_art"],
             "eintraege": [{"lexem_id": e["lexem_id"], "lemma": e["lemma"],
                            **_bericht_kurz(e)} for e in bericht["eintraege"]]}
 
@@ -1478,10 +1479,16 @@ WERKZEUGE: list[dict] = [
     {
         "name": "sammlung_pruefen",
         "description": "Alle Einträge einer Sammlung auf einmal prüfen. Gut "
-                       "nach einem größeren Eintragen.",
+                       "nach einem größeren Eintragen. Die Antwort nennt "
+                       "unter 'nach_art', wie oft jede Befundart vorkommt; "
+                       "mit 'art' lässt sich auf genau eine eingrenzen — "
+                       "ohne das wird die Antwort bei großen Sammlungen "
+                       "mehrere hundert Kilobyte groß.",
         "inputSchema": {"type": "object", "properties": {
             "sammlung_id": _s("integer", ""),
-            "nur_mangelhafte": _s("boolean", "nur auffällige Einträge zeigen")},
+            "nur_mangelhafte": _s("boolean", "nur auffällige Einträge zeigen"),
+            "art": _s("string", "nur diese Befundart, z.B. "
+                                "kontext_nennt_form")},
             "required": ["sammlung_id"]},
         "funktion": sammlung_pruefen,
     },

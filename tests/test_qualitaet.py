@@ -430,3 +430,37 @@ def test_ein_kontext_ohne_eigene_form_wird_nicht_gemeldet(klient):
     lexem = klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()["lexeme"][0]
     bericht = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
     assert "kontext_nennt_form" not in [x["art"] for x in bericht["befunde"]]
+
+
+def test_die_pruefung_laesst_sich_auf_eine_befundart_eingrenzen(klient):
+    """Ohne das ist die Antwort für den griechischen Bestand 744 KB
+    groß — 1363 Einträge mit 1808 Befunden. Zu viel, um sie einer KI
+    zu geben, und zu viel, um darin etwas zu finden.
+
+    Der Zähler zählt trotzdem ALLES: sonst sähe eine gefilterte
+    Prüfung aus wie ein sauberer Bestand.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lernende 3"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [
+            {"lemma": "τρώω", "wortart": "verb",
+             "bedeutungen": [{"uebersetzungen": ["essen"]},
+                             {"uebersetzungen": ["gegessen"],
+                              "kontext": "Partizip φαγωμένος"}],
+             "formen": [{"text": "φαγωμένος", "merkmale": {
+                 "nonfinit": "partizip_perfekt", "genus_verbi": "passiv"}}]},
+            {"lemma": "μικρός", "wortart": "adjektiv",
+             "bedeutungen": [{"uebersetzungen": ["klein"]}]}]})
+
+    alles = klient.get(f"/api/sammlungen/{s['id']}/pruefung").json()
+    eng = klient.get(f"/api/sammlungen/{s['id']}/pruefung",
+                     params={"art": "kontext_nennt_form"}).json()
+
+    assert eng["geprueft"] == 1, eng["eintraege"]
+    assert all(x["art"] == "kontext_nennt_form"
+               for e in eng["eintraege"] for x in e["befunde"])
+    assert eng["zaehler"] == alles["zaehler"], \
+        "der Zähler zählt alles, auch das Ausgeblendete"
+    assert eng["nach_art"]["kontext_nennt_form"] == 1

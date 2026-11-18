@@ -422,16 +422,36 @@ def _aufgaben_pruefen(aktive: list[dict], formen: list[dict],
 # ----------------------------------------------------- Ganze Sammlung prüfen
 
 def pruefen_sammlung(db: sqlite3.Connection, sammlung_id: int,
-                     nur_mangelhafte: bool = True) -> dict:
-    """Prüft alle Einträge einer Sammlung auf einmal."""
+                     nur_mangelhafte: bool = True,
+                     art: str | None = None) -> dict:
+    """Prüft alle Einträge einer Sammlung auf einmal.
+
+    `art` grenzt auf EINE Befundart ein — und zwar sowohl die Einträge
+    als auch die Befunde darin. Ohne das ist die Antwort für den
+    griechischen Bestand 744 KB groß (1363 Einträge mit zusammen 1808
+    Befunden): zu viel, um sie einer KI zu geben, und zu viel, um
+    darin etwas zu finden. Wer eine Sache abarbeiten will, will auch
+    nur diese sehen.
+
+    `zaehler` zählt weiterhin ALLES. Sonst sähe eine gefilterte
+    Prüfung aus wie ein sauberer Bestand.
+    """
     berichte = []
-    zaehler = {"fehler": 0, "hinweis": 0, "notiz": 0}
+    zaehler: dict[str, int] = {"fehler": 0, "hinweis": 0, "notiz": 0}
+    nach_art: dict[str, int] = {}
     for z in dbm.zeilen(db, "SELECT id FROM lexem WHERE sammlung_id = ? ORDER BY lemma",
                         (sammlung_id,)):
         bericht = pruefen(db, z["id"])
         for b in bericht["befunde"]:
             zaehler[b["schwere"]] += 1
+            nach_art[b["art"]] = nach_art.get(b["art"], 0) + 1
+        if art:
+            passend = [b for b in bericht["befunde"] if b["art"] == art]
+            if passend:
+                berichte.append({**bericht, "befunde": passend})
+            continue
         if bericht["befunde"] or not nur_mangelhafte:
             berichte.append(bericht)
     return {"sammlung_id": sammlung_id, "geprueft": len(berichte),
-            "zaehler": zaehler, "eintraege": berichte}
+            "zaehler": zaehler, "nach_art": nach_art,
+            "art": art, "eintraege": berichte}

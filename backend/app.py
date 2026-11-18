@@ -2195,10 +2195,15 @@ def lexem_pruefen(lexem_id: int, db: sqlite3.Connection = DB):
 
 @app.get("/api/sammlungen/{sammlung_id}/pruefung")
 def sammlung_pruefen(sammlung_id: int, nur_mangelhafte: bool = True,
+                     art: str | None = None,
                      db: sqlite3.Connection = DB):
-    """Alle Einträge einer Sammlung auf einmal prüfen."""
+    """Alle Einträge einer Sammlung auf einmal prüfen.
+
+    `art` grenzt auf eine Befundart ein — ohne das ist die Antwort für
+    einen großen Bestand mehrere hundert Kilobyte.
+    """
     _holen(db, "sammlung", sammlung_id)
-    return qualitaet.pruefen_sammlung(db, sammlung_id, nur_mangelhafte)
+    return qualitaet.pruefen_sammlung(db, sammlung_id, nur_mangelhafte, art)
 
 
 # ========================================================== Wörterbuch

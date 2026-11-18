@@ -29,219 +29,312 @@ const FARBE = {
 };
 
 
-// ------------------------------------------------------------- Textliste
+// --------------------------------------------------------- Bücherregal
 
-/* Kapitelfilter und Auswahl — wie im Wortschatz, und bewusst gleich.
+/* Bücher, Kapitel, Texte — und das Regal gehört dem Konto.
  *
- * »Die Texte müssten wir noch zusammenfassbar machen, also Text –
- * Kapitel. So ist das schwer für jemand, der damit lernt.«
+ * »Tatsächlich würde ich behaupten, die Texte gehören dem Konto und
+ * nicht der Sammlung, also können sie auch außerhalb der
+ * Sammlungskarte dargestellt werden, als eigene Karte.«
  *
- * Der Iwein liegt in 173 Stücken vor. Als flache Liste ist das keine
- * Bedienung, sondern ein Stapel.
+ * Sie hat recht. Der Iwein gehört nicht zu »Mittelhochdeutsch,
+ * Stammformen« — er ist Literatur, die man MIT diesem Wortschatz
+ * liest. Vorher musste man erst eine Sammlung wählen, und bei drei
+ * Sammlungen stand der Knopf »Texte« dreimal auf der Übersicht, jedes
+ * Mal mit einem anderen Ausschnitt dahinter.
  *
- * Die Spalte text.lektion_id gab es längst, gefüllt ist sie aber nur
- * beim Übungsmaterial (352 griechische Übungssätze). Diese Liste zeigt
- * nur typ='lesetext', und davon hatte keiner ein Kapitel. */
-let textFilter = '';
-let textAngehakt = new Set();
-let textSammlung = null;
-const OHNE_KAPITEL = 'ohne';
+ * Die Sammlung steht trotzdem an jedem Buch: an ihr hängt die Deckung
+ * (»kann ich das schon lesen?«). Sie ist eine Eigenschaft, kein
+ * Eingang.
+ */
+let offeneBuecher = new Set();
+let angehakt = new Set();
 
 export async function zeichnen(behaelter) {
-  leeren(behaelter);
-  if (!zustand.sammlungId) {
-    behaelter.append(h('p', { class: 'leise',
-      text: 'Erst eine Sammlung wählen — ein Text gehört zu einer Sprache.' }));
-    behaelter.append(h('button', {
-      onclick: () => { location.hash = '#/uebersicht'; },
-    }, 'Zur Übersicht'));
-    return;
-  }
-  if (textSammlung !== zustand.sammlungId) {
-    textSammlung = zustand.sammlungId;
-    textFilter = '';
-    textAngehakt.clear();
-  }
+  const el = leeren(behaelter);
+  el.append(h('h1', { text: 'Bücher und Texte' }));
 
-  behaelter.append(h('h1', { text: 'Texte' }));
-  behaelter.append(h('p', { class: 'leise',
-    text: 'Einen Text einwerfen und sehen, ob du ihn schon übersetzen '
-        + 'könntest. Was dir fehlt, kannst du beim Lesen anfordern.' }));
-
-  const [texte, kapitel] = await Promise.all([
-    api.texte(zustand.sammlungId),
-    api.lektionen(zustand.sammlungId).catch(() => []),
-  ]);
-
-  if (!texte.length) {
-    behaelter.append(h('p', { class: 'leise', text: 'Noch kein Text.' }),
-                     teilEinwerfen(behaelter));
+  let buecher, texte, sammlungen;
+  try {
+    [buecher, texte, sammlungen] = await Promise.all([
+      api.buecher(zustand.benutzerId),
+      api.alleTexte(zustand.benutzerId),
+      api.sammlungen(zustand.benutzerId),
+    ]);
+  } catch (fehler) {
+    el.append(h('p', { class: 'leise', text: fehler.message }));
     return;
   }
 
-  // Nur anbieten, wo es etwas zu ordnen gibt. Bei drei Texten ist ein
-  // Kapitelfilter Beiwerk; bei 173 ist er der einzige Weg hinein.
-  const mitKapitel = [...new Set(texte.map((t) => t.lektion_id))];
-  if (texte.length > 5 || mitKapitel.length > 1) {
-    behaelter.append(teilKapitelwahl(behaelter, texte, kapitel));
+  if (!texte.length && !buecher.length) {
+    el.append(h('p', { class: 'leise',
+      text: 'Noch nichts hier. Wirf einen Text ein — der Trainer sagt dir '
+          + 'dann, ob du ihn schon lesen könntest.' }));
+    el.append(teilEinwerfen(behaelter, sammlungen));
+    return;
   }
+
+  el.append(h('p', { class: 'leise',
+    text: 'Was dir beim Lesen fehlt, kannst du im Text antippen und '
+        + 'anfordern.' }));
 
   const stapel = h('div', {});
-  const liste = h('div', { class: 'karte-reihe' });
-  behaelter.append(stapel, liste, teilEinwerfen(behaelter));
-
+  el.append(stapel);
   const stapelZeichnen = () => {
     leeren(stapel);
-    if (textAngehakt.size) {
-      stapel.append(teilStapel(behaelter, kapitel, stapelZeichnen));
+    if (angehakt.size) {
+      stapel.append(teilStapel(behaelter, buecher, texte, stapelZeichnen));
     }
   };
 
-  const gezeigt = texte.filter((t) => (
-    textFilter === '' ? true
-      : textFilter === OHNE_KAPITEL ? t.lektion_id === null
-        : String(t.lektion_id) === textFilter));
-
-  if (!gezeigt.length) {
-    liste.append(h('p', { class: 'leise',
-      text: 'In diesem Kapitel liegt noch kein Text.' }));
-    return;
+  for (const b of buecher) {
+    el.append(teilBuch(behaelter, b, texte, stapelZeichnen));
   }
 
-  let letztes;
-  for (const t of gezeigt) {
-    const kennung = t.lektion_id === null ? OHNE_KAPITEL : t.lektion_id;
-    if (kennung !== letztes && !textFilter) {
-      letztes = kennung;
-      liste.append(h('h2', { class: 'kapitelkopf',
-        text: t.lektion_id === null
-          ? 'Ohne Kapitel'
-          : (t.lektion_nr !== null ? `${t.lektion_nr}. ` : '')
-            + (t.lektion_name || 'ohne Namen') }));
-    }
-    const haken = h('input', { type: 'checkbox', class: 'eintrag-haken',
-                               title: 'auswählen' });
-    haken.checked = textAngehakt.has(t.id);
-    haken.addEventListener('change', () => {
-      if (haken.checked) textAngehakt.add(t.id);
-      else textAngehakt.delete(t.id);
-      stapelZeichnen();
-    });
-    liste.append(h('div', { class: 'karte' },
-      h('div', { style: 'display:flex;align-items:center;gap:.6rem' },
-        haken,
-        h('strong', { text: t.titel })),
-      h('p', { class: 'leise', style: 'margin:.2rem 0 .6rem',
-               text: `${t.abschnitte} Abschnitte · ${t.zeichen} Zeichen`
-                   + (t.niveau ? ` · ${t.niveau}` : '')
-                   // Wie weit die Übersetzung ist. Nur wo sie überhaupt
-                   // eine Rolle spielt: »0 übersetzt« an jedem Satz
-                   // einer Anfängersammlung wäre Lärm.
-                   + (t.abschnitte > 1
-                      ? (t.uebersetzt === t.abschnitte
-                         ? ' · ganz übersetzt'
-                         : t.uebersetzt
-                           ? ` · ${t.uebersetzt} von ${t.abschnitte} übersetzt`
-                           : ' · noch nicht übersetzt')
-                      : '') }),
-      h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
-        h('button', { class: 'wichtig',
-          onclick: () => { location.hash = `#/texte/${t.id}`; },
-        }, 'Öffnen'),
-        h('button', { class: 'schlicht', onclick: () => entfernen(t, behaelter) },
-          'Löschen'))));
+  const lose = texte.filter((t) => t.buch_id === null);
+  if (lose.length) {
+    el.append(h('h2', { class: 'kapitelkopf',
+      text: buecher.length ? 'Ohne Buch' : 'Texte' }));
+    // Hier MIT Sammlung: außerhalb eines Buchs sagt nichts anderes,
+    // gegen welchen Wortschatz der Text gelesen wird.
+    el.append(teilTexte(behaelter, lose, stapelZeichnen, true));
   }
+
+  el.append(teilEinwerfen(behaelter, sammlungen));
+  el.append(teilNeuesBuch(behaelter, sammlungen));
   stapelZeichnen();
 }
 
 
-function teilKapitelwahl(behaelter, texte, kapitel) {
-  // Nur Kapitel, in denen auch ein Text liegt — die Vokabelkapitel
-  // einer Sammlung sind oft viel mehr, und eine Auswahl mit fünfzig
-  // leeren Einträgen hilft niemandem.
-  const zaehler = new Map();
-  for (const t of texte) {
-    const k = t.lektion_id;
-    zaehler.set(k, (zaehler.get(k) || 0) + 1);
+/** Ein Buch als aufklappbare Karte.
+ *
+ * Zugeklappt, solange niemand es öffnet: bei fünf Büchern mit je 173
+ * Stücken wäre die Seite sonst ein Band. Welche offen sind, überlebt
+ * das Neuzeichnen — sonst klappt das Buch nach jeder Zuordnung zu.
+ */
+function teilBuch(behaelter, b, texte, stapelZeichnen) {
+  const meine = texte.filter((t) => t.buch_id === b.id);
+  const offen = offeneBuecher.has(b.id);
+
+  const kopf = h('button', {
+    class: 'buchkopf',
+    onclick: () => {
+      if (offen) offeneBuecher.delete(b.id); else offeneBuecher.add(b.id);
+      zeichnen(behaelter);
+    },
+  },
+    h('span', { class: 'buchpfeil', text: offen ? '▾' : '▸' }),
+    h('span', {},
+      h('strong', { text: b.titel }),
+      b.verfasser ? h('span', { class: 'leise', text: ` · ${b.verfasser}` }) : null));
+
+  const karte = h('div', { class: 'karte' }, kopf,
+    h('p', { class: 'leise', style: 'margin:.2rem 0 0' },
+      `${meine.length} ${meine.length === 1 ? 'Text' : 'Texte'}`,
+      ` · ${b.sammlung}`,
+      b.abschnitte
+        ? (b.uebersetzt === b.abschnitte ? ' · ganz übersetzt'
+           : b.uebersetzt ? ` · ${b.uebersetzt} von ${b.abschnitte} Abschnitten übersetzt`
+             : ' · noch nicht übersetzt')
+        : ''));
+
+  if (!offen) return karte;
+
+  // Nach Kapiteln, in der Reihenfolge ihres ersten Textes. Das Kapitel
+  // ist ein Name am Text und keine eigene Zeile — es hat nichts außer
+  // seinem Namen und seiner Stelle.
+  const kapitel = [];
+  const nach = new Map();
+  for (const t of meine) {
+    const name = t.kapitel || null;
+    if (!nach.has(name)) { nach.set(name, []); kapitel.push(name); }
+    nach.get(name).push(t);
   }
-  const wahl = h('select', {},
-    h('option', { value: '', text: `alle Kapitel (${texte.length})` }),
-    kapitel.filter((k) => zaehler.has(k.id)).map((k) => h('option', {
-      value: String(k.id),
-      text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen')
-          + ` (${zaehler.get(k.id)})`,
-    })),
-    zaehler.has(null)
-      ? h('option', { value: OHNE_KAPITEL,
-                      text: `ohne Kapitel (${zaehler.get(null)})` })
-      : null);
-  wahl.value = textFilter;
-  wahl.addEventListener('change', () => {
-    textFilter = wahl.value;
-    textAngehakt.clear();
-    zeichnen(behaelter);
-  });
-  return h('div', { class: 'gezielt-filter', style: 'margin:.6rem 0' }, wahl);
+  for (const name of kapitel) {
+    if (name !== null || kapitel.length > 1) {
+      karte.append(h('h3', { class: 'kapitelkopf',
+                             text: name || 'Ohne Kapitel' }));
+    }
+    karte.append(teilTexte(behaelter, nach.get(name), stapelZeichnen));
+  }
+  if (!meine.length) {
+    karte.append(h('p', { class: 'leise',
+      text: 'Noch kein Text in diesem Buch. Unten einen anhaken und '
+          + 'zuordnen.' }));
+  }
+  karte.append(h('div', { class: 'frage-werkzeuge',
+                          style: 'justify-content:flex-start;margin-top:.8rem' },
+    h('button', { class: 'schlicht', onclick: () => buchUmbenennen(behaelter, b) },
+      'Umbenennen'),
+    h('button', { class: 'schlicht gefahr',
+                  onclick: () => buchEntfernen(behaelter, b, meine.length) },
+      'Buch auflösen')));
+  return karte;
 }
 
 
-function teilStapel(behaelter, kapitel, stapelZeichnen) {
-  const wohin = h('select', {},
-    h('option', { value: '', text: 'Kapitel wählen …' }),
-    kapitel.map((k) => h('option', {
-      value: String(k.id),
-      text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen'),
-    })),
-    h('option', { value: OHNE_KAPITEL, text: 'ohne Kapitel' }));
-  const nr = h('input', { type: 'number', min: '0', max: '9999',
-                          placeholder: 'neue Nr.', style: 'width:7rem' });
-  const name = h('input', { type: 'text', placeholder: 'Name des Kapitels',
-                            style: 'width:12rem' });
+/** Die Texte als flache Liste — im Buch wie außerhalb.
+ *
+ * Der erste Entwurf setzte die losen Texte als Karten; eine Karte in
+ * der Karte, und der Haken stand neben einem Kasten im Kasten. Ein
+ * Text sieht überall gleich aus, auch wenn er noch keinem Buch
+ * zugeordnet ist — das ist ja gerade das, was man ändern will.
+ */
+function teilTexte(behaelter, liste, stapelZeichnen, mitSammlung = false) {
+  const halter = h('div', { class: 'liste' });
+  for (const t of liste) {
+    const haken = h('input', { type: 'checkbox', class: 'eintrag-haken',
+                               title: 'auswählen' });
+    haken.checked = angehakt.has(t.id);
+    haken.addEventListener('change', () => {
+      if (haken.checked) angehakt.add(t.id); else angehakt.delete(t.id);
+      stapelZeichnen();
+    });
+    const beschriftung = `${t.abschnitte} Abschnitte`
+      + (t.abschnitte
+         ? (t.uebersetzt === t.abschnitte ? ' · ganz übersetzt'
+            : t.uebersetzt ? ` · ${t.uebersetzt} übersetzt` : '')
+         : '');
+    halter.append(h('div', { class: 'eintrag-zeile' },
+      haken,
+      h('button', {
+        class: 'eintrag', style: 'flex:1 1 auto',
+        onclick: () => { location.hash = `#/texte/${t.id}`; },
+      },
+        h('span', { class: 'lemma', text: t.titel }),
+        h('span', { class: 'bedeutung', text: beschriftung }),
+        mitSammlung && t.sammlung
+          ? h('span', { class: 'marke', text: t.sammlung }) : null)));
+  }
+  return halter;
+}
 
-  const setzen = (daten) => tun(async () => {
-    const e = await api.texteVerschieben(zustand.sammlungId,
-                                         { text_ids: [...textAngehakt], ...daten });
-    meldung(`${e.verschoben} ${e.verschoben === 1 ? 'Text' : 'Texte'} `
-          + 'umgehängt.');
-    textAngehakt.clear();
-    zeichnen(behaelter);
-  });
+
+/** Was mit den angehakten Texten geschehen soll. */
+function teilStapel(behaelter, buecher, texte, stapelZeichnen) {
+  const wohin = h('select', {},
+    h('option', { value: '', text: 'Buch wählen …' }),
+    buecher.map((b) => h('option', { value: String(b.id), text: b.titel })),
+    h('option', { value: 'ohne', text: 'ohne Buch' }));
+  // Vorhandene Kapitelnamen anbieten: Tippfehler machen sonst aus
+  // einem Kapitel zwei.
+  const bekannt = [...new Set(texte.map((t) => t.kapitel).filter(Boolean))];
+  const kapitel = h('input', { type: 'text', list: 'kapitelnamen',
+                               placeholder: 'Kapitel (freigestellt)',
+                               style: 'width:14rem' });
+  const liste = h('datalist', { id: 'kapitelnamen' },
+    bekannt.map((n) => h('option', { value: n })));
 
   return h('div', { class: 'karte gezielt-stapel' },
-    h('b', { text: `${textAngehakt.size} ausgewählt` }),
+    h('b', { text: `${angehakt.size} ausgewählt` }),
     h('div', { class: 'frage-werkzeuge',
                style: 'justify-content:flex-start;flex-wrap:wrap' },
-      wohin,
+      wohin, kapitel, liste,
       h('button', {
         class: 'wichtig',
-        onclick: () => {
-          if (!wohin.value) { meldung('Erst ein Kapitel wählen.'); return; }
-          setzen(wohin.value === OHNE_KAPITEL
-            ? {} : { lektion_id: Number(wohin.value) });
-        },
-      }, 'Umhängen'),
-      nr, name,
-      h('button', {
-        title: 'Legt das Kapitel an, falls es noch nicht da ist.',
-        onclick: () => {
-          if (nr.value === '') { meldung('Welche Nummer?'); return; }
-          setzen({ lektion_nr: Number(nr.value),
-                   lektion_name: name.value.trim() || null });
-        },
-      }, 'In neues Kapitel'),
+        onclick: () => tun(async () => {
+          if (!wohin.value) { meldung('Erst ein Buch wählen.'); return; }
+          const e = await api.texteZuordnen({
+            benutzer_id: zustand.benutzerId,
+            text_ids: [...angehakt],
+            buch_id: wohin.value === 'ohne' ? null : Number(wohin.value),
+            kapitel: kapitel.value.trim() || null,
+          });
+          meldung(`${e.zugeordnet} ${e.zugeordnet === 1 ? 'Text' : 'Texte'} `
+                + 'zugeordnet.');
+          angehakt.clear();
+          zeichnen(behaelter);
+        }),
+      }, 'Zuordnen'),
       h('button', { class: 'schlicht',
-                    onclick: () => { textAngehakt.clear(); zeichnen(behaelter); } },
-        'Auswahl aufheben')));
+                    onclick: () => { angehakt.clear(); zeichnen(behaelter); } },
+        'Auswahl aufheben'),
+      // Beim Umbau auf das Regal war der Löschen-Knopf von den
+      // Textkarten verschwunden. Hier ist er besser aufgehoben: wer
+      // 173 Stücke eines Fehlimports loswerden will, klickt nicht 173
+      // Mal. Die Rückfrage sagt, was mit verloren geht.
+      h('button', {
+        class: 'schlicht gefahr',
+        onclick: () => tun(async () => {
+          const ids = [...angehakt];
+          if (!window.confirm(
+            `${ids.length} ${ids.length === 1 ? 'Text' : 'Texte'} löschen? `
+            + 'Die Übersetzungen dazu gehen mit verloren.')) return;
+          for (const id of ids) await api.textLoeschen(id);
+          meldung(`${ids.length} gelöscht.`);
+          angehakt.clear();
+          zeichnen(behaelter);
+        }),
+      }, 'Löschen')));
 }
 
 
-function teilEinwerfen(behaelter) {
+function teilNeuesBuch(behaelter, sammlungen) {
+  const titel = h('input', { type: 'text', placeholder: 'Titel' });
+  const verfasser = h('input', { type: 'text', placeholder: 'Verfasser (freigestellt)' });
+  // Gegen welchen Wortschatz das Buch gelesen wird. Keine Spielerei:
+  // ohne das gibt es die Auskunft »kannst du das schon lesen« nicht.
+  const wortschatz = h('select', {},
+    sammlungen.map((s) => h('option', { value: String(s.id),
+                                        text: `${s.name} (${s.sprache})` })));
+
+  return h('details', { class: 'karte', style: 'margin-top:1rem' },
+    h('summary', { text: 'Neues Buch' }),
+    h('p', { class: 'leise', style: 'margin:.4rem 0',
+             text: 'Ein Buch bündelt Texte. Der Wortschatz dahinter '
+                 + 'entscheidet, wogegen die Deckung gerechnet wird — '
+                 + '»kannst du das schon lesen«.' }),
+    h('div', { style: 'display:flex;gap:.5rem;flex-wrap:wrap' },
+      titel, verfasser, wortschatz),
+    h('button', {
+      class: 'wichtig', style: 'margin-top:.6rem',
+      onclick: () => tun(async () => {
+        if (!titel.value.trim()) { meldung('Der Titel fehlt.'); return; }
+        if (!wortschatz.value) { meldung('Erst eine Sammlung anlegen.'); return; }
+        const b = await api.buchAnlegen({
+          benutzer_id: zustand.benutzerId,
+          sammlung_id: Number(wortschatz.value),
+          titel: titel.value.trim(),
+          verfasser: verfasser.value.trim() || null,
+        });
+        offeneBuecher.add(b.id);
+        meldung('Buch angelegt.');
+        zeichnen(behaelter);
+      }),
+    }, 'Anlegen'));
+}
+
+
+async function buchUmbenennen(behaelter, b) {
+  const neu = window.prompt('Neuer Titel:', b.titel);
+  if (neu === null || !neu.trim()) return;
+  await api.buchAendern(b.id, { titel: neu.trim() });
+  zeichnen(behaelter);
+}
+
+
+async function buchEntfernen(behaelter, b, anzahl) {
+  // Ein Buch ist eine Klammer, kein Behälter — und das muss dastehen,
+  // sonst traut sich niemand.
+  if (!window.confirm(
+    `»${b.titel}« auflösen? Die ${anzahl} Texte bleiben erhalten und `
+    + 'stehen danach ohne Buch.')) return;
+  await api.buchLoeschen(b.id);
+  offeneBuecher.delete(b.id);
+  zeichnen(behaelter);
+}
+
+
+function teilEinwerfen(behaelter, sammlungen) {
   const titel = h('input', { type: 'text', placeholder: 'Titel' });
   // Kein Pflichtfeld-Gehabe: Titel darf leer bleiben, dann heißt er so.
   const inhalt = h('textarea', {
     rows: '8', placeholder: 'Text hier einfügen …',
     style: 'width:100%;font-family:inherit',
   });
+  const wortschatz = h('select', {},
+    sammlungen.map((s) => h('option', { value: String(s.id),
+                                        text: `${s.name} (${s.sprache})` })));
   const datei = h('input', { type: 'file', accept: '.txt,.md,text/plain' });
   datei.addEventListener('change', async () => {
     const f = datei.files?.[0];
@@ -258,27 +351,20 @@ function teilEinwerfen(behaelter) {
              text: 'Absätze durch Leerzeilen trennen — daran entstehen die '
                  + 'Abschnitte, in denen du übersetzt.' }),
     titel, inhalt,
+    h('div', { style: 'display:flex;gap:.5rem;align-items:center;margin:.4rem 0;flex-wrap:wrap' },
+      h('span', { class: 'leise', text: 'Wortschatz:' }), wortschatz),
     h('p', { class: 'leise', style: 'margin:.4rem 0' },
       'oder eine Datei: ', datei),
     h('button', {
       class: 'wichtig',
-      onclick: async () => {
+      onclick: () => tun(async () => {
         if (!inhalt.value.trim()) { meldung('Der Text ist leer.'); return; }
-        try {
-          const t = await api.textAnlegen(zustand.sammlungId, {
-            titel: titel.value, inhalt: inhalt.value });
-          location.hash = `#/texte/${t.id}`;
-        } catch (f) { meldung(f.message, 'fehler'); }
-      },
+        if (!wortschatz.value) { meldung('Erst eine Sammlung anlegen.'); return; }
+        const t = await api.textAnlegen(Number(wortschatz.value), {
+          titel: titel.value, inhalt: inhalt.value });
+        location.hash = `#/texte/${t.id}`;
+      }),
     }, 'Speichern und öffnen'));
-}
-
-
-async function entfernen(t, behaelter) {
-  if (!window.confirm(`»${t.titel}« löschen? Deine Übersetzung dazu `
-                      + 'geht mit verloren.')) return;
-  await api.textLoeschen(t.id);
-  zeichnen(behaelter);
 }
 
 

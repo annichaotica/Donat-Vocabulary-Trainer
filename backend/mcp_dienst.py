@@ -847,6 +847,41 @@ def text_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
             "abschnitte": len(t["abschnitte"])}
 
 
+def buecher_auflisten(db: sqlite3.Connection, person: dict):
+    """Das Regal dieser Person — über alle Sammlungen."""
+    import buecher
+    return {"buecher": [dict(b) for b in
+                        buecher.auflisten(db, person["id"])]}
+
+
+def buch_anlegen(db: sqlite3.Connection, person: dict, sammlung_id: int,
+                 titel: str, verfasser: str | None = None,
+                 notiz: str | None = None):
+    """Ein Buch als Klammer über Texten."""
+    import buecher
+    zugang.sammlung_pruefen(db, person["id"], sammlung_id, schreiben=True)
+    return dict(_fehler_wandeln(buecher.anlegen, db, person["id"],
+                                sammlung_id, titel, verfasser=verfasser,
+                                notiz=notiz))
+
+
+def buch_lesen(db: sqlite3.Connection, person: dict, buch_id: int):
+    """Das Inhaltsverzeichnis: Kapitel, darin die Texte."""
+    import buecher
+    b = _fehler_wandeln(buecher.lesen, db, buch_id)
+    zugang.sammlung_pruefen(db, person["id"], b["sammlung_id"])
+    return _fehler_wandeln(buecher.inhalt, db, buch_id)
+
+
+def texte_zuordnen(db: sqlite3.Connection, person: dict, text_ids: list,
+                   buch_id: int | None = None, kapitel: str | None = None):
+    """Texte in ein Buch und ein Kapitel hängen."""
+    import buecher
+    return _fehler_wandeln(buecher.texte_zuordnen, db, person["id"],
+                           [int(i) for i in text_ids], buch_id,
+                           kapitel=kapitel)
+
+
 def text_lesen(db: sqlite3.Connection, person: dict, text_id: int):
     """Den Text mit seinen Abschnitten — zum Übersetzen."""
     t = dbm.zeile(db, "SELECT sammlung_id FROM text WHERE id = ?", (text_id,))
@@ -1732,6 +1767,64 @@ WERKZEUGE: list[dict] = [
             "required": ["wunsch_id"],
         },
         "funktion": offenes_wort_erledigen,
+    },
+    {
+        "name": "buecher_auflisten",
+        "funktion": buecher_auflisten,
+        "description": "Das Bücherregal dieser Person — über alle "
+                       "Sammlungen hinweg. Je Buch kommt zurück, wie viele "
+                       "Texte und Abschnitte es hat und wie viele davon "
+                       "übersetzt sind.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "buch_anlegen",
+        "funktion": buch_anlegen,
+        "description": "Legt ein Buch an — die Klammer über mehreren "
+                       "Texten. Die Sammlung sagt, gegen welchen "
+                       "Wortschatz das Buch gelesen wird; Texte aus einem "
+                       "anderen Wortschatz dürfen nicht hinein.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sammlung_id": _s("integer", "aus sammlungen_auflisten"),
+                "titel": _s("string", "z.B. Iwein"),
+                "verfasser": _s("string", "z.B. Hartmann von Aue"),
+                "notiz": _s("string", "freier Vermerk"),
+            },
+            "required": ["sammlung_id", "titel"],
+        },
+    },
+    {
+        "name": "buch_lesen",
+        "funktion": buch_lesen,
+        "description": "Das Inhaltsverzeichnis eines Buchs: die Kapitel "
+                       "und die Texte darin, je mit dem Stand der "
+                       "Übersetzung.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"buch_id": _s("integer", "aus buecher_auflisten")},
+            "required": ["buch_id"],
+        },
+    },
+    {
+        "name": "texte_zuordnen",
+        "funktion": texte_zuordnen,
+        "description": "Hängt Texte in ein Buch und ein Kapitel. Das "
+                       "Kapitel ist ein freier Name (z.B. »Prolog und "
+                       "Pfingstfest«) — gleiche Schreibweise heißt "
+                       "gleiches Kapitel, also genau abschreiben. Ohne "
+                       "buch_id werden die Texte wieder herausgenommen.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text_ids": {"type": "array", "items": {"type": "integer"},
+                             "description": "aus texte_auflisten"},
+                "buch_id": _s("integer", "aus buecher_auflisten"),
+                "kapitel": _s("string", "Name des Kapitels im Buch"),
+            },
+            "required": ["text_ids"],
+        },
     },
     {
         "name": "texte_auflisten",

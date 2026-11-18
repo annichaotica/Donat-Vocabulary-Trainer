@@ -35,6 +35,7 @@ import datenbank as dbm
 import legasthenie
 import lernen as lernmodul
 import beispielkurs
+import buecher
 import lehrgang
 import lesetexte
 import lernziele
@@ -55,6 +56,7 @@ import zugang
 import zuspruch as zuspruchmodul
 from modelle import (RegelEingabe, RegelAendern, ZuspruchEingabe,
                      LexemeVerschieben, TexteVerschieben,
+                     BuchAnlegen, BuchAendern, TexteZuordnen,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
@@ -1121,6 +1123,88 @@ def uebung_loeschen(uebung_id: int, request: Request = None,
 
 
 # ------------------------------------------------------- Lesen und Übersetzen
+
+# ============================================================== Bücher
+
+def _buch_fehler(arbeit):
+    try:
+        return arbeit()
+    except PermissionError as f:
+        raise HTTPException(403, str(f)) from f
+    except KeyError as f:
+        raise HTTPException(404, str(f.args[0] if f.args else f)) from f
+    except ValueError as f:
+        raise HTTPException(400, str(f)) from f
+
+
+@app.get("/api/buecher")
+def buecher_auflisten(benutzer_id: int, request: Request = None,
+                      db: sqlite3.Connection = DB):
+    """Alle Bücher dieser Person — über alle Sammlungen hinweg.
+
+    Ohne Sammlungskennung, und das ist der Punkt: wer drei Sprachen
+    lernt, hat ein Regal und nicht drei.
+    """
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _holen(db, "benutzer", benutzer_id)
+    return _buch_fehler(lambda: buecher.auflisten(db, benutzer_id))
+
+
+@app.post("/api/buecher", status_code=201)
+def buch_anlegen(eingabe: BuchAnlegen, request: Request = None,
+                 db: sqlite3.Connection = DB):
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id,
+                 sammlung_id=eingabe.sammlung_id, schreiben=True)
+    return _buch_fehler(lambda: buecher.anlegen(
+        db, eingabe.benutzer_id, eingabe.sammlung_id, eingabe.titel,
+        verfasser=eingabe.verfasser, notiz=eingabe.notiz))
+
+
+@app.get("/api/buecher/{buch_id}")
+def buch_lesen(buch_id: int, request: Request = None,
+               db: sqlite3.Connection = DB):
+    b = _holen(db, "buch", buch_id)
+    _wache_rumpf(db, request, sammlung_id=b["sammlung_id"])
+    return _buch_fehler(lambda: buecher.inhalt(db, buch_id))
+
+
+@app.patch("/api/buecher/{buch_id}")
+def buch_aendern(buch_id: int, eingabe: BuchAendern, request: Request = None,
+                 db: sqlite3.Connection = DB):
+    b = _holen(db, "buch", buch_id)
+    _wache_rumpf(db, request, sammlung_id=b["sammlung_id"], schreiben=True)
+    return _buch_fehler(lambda: buecher.aendern(
+        db, buch_id, titel=eingabe.titel, verfasser=eingabe.verfasser,
+        notiz=eingabe.notiz, reihenfolge=eingabe.reihenfolge))
+
+
+@app.delete("/api/buecher/{buch_id}")
+def buch_loeschen(buch_id: int, request: Request = None,
+                  db: sqlite3.Connection = DB):
+    """Das Buch weg, die Texte bleiben — sie stehen danach ohne Buch."""
+    b = _holen(db, "buch", buch_id)
+    _wache_rumpf(db, request, sammlung_id=b["sammlung_id"], schreiben=True)
+    return _buch_fehler(lambda: buecher.loeschen(db, buch_id))
+
+
+@app.get("/api/texte")
+def texte_aller_sammlungen(benutzer_id: int, request: Request = None,
+                           db: sqlite3.Connection = DB):
+    """Alle Lesetexte dieser Person — über alle Sammlungen hinweg."""
+    _wache_rumpf(db, request, benutzer_id=benutzer_id)
+    _holen(db, "benutzer", benutzer_id)
+    return lesetexte.alle_fuer(db, benutzer_id)
+
+
+@app.put("/api/texte/zuordnen")
+def texte_zuordnen(eingabe: TexteZuordnen, request: Request = None,
+                   db: sqlite3.Connection = DB):
+    """Texte in ein Buch und ein Kapitel hängen — oder wieder heraus."""
+    _wache_rumpf(db, request, benutzer_id=eingabe.benutzer_id)
+    return _buch_fehler(lambda: buecher.texte_zuordnen(
+        db, eingabe.benutzer_id, eingabe.text_ids, eingabe.buch_id,
+        kapitel=eingabe.kapitel))
+
 
 @app.get("/api/sammlungen/{sammlung_id}/texte")
 def texte_auflisten(sammlung_id: int, request: Request = None,

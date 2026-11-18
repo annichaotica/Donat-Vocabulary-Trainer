@@ -518,6 +518,28 @@ export async function zeichnen(behaelter) {
     anfuegen(h('p', { class: 'leise', style: 'margin:.8rem 0 0' }),
              stufenzeile(spielstand))));
 
+  // Bücher und Texte: eine eigene Karte, denn sie gehören dem Konto
+  // und nicht einer Sammlung. Der Iwein gehört nicht zu
+  // »Mittelhochdeutsch, Stammformen« — er ist Literatur, die man MIT
+  // diesem Wortschatz liest.
+  const buecher = await api.buecher(zustand.benutzerId).catch(() => []);
+  const alleTexte = await api.alleTexte(zustand.benutzerId).catch(() => []);
+  if (buecher.length || alleTexte.length) {
+    const offeneAbschnitte = alleTexte.reduce(
+      (summe, t) => summe + (t.abschnitte - t.uebersetzt), 0);
+    el.append(h('h2', { text: 'Bücher und Texte' }));
+    el.append(h('div', { class: 'karte' },
+      h('div', { class: 'zahlen' },
+        zahlKasten(buecher.length, buecher.length === 1 ? 'Buch' : 'Bücher'),
+        zahlKasten(alleTexte.length, 'Texte'),
+        zahlKasten(offeneAbschnitte, 'Abschnitte ohne Übersetzung')),
+      h('div', { class: 'frage-werkzeuge',
+                 style: 'justify-content:flex-start;margin-top:.8rem' },
+        h('button', { class: 'wichtig',
+                      onclick: () => { location.hash = '#/texte'; } },
+          'Zum Regal'))));
+  }
+
   // Lernziele: Ausschnitte des Bestands mit Termin, auch über Lektionen
   // und Sammlungen hinweg.
   const ziele = await api.lernziele(zustand.benutzerId).catch(() => []);
@@ -623,9 +645,10 @@ export async function zeichnen(behaelter) {
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/ueben'; },
         }, 'Sätze'),
-        h('button', {
-          onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/texte'; },
-        }, 'Texte'),
+        // »Texte« stand hier einmal — bei drei Sammlungen dreimal, jedes
+        // Mal mit einem anderen Ausschnitt dahinter. Bücher und Texte
+        // gehören dem Konto und haben jetzt ihre eigene Karte weiter
+        // oben.
         h('button', { onclick: () => modusWaehlen(behaelter, s) }, 'Gezielt üben'),
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/gezielt'; },

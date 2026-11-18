@@ -102,6 +102,14 @@ NACHRUESTEN: dict[str, dict[str, str]] = {
         "kennung": "TEXT",
         "reihenfolge": "INTEGER NOT NULL DEFAULT 0",
         "geaendert": "TEXT",
+        # Buch und Kapitel. Der Verweis steht ohne REFERENCES da:
+        # ALTER TABLE ADD COLUMN nimmt in SQLite keine Fremdschlüssel
+        # an, und nachträglich lässt er sich nicht anbringen. Die
+        # frische Datenbank bekommt ihn aus dem Schema; in einem
+        # gewanderten Bestand fehlt er. Gelöschte Bücher räumt
+        # `buecher.loeschen` darum selbst auf.
+        "buch_id": "INTEGER",
+        "kapitel": "TEXT",
     },
     "textabschnitt": {
         "varianten": "TEXT NOT NULL DEFAULT '[]'",
@@ -146,6 +154,10 @@ def wandern(db: sqlite3.Connection, von: int) -> None:
         for name, art in felder.items():
             if name not in vorhanden:
                 db.execute(f"ALTER TABLE {tabelle} ADD COLUMN {name} {art}")
+    # Erst JETZT, nach dem Nachrüsten: in einem bestehenden Bestand gibt
+    # es text.buch_id beim Ausführen des Schemas noch nicht.
+    db.execute("""CREATE INDEX IF NOT EXISTS idx_text_buch
+                    ON text(buch_id)""")
     db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_benutzer_email
                     ON benutzer(email) WHERE email IS NOT NULL""")
     db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_lektion_nr

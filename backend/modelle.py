@@ -457,6 +457,33 @@ class EintragPruefen(BaseModel):
     nur_mangelhafte: bool = True
 
 
+class BuchAnlegen(BaseModel):
+    benutzer_id: int
+    sammlung_id: int
+    titel: str = Field(min_length=1, max_length=200)
+    verfasser: str | None = Field(default=None, max_length=200)
+    notiz: str | None = Field(default=None, max_length=2000)
+
+
+class BuchAendern(BaseModel):
+    titel: str | None = Field(default=None, min_length=1, max_length=200)
+    verfasser: str | None = Field(default=None, max_length=200)
+    notiz: str | None = Field(default=None, max_length=2000)
+    reihenfolge: int | None = None
+
+
+class TexteZuordnen(BaseModel):
+    """Texte in ein Buch und ein Kapitel hängen.
+
+    `buch_id = None` nimmt sie wieder heraus. Das Kapitel ist ein Name
+    und kein Verweis — siehe `buecher`.
+    """
+    benutzer_id: int
+    text_ids: list[int] = Field(min_length=1, max_length=500)
+    buch_id: int | None = None
+    kapitel: str | None = Field(default=None, max_length=200)
+
+
 class TexteVerschieben(BaseModel):
     """Texte in ein Kapitel hängen. Wie bei den Wörtern: entweder eine
     bestehende Kennung oder eine Nummer, die notfalls angelegt wird."""

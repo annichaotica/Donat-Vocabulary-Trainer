@@ -157,6 +157,23 @@ export async function zeichnen(behaelter) {
     h('p', { class: 'leise' }, 'Wie viele Fragen am Tag und wie viel Neues '
       + 'dazwischen, stellst du unter Einstellungen ein.')));
 
+  el.append(abschnitt('Bücher und Texte',
+    h('p', {}, 'Bücher und Texte gehören zu ', h('b', { text: 'dir' }),
+      ' und nicht zu einer Sammlung. Du findest sie darum auf der '
+      + 'Übersicht als eigene Karte — ein Regal, auch wenn du drei '
+      + 'Sprachen lernst.'),
+    h('p', {}, h('b', { text: 'Drei Ebenen: Buch, Kapitel, Text. ' }),
+      'Ein Buch bündelt Texte; innerhalb des Buchs ordnen Kapitel sie. '
+      + 'Das Kapitel ist einfach ein Name — gleiche Schreibweise heißt '
+      + 'gleiches Kapitel.'),
+    h('p', {}, h('b', { text: 'Wogegen gelesen wird. ' }),
+      'Jedes Buch nennt einen Wortschatz. Daran rechnet der Trainer aus, '
+      + 'ob du den Text schon lesen könntest — darum darf kein Text aus '
+      + 'einem anderen Wortschatz hinein.'),
+    h('p', { class: 'leise' }, 'Ein Buch aufzulösen löscht keine Texte. '
+      + 'Es ist eine Klammer, kein Behälter — danach stehen sie unter '
+      + '»Ohne Buch«.')));
+
   el.append(abschnitt('Texte lesen',
     h('p', {}, h('b', { text: 'Übersetzung daneben. ' }),
       'Über dem Text steht ein Schalter. Angeschaltet stehen Original '

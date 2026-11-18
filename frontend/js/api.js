@@ -107,6 +107,14 @@ export const api = {
   // Als EIN Aufruf: jedes Umhängen erzeugt die Aufgaben neu, und bei
   // dreißig einzelnen Anfragen bliebe bei einem Abbruch die Hälfte
   // verschoben.
+  // Bücher und Texte hängen am Konto, nicht an einer Sammlung.
+  buecher: (benutzerId) => ruf('/buecher', { frage: { benutzer_id: benutzerId } }),
+  buch: (id) => ruf(`/buecher/${id}`),
+  buchAnlegen: (daten) => ruf('/buecher', { methode: 'POST', daten }),
+  buchAendern: (id, daten) => ruf(`/buecher/${id}`, { methode: 'PATCH', daten }),
+  buchLoeschen: (id) => ruf(`/buecher/${id}`, { methode: 'DELETE' }),
+  alleTexte: (benutzerId) => ruf('/texte', { frage: { benutzer_id: benutzerId } }),
+  texteZuordnen: (daten) => ruf('/texte/zuordnen', { methode: 'PUT', daten }),
   texteVerschieben: (sammlungId, daten) =>
     ruf(`/sammlungen/${sammlungId}/texte/kapitel`,
         { methode: 'PUT', daten }),

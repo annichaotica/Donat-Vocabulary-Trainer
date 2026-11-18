@@ -434,6 +434,40 @@ CREATE INDEX IF NOT EXISTS idx_wiederholung_zeit
 --               abgefragt.
 -- kennung       Schlüssel des Lehrwerks, damit ein erneuter Import
 --               aktualisiert statt zu verdoppeln.
+-- Ein Buch — die Klammer über den Texten.
+--
+-- »Es gibt noch keine Bücher, das wäre noch gut. Und tatsächlich würde
+-- ich behaupten, die Texte gehören dem Konto und nicht der Sammlung.«
+--
+-- Sie hat recht, und zwar in der Darstellung: der Iwein gehört nicht
+-- zu »Mittelhochdeutsch, Stammformen«. Er ist Literatur, die man MIT
+-- diesem Wortschatz liest. Als Unterpunkt einer Vokabelsammlung stand
+-- er am falschen Ort, und bei drei Sammlungen stand der Knopf »Texte«
+-- dreimal da.
+--
+-- Die Sammlung bleibt trotzdem dran, aber am BUCH und nicht am Begriff
+-- des Besitzes: an ihr hängt die Deckung (»kann ich das schon
+-- lesen?«), und ohne einen Wortschatz, gegen den gerechnet wird, gibt
+-- es diese Auskunft nicht. Ein Buch wird also gegen einen Wortschatz
+-- gelesen — das ist etwas anderes, als ihm zu gehören.
+--
+-- Die Kapitel stehen NICHT in einer eigenen Tabelle, sondern als Name
+-- am Text (text.kapitel). Ein Buchkapitel hat keine Eigenschaften
+-- außer seinem Namen und seiner Stelle; die Stelle ergibt sich aus der
+-- Reihenfolge der Texte. Eine Tabelle dafür wäre eine Zeile Verwaltung
+-- je Kapitel, ohne dass irgendetwas daran hinge.
+CREATE TABLE IF NOT EXISTS buch (
+    id          INTEGER PRIMARY KEY,
+    benutzer_id INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+    sammlung_id INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
+    titel       TEXT NOT NULL,
+    verfasser   TEXT,
+    notiz       TEXT,
+    reihenfolge INTEGER NOT NULL DEFAULT 0,
+    angelegt    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_buch_benutzer ON buch(benutzer_id);
+
 CREATE TABLE IF NOT EXISTS text (
     id            INTEGER PRIMARY KEY,
     sammlung_id   INTEGER NOT NULL REFERENCES sammlung(id) ON DELETE CASCADE,
@@ -459,9 +493,18 @@ CREATE TABLE IF NOT EXISTS text (
     geprueft      INTEGER NOT NULL DEFAULT 0,
     kennung       TEXT,                   -- stabil fürs Wiederfinden
     reihenfolge   INTEGER NOT NULL DEFAULT 0,
-    geaendert     TEXT
+    geaendert     TEXT,
+    -- Zu welchem Buch gehört der Text, und zu welchem Kapitel darin.
+    -- Das Kapitel als NAME, nicht als Verweis — siehe die Begründung
+    -- an der Tabelle `buch`.
+    buch_id       INTEGER REFERENCES buch(id) ON DELETE SET NULL,
+    kapitel       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_text_sammlung ON text(sammlung_id);
+-- Der Index auf buch_id steht NICHT hier, sondern in datenbank.wandern:
+-- in einem bestehenden Bestand gibt es die Spalte beim Ausführen dieses
+-- Schemas noch nicht (CREATE TABLE IF NOT EXISTS tut dann nichts, die
+-- Spalte kommt erst beim Nachrüsten), und der Index schlüge fehl.
 
 -- Die Arbeitseinheit: ein Satz oder ein Absatz.
 -- varianten / referenz_varianten: weitere gültige Fassungen desselben

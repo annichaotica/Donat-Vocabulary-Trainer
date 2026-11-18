@@ -499,7 +499,7 @@ def test_kein_werkzeugtext_nennt_ein_werkzeug_das_es_nicht_gibt():
     erlaubt = {"lektion_nr", "sammlung_id", "lexem_id", "form_id", "text_id",
                "benutzer_id", "abschnitt_id", "wunsch_id", "aufgabe_id",
                "als_geprueft", "nur_pruefen", "ist_grundform", "genus_verbi",
-               "bedeutung_id", "lernziel_id",
+               "bedeutung_id", "lernziel_id", "buch_id",
                "ist_variante", "bewertung_art", "grund_sprache",
                "ungeprueft_abfragen", "ab_lektion", "bis_lektion",
                "textaufgabe_id", "formgruppe_lektion", "zielsprache_text",
@@ -624,3 +624,33 @@ def test_in_fremde_postfaecher_sieht_nur_wer_verwalten_darf(klient, mcp):
     assert fremd.get("_werkzeugfehler"), fremd
     # Das eigene schon.
     assert not werkzeug(kind, "zuspruch_lesen").get("_werkzeugfehler")
+
+
+def test_buecher_lassen_sich_ueber_den_mcp_einsortieren(klient, mcp):
+    """»Die Übersetzung geb ich dem Chat, der die Bücher eingestellt
+    hat.« Dann muss derselbe Chat sie auch einsortieren können — 173
+    Stücke von Hand in der Oberfläche wären eine Strafe.
+    """
+    s = werkzeug(mcp, "sammlung_anlegen", name="Mittelhochdeutsch",
+                 sprache="gmh")
+    sid = s["sammlung_id"]
+    ids = []
+    for i in (1, 2, 3):
+        t = werkzeug(mcp, "text_anlegen", sammlung_id=sid,
+                     titel=f"Iwein – Verse {i}", inhalt=f"ein vers {i}.")
+        ids.append(t["text_id"])
+
+    buch = werkzeug(mcp, "buch_anlegen", sammlung_id=sid, titel="Iwein",
+                    verfasser="Hartmann von Aue")
+    assert not buch.get("_werkzeugfehler"), buch
+
+    e = werkzeug(mcp, "texte_zuordnen", text_ids=ids[:2],
+                 buch_id=buch["id"], kapitel="Prolog")
+    assert e["zugeordnet"] == 2, e
+
+    inhalt = werkzeug(mcp, "buch_lesen", buch_id=buch["id"])
+    assert [k["titel"] for k in inhalt["kapitel"]] == ["Prolog"]
+    assert inhalt["texte"] == 2
+
+    regal = werkzeug(mcp, "buecher_auflisten")
+    assert [b["titel"] for b in regal["buecher"]] == ["Iwein"]

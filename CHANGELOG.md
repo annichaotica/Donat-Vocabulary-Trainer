@@ -14,6 +14,43 @@ Eintrag wiederfindet.
 
 ---
 
+## 18.11.2026
+
+### Ein Regal: Buch – Kapitel – Text
+
+»Es gibt noch keine Bücher, das wäre noch gut. Und tatsächlich würde
+ich behaupten, die Texte gehören dem Konto und nicht der Sammlung,
+also können sie auch außerhalb der Sammlungskarte dargestellt werden,
+als eigene Karte.«
+
+Sie hat recht, und zwar in der Ordnung der Dinge: **der Iwein gehört
+nicht zu »Mittelhochdeutsch, Stammformen«.** Er ist Literatur, die man
+*mit* diesem Wortschatz liest. Vorher musste man erst eine Sammlung
+wählen, und bei drei Sammlungen stand der Knopf »Texte« dreimal auf
+der Übersicht, jedes Mal mit einem anderen Ausschnitt dahinter.
+
+Jetzt gibt es **Bücher und Texte** als eigene Karte auf der Übersicht,
+und dahinter ein Regal mit drei Ebenen: Buch → Kapitel → Text. Bücher
+sind zugeklappt, bis man sie öffnet — bei fünf Büchern mit je 173
+Stücken wäre die Seite sonst ein Band.
+
+Zuordnen geht wie überall sonst: anhaken, Buch wählen, Kapitel
+eintippen, zuordnen. Vorhandene Kapitelnamen werden vorgeschlagen,
+damit aus einem Tippfehler nicht zwei Kapitel werden.
+
+**Die Sammlung bleibt am Buch** — aber als Eigenschaft, nicht als
+Besitz. An ihr hängt die Deckung (»kann ich das schon lesen?«), und
+ohne einen Wortschatz, gegen den gerechnet wird, gibt es diese
+Auskunft nicht. Ein Text aus einem anderen Wortschatz darf darum nicht
+ins Buch: die Antwort wäre sonst erfunden.
+
+**Ein Buch aufzulösen löscht keine Texte.** Es ist eine Klammer, kein
+Behälter; danach stehen sie unter »Ohne Buch«.
+
+Über den MCP geht alles auch: `buch_anlegen`, `buecher_auflisten`,
+`buch_lesen`, `texte_zuordnen`. 173 Stücke von Hand einzusortieren
+wäre eine Strafe.
+
 ## 17.11.2026
 
 ### Texte haben jetzt Kapitel

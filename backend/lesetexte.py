@@ -734,6 +734,7 @@ def auflisten(db: sqlite3.Connection, sammlung_id: int) -> list[dict]:
     return dbm.zeilen(db, """
         SELECT t.id, t.titel, t.sprache, t.niveau, t.angelegt, t.notiz,
                t.lektion_id, k.nr AS lektion_nr, k.name AS lektion_name,
+               t.buch_id, t.kapitel, b.titel AS buch_titel,
                LENGTH(t.inhalt) AS zeichen,
                (SELECT COUNT(*) FROM textabschnitt a WHERE a.text_id = t.id)
                  AS abschnitte,
@@ -743,6 +744,7 @@ def auflisten(db: sqlite3.Connection, sammlung_id: int) -> list[dict]:
                  AS uebersetzt
           FROM text t
           LEFT JOIN lektion k ON k.id = t.lektion_id
+          LEFT JOIN buch b ON b.id = t.buch_id
          WHERE t.sammlung_id = ? AND t.typ = 'lesetext'
          ORDER BY k.nr IS NULL, k.nr, t.reihenfolge, t.angelegt, t.id""",
         (sammlung_id,))
@@ -778,6 +780,44 @@ def kapitel_setzen(db: sqlite3.Connection, sammlung_id: int,
                           geaendert = datetime('now')
                     WHERE id IN ({platz})""", (lektion_id, *text_ids))
     return {"verschoben": len(text_ids), "lektion_id": lektion_id}
+
+
+def alle_fuer(db: sqlite3.Connection, benutzer_id: int) -> list[dict]:
+    """Alle Lesetexte, die diese Person erreichen kann.
+
+    Ohne Sammlungskennung — dasselbe Argument wie bei den Büchern: wer
+    drei Sprachen lernt, hat ein Regal und nicht drei. Die Sammlung
+    steht an jedem Text dabei, sie ist eine Eigenschaft und kein
+    Eingang.
+
+    Was in einem Buch steht, kommt zuerst; Loses zuletzt. `b.id IS
+    NULL` muss dafür ausdrücklich davorstehen: SQLite sortiert NULL
+    nach vorn, und ohne diese Zeile stand der eine unsortierte Text
+    über dem ganzen Iwein.
+    """
+    import buecher
+    sammlungen = buecher._zugaenglich(db, benutzer_id)
+    if not sammlungen:
+        return []
+    platz = ",".join("?" * len(sammlungen))
+    return dbm.zeilen(db, f"""
+        SELECT t.id, t.titel, t.sprache, t.niveau, t.angelegt,
+               t.sammlung_id, s.name AS sammlung,
+               t.buch_id, t.kapitel, b.titel AS buch_titel,
+               LENGTH(t.inhalt) AS zeichen,
+               (SELECT COUNT(*) FROM textabschnitt a WHERE a.text_id = t.id)
+                 AS abschnitte,
+               (SELECT COUNT(*) FROM textabschnitt a
+                 WHERE a.text_id = t.id
+                   AND a.referenz IS NOT NULL AND TRIM(a.referenz) != '')
+                 AS uebersetzt
+          FROM text t
+          JOIN sammlung s ON s.id = t.sammlung_id
+          LEFT JOIN buch b ON b.id = t.buch_id
+         WHERE t.sammlung_id IN ({platz}) AND t.typ = 'lesetext'
+         ORDER BY b.id IS NULL, b.reihenfolge, b.titel,
+                  t.reihenfolge, t.angelegt, t.id""",
+        sammlungen)
 
 
 def loeschen(db: sqlite3.Connection, text_id: int) -> None:

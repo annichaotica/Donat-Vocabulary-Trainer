@@ -61,6 +61,7 @@ def pruefen(db: sqlite3.Connection, lexem_id: int) -> dict:
     befunde += _aufgaben_pruefen(aktive, formen, uebersetzungen)
     befunde += _mehrdeutigkeit_pruefen(db, lexem, bedeutungen, grund)
     befunde += _gleichlauter_pruefen(db, lexem, formen)
+    befunde += _kontext_nennt_form(bedeutungen, formen)
 
     schwer = [b for b in befunde if b["schwere"] == "fehler"]
     return {
@@ -167,6 +168,59 @@ def _mehrdeutigkeit_pruefen(db: sqlite3.Connection, lexem: dict,
             if not b["kontext"] else
             ("Durch den Kontext »" + b["kontext"] + "« ist die Frage "
              "eindeutig; die anderen gelten nicht als richtig.")))
+    return befunde
+
+
+def _kontext_nennt_form(bedeutungen: list[dict],
+                        formen: list[dict]) -> list[dict]:
+    """Steht im Kontext einer Bedeutung eine FORM desselben Wortes?
+
+    »Falscher Wortstamm? Hat mich jedenfalls verwirrt.«
+
+    Die Frage lautete: »gegessen — Partizip φαγωμένος«, und erwartet
+    war τρώω. Sie hat φαγωμένο getippt, also das, was in der Frage
+    stand, und bekam »Nicht richtig, richtig ist τρώω«.
+
+    Beides ist für sich genommen in Ordnung: Deutsch → Griechisch
+    fragt nach der GRUNDFORM, und ein Kontext soll erläutern. Zusammen
+    ergibt es eine Frage, die ein griechisches Wort zeigt und ein
+    anderes verlangt.
+
+    Dahinter steckt meist eine Verwechslung beim Eintragen: »gegessen«
+    ist keine Bedeutung von τρώω, sondern die Übersetzung einer FORM —
+    und die Form steht schon im Paradigma. Gemessen am laufenden
+    Bestand: 116 Bedeutungen sind so.
+
+    Eine NOTIZ und kein Fehler: manchmal ist es gewollt (»ο έτερος =
+    der andere«), nämlich wenn der Kontext ein Beispiel zeigt und
+    nicht die Antwort. Das kann nur ein Mensch unterscheiden — hier
+    steht, wo er hinsehen soll.
+    """
+    texte = [f["text"] for f in formen if f.get("text")]
+    if not texte:
+        return []
+    befunde = []
+    for b in bedeutungen:
+        kontext = (b.get("kontext") or "").strip()
+        if not kontext:
+            continue
+        # Die längsten zuerst, damit »αναφέρομαι« gefunden wird und
+        # nicht bloß das darin enthaltene »αναφέρω«.
+        treffer = [t for t in sorted(texte, key=len, reverse=True)
+                   if t and t in kontext]
+        if not treffer:
+            continue
+        befunde.append(_befund(
+            "kontext_nennt_form", "notiz",
+            f"Der Kontext »{kontext}« nennt {treffer[0]} — eine Form "
+            "dieses Wortes.",
+            betrifft=treffer[:3],
+            rat=("Beim Abfragen Deutsch → Fremdsprache steht diese Form "
+                 "dann in der Frage, verlangt wird aber die Grundform. "
+                 "Wenn die Bedeutung eigentlich zu der FORM gehört "
+                 "(»gegessen« zu φαγωμένος), gehört sie nicht als "
+                 "Bedeutung an das Wort. Zeigt der Kontext dagegen nur "
+                 "ein Beispiel, ist alles richtig.")))
     return befunde
 
 

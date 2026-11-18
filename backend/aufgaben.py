@@ -15,7 +15,7 @@ import datenbank as dbm
 import legasthenie
 import merkmale as mk
 import sprachen
-from pruefung import Urteil, pruefen as text_pruefen
+from pruefung import Urteil, artikel_trennen, pruefen as text_pruefen
 
 # Aufgabentypen. eingabeart steuert, was die Oberfläche anzeigt:
 #   text      — Eingabefeld
@@ -944,15 +944,24 @@ def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
     if typ == "genus":
         artikel = sprachen.profil(code)["artikel"]["genus_artikel"]
         gemeinsam = dbm.j_lesen(lexem["merkmale"]).get("genus") == "mf"
+        # OHNE den Artikel. Er steht im Lemma (»το αγόρι«) — und er IST
+        # die Antwort. Gemessen am laufenden Bestand: 909 von 928
+        # Artikelaufgaben zeigten sie an, also praktisch alle. Wer hier
+        # richtig lag, hat nichts bewiesen, und FSRS hat daraus
+        # geschlossen, das Wort sitze.
+        ohne = artikel_trennen(lexem["lemma"],
+                               dbm.profil_fuer(db, code))[1]
         return {**kopf,
-                "frage_text": lexem["lemma"],
+                "frage_text": ohne or lexem["lemma"],
                 "frage_sprache": code,
                 "frage_zusatz": ("Welcher Artikel? (gemeinsames Geschlecht — "
                                  "beide gelten)" if gemeinsam
                                  else "Welcher Artikel?"),
                 "antwort_sprache": code,
                 "auswahl": [{"wert": g, "text": t} for g, t in artikel.items()],
-                "vorlesen": lexem["lemma"]}
+                # Vorgelesen wird das Wort OHNE Artikel, aus demselben
+                # Grund: »το αγόρι« zu hören beantwortet die Frage.
+                "vorlesen": ohne or lexem["lemma"]}
 
     raise ValueError(f"Unbekannter Aufgabentyp {typ!r}")
 

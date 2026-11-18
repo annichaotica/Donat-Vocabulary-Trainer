@@ -16,6 +16,44 @@ Eintrag wiederfindet.
 
 ## 18.11.2026
 
+### Die Artikelfrage zeigte die Antwort
+
+»Artikel wird bereits angezeigt.«
+
+Die Frage lautete **»το αγόρι — Welcher Artikel?«**, und darüber stand
+το. Nachgezählt am laufenden Bestand: **909 von 928 Artikelaufgaben
+waren so** — praktisch alle, denn ein griechisches Hauptwort steht im
+Lehrwerk mit seinem Artikel.
+
+Wer da richtig lag, hat nichts bewiesen. Und der Lernplan hat daraus
+geschlossen, das Wort sitze.
+
+Jetzt steht in der Frage das Wort ohne Artikel — und vorgelesen wird
+es auch ohne, denn »το αγόρι« zu *hören* beantwortet die Frage
+genauso. Abgetrennt wird nur ein echter Artikel: »τοίχος« fängt zwar
+mit »το« an, ist aber keine Fügung.
+
+### Wenn der Kontext eine Form desselben Wortes nennt
+
+»Falscher Wortstamm? Hat mich jedenfalls verwirrt.«
+
+Die Frage lautete »gegessen — *Partizip φαγωμένος*«, erwartet war
+**τρώω**. Sie hat φαγωμένο getippt, also das, was in der Frage stand,
+und bekam »Nicht richtig«.
+
+Jedes Stück für sich ist in Ordnung: Deutsch → Griechisch fragt nach
+der Grundform, und ein Kontext soll erläutern. Zusammen zeigt die
+Frage ein griechisches Wort und verlangt ein anderes.
+
+Dahinter steckt meist eine Verwechslung beim Eintragen: »gegessen« ist
+keine Bedeutung von τρώω, sondern die Übersetzung einer **Form** — und
+die steht schon im Paradigma. Im Bestand sind **116 Bedeutungen** so.
+
+Die Eintragsprüfung meldet das jetzt. Als Notiz und nicht als Fehler:
+manchmal ist es gewollt (»ο έτερος = der andere«), nämlich wenn der
+Kontext ein Beispiel zeigt und nicht die Antwort. Das kann nur ein
+Mensch unterscheiden — die Prüfung sagt, wo er hinsehen soll.
+
 ### Ein Regal: Buch – Kapitel – Text
 
 »Es gibt noch keine Bücher, das wäre noch gut. Und tatsächlich würde

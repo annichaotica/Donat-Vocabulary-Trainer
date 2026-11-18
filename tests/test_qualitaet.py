@@ -381,3 +381,52 @@ def test_der_mcp_ruft_routenfunktionen_mit_namen():
                            f"{len(knoten.args) - 1} Stellungsargumente")
     assert not schlimm, ("Routenfunktionen mit Namen aufrufen: "
                          + "; ".join(schlimm))
+
+
+def test_ein_kontext_der_eine_form_nennt_wird_gemeldet(klient):
+    """»Falscher Wortstamm? Hat mich jedenfalls verwirrt.«
+
+    Die Frage lautete »gegessen — Partizip φαγωμένος«, erwartet war
+    τρώω. Sie hat φαγωμένο getippt, also das, was in der Frage stand.
+
+    Jedes Stück für sich ist richtig: Deutsch → Griechisch fragt nach
+    der Grundform, und ein Kontext soll erläutern. Zusammen zeigt die
+    Frage ein griechisches Wort und verlangt ein anderes.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lernende 1"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{
+            "lemma": "τρώω", "wortart": "verb",
+            "bedeutungen": [
+                {"uebersetzungen": ["essen"]},
+                {"uebersetzungen": ["gegessen"],
+                 "kontext": "Partizip φαγωμένος"}],
+            "formen": [{"text": "φαγωμένος", "merkmale": {
+                "nonfinit": "partizip_perfekt", "genus_verbi": "passiv"}}]}]})
+
+    lexem = klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()["lexeme"][0]
+    bericht = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    arten = [x["art"] for x in bericht["befunde"]]
+    assert "kontext_nennt_form" in arten, bericht["befunde"]
+    treffer = [x for x in bericht["befunde"]
+               if x["art"] == "kontext_nennt_form"][0]
+    assert "φαγωμένος" in treffer["text"]
+    # Eine Notiz, kein Fehler: manchmal ist es gewollt.
+    assert treffer["schwere"] == "notiz"
+
+
+def test_ein_kontext_ohne_eigene_form_wird_nicht_gemeldet(klient):
+    """Die Gegenprobe. »klein, Körpergröße« nennt keine Form — das ist
+    genau der Kontext, den es geben soll."""
+    b = klient.post("/api/benutzer", json={"name": "Lernende 2"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "μικρός", "wortart": "adjektiv",
+                       "bedeutungen": [{"uebersetzungen": ["klein"],
+                                        "kontext": "Körpergröße"}]}]})
+    lexem = klient.get(f"/api/sammlungen/{s['id']}/lexeme").json()["lexeme"][0]
+    bericht = klient.get(f"/api/lexeme/{lexem['id']}/pruefung").json()
+    assert "kontext_nennt_form" not in [x["art"] for x in bericht["befunde"]]

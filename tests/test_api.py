@@ -948,3 +948,70 @@ def test_ohne_kapitel_wird_in_der_abfrage_gefiltert(klient):
     breit = klient.get(f"/api/sammlungen/{s['id']}/lexeme",
                        params={"anzahl": 5}).json()
     assert "chose" not in [l["lemma"] for l in breit["lexeme"]]
+
+
+def test_die_artikelfrage_zeigt_den_artikel_nicht(klient):
+    """»Artikel wird bereits angezeigt.«
+
+    Die Frage lautete »το αγόρι — Welcher Artikel?«, und darüber stand
+    die Antwort. Gemessen am laufenden Bestand: 909 von 928
+    Artikelaufgaben waren so. Wer da richtig lag, hat nichts bewiesen —
+    und FSRS hat daraus geschlossen, das Wort sitze.
+
+    Vorgelesen wird aus demselben Grund das Wort ohne Artikel: »το
+    αγόρι« zu HÖREN beantwortet die Frage genauso.
+    """
+    import datenbank as dbm
+    import aufgaben
+
+    b = klient.post("/api/benutzer", json={"name": "Lernender 1"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "το αγόρι", "wortart": "substantiv",
+                       "merkmale": {"genus": "n"},
+                       "bedeutungen": [{"uebersetzungen": ["der Junge"]}]}]})
+
+    db = dbm.verbindung()
+    try:
+        z = dbm.zeile(db, """SELECT a.id FROM aufgabe a
+                               JOIN lexem l ON l.id = a.lexem_id
+                              WHERE l.sammlung_id = ? AND a.typ = 'genus'""",
+                      (s["id"],))
+        assert z, "es muss eine Artikelaufgabe geben"
+        f = aufgaben.frage(db, z["id"])
+    finally:
+        db.close()
+
+    assert f["frage_text"] == "αγόρι", f["frage_text"]
+    assert f["vorlesen"] == "αγόρι", f["vorlesen"]
+    assert "το" not in f["frage_text"].split(), f
+
+
+def test_ein_wort_ohne_artikel_bleibt_unangetastet(klient):
+    """Die Gegenprobe: abgetrennt wird nur ein echter Artikel.
+
+    Ein Lemma, das zufällig mit denselben Buchstaben anfängt, darf
+    nicht beschnitten werden — »τοίχος« beginnt mit »το«, ist aber
+    keine Fügung aus Artikel und Wort.
+    """
+    import datenbank as dbm
+    import aufgaben
+
+    b = klient.post("/api/benutzer", json={"name": "Lernende 2"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "τοίχος", "wortart": "substantiv",
+                       "merkmale": {"genus": "m"},
+                       "bedeutungen": [{"uebersetzungen": ["die Wand"]}]}]})
+    db = dbm.verbindung()
+    try:
+        z = dbm.zeile(db, """SELECT a.id FROM aufgabe a
+                               JOIN lexem l ON l.id = a.lexem_id
+                              WHERE l.sammlung_id = ? AND a.typ = 'genus'""",
+                      (s["id"],))
+        f = aufgaben.frage(db, z["id"])
+    finally:
+        db.close()
+    assert f["frage_text"] == "τοίχος", f["frage_text"]

@@ -155,8 +155,12 @@ def varianten(text: str) -> list[str]:
     return [v for v in ergebnis if v]
 
 
-def _artikel_trennen(text: str, profil: dict) -> tuple[str | None, str]:
-    """Trennt einen führenden Artikel ab. Gibt (Artikel, Rest) zurück."""
+def artikel_trennen(text: str, profil: dict) -> tuple[str | None, str]:
+    """Trennt einen führenden Artikel ab. Gibt (Artikel, Rest) zurück.
+
+    Öffentlich, seit die Artikelaufgabe ihn braucht: dort darf der
+    Artikel nicht in der Frage stehen, weil er die Antwort IST.
+    """
     artikel = profil.get("artikel", {}) if profil else {}
     alle = [a.casefold() for a in
             list(artikel.get("bestimmt", [])) + list(artikel.get("unbestimmt", []))]
@@ -323,7 +327,7 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
 
     e_norm = normalisieren(eingabe, profil)
     e_kern_voll = _kern(eingabe, profil)
-    e_artikel, e_rest = _artikel_trennen(e_norm, profil)
+    e_artikel, e_rest = artikel_trennen(e_norm, profil)
     e_kern = _kern(e_rest, profil)
     e_genau = _genau(e_rest, profil)
 
@@ -335,7 +339,7 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
     bestes: Urteil | None = None
     for _roh, ziel in ziele:
         z_norm = normalisieren(ziel, profil)
-        z_artikel, z_rest = _artikel_trennen(z_norm, profil)
+        z_artikel, z_rest = artikel_trennen(z_norm, profil)
         z_kern = _kern(z_rest, profil)
         z_genau = _genau(z_rest, profil)
         if not z_kern:
@@ -421,7 +425,7 @@ def pruefen(eingabe: str, erwartet: list[str], profil: dict,
     # ---- Schicht 3: Tippfehler
     for _roh, ziel in ziele:
         z_norm = normalisieren(ziel, profil)
-        _z_artikel, z_rest = _artikel_trennen(z_norm, profil)
+        _z_artikel, z_rest = artikel_trennen(z_norm, profil)
         z_kern = _kern(z_rest, profil)
         if not z_kern:
             continue

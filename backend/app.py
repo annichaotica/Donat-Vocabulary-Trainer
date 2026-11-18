@@ -57,6 +57,7 @@ import zuspruch as zuspruchmodul
 from modelle import (RegelEingabe, RegelAendern, ZuspruchEingabe,
                      LexemeVerschieben, TexteVerschieben,
                      BuchAnlegen, BuchAendern, TexteZuordnen,
+                     BedeutungAendern,
     BedeutungEingabe, BenutzerAendern, BenutzerAnlegen,
                      BewertenEingabe, EingriffEingabe, FormEingabe,
                      LegasthenieEinstellungen, LektionAnlegen,
@@ -1072,7 +1073,7 @@ def uebungen_importieren(sammlung_id: int, eingabe: UebungenImportEingabe,
 
 
 @app.post("/api/sammlungen/{sammlung_id}/text/pruefen")
-def text_deckung(sammlung_id: int, eingabe: TextPruefenEingabe,
+def text_auf_stufe_pruefen(sammlung_id: int, eingabe: TextPruefenEingabe,
                  db: sqlite3.Connection = DB):
     """Welche Wörter eines Textes stehen bis zu dieser Lektion noch nicht da?
 
@@ -1784,6 +1785,63 @@ def _bedeutung_einfuegen(db: sqlite3.Connection, lexem_id: int,
     return bedeutung_id
 
 
+def _bedeutung_lexem(db: sqlite3.Connection, bedeutung_id: int) -> dict:
+    b = dbm.zeile(db, "SELECT * FROM bedeutung WHERE id = ?", (bedeutung_id,))
+    if b is None:
+        raise HTTPException(404, f"Bedeutung {bedeutung_id} gibt es nicht")
+    return b
+
+
+@app.patch("/api/bedeutungen/{bedeutung_id}")
+def bedeutung_aendern(bedeutung_id: int, eingabe: BedeutungAendern,
+                      request: Request = None, db: sqlite3.Connection = DB):
+    """EINE Bedeutung ändern — und die Kennung behalten.
+
+    Der ganze Zweck: `lexem_aendern` mit `bedeutungen` löscht alle und
+    legt sie neu an. Die Aufgabe »Wort bilden« hängt aber an der
+    Kennung der Bedeutung, also bekäme jede einen neuen Schlüssel und
+    der Lernstand finge von vorn an. Wer eine Fußnote berichtigt, soll
+    nicht den Lernstand des Wortes verlieren.
+    """
+    b = _bedeutung_lexem(db, bedeutung_id)
+    lexem = _holen(db, "lexem", b["lexem_id"])
+    _wache_rumpf(db, request, sammlung_id=lexem["sammlung_id"],
+                 schreiben=True)
+    s_ = _holen(db, "sammlung", lexem["sammlung_id"])
+
+    felder, werte = [], []
+    if eingabe.kontext is not None:
+        felder.append("kontext = ?")
+        werte.append(eingabe.kontext.strip() or None)
+    if eingabe.notiz is not None:
+        felder.append("notiz = ?"); werte.append(eingabe.notiz or None)
+    if eingabe.reihenfolge is not None:
+        felder.append("reihenfolge = ?"); werte.append(eingabe.reihenfolge)
+    if felder:
+        db.execute(f"UPDATE bedeutung SET {', '.join(felder)} WHERE id = ?",
+                   (*werte, bedeutung_id))
+
+    if eingabe.uebersetzungen is not None:
+        texte = [t.strip() for t in eingabe.uebersetzungen if t.strip()]
+        if not texte:
+            raise HTTPException(
+                400, "Ohne Übersetzung entsteht keine Aufgabe. Um die "
+                     "Bedeutung zu entfernen, sie löschen.")
+        # Die Übersetzungen hängen AN der Bedeutung; sie neu zu setzen
+        # ändert deren Kennung nicht, und daran hängt die Aufgabe.
+        db.execute("DELETE FROM uebersetzung WHERE bedeutung_id = ?",
+                   (bedeutung_id,))
+        for i, t in enumerate(texte):
+            db.execute("""INSERT INTO uebersetzung
+                            (bedeutung_id, sprache, text, ist_haupt)
+                          VALUES (?, ?, ?, ?)""",
+                       (bedeutung_id, s_["grundsprache"], t, int(i == 0)))
+
+    aufgaben.erzeugen(db, lexem["id"])
+    return _lexem_ausbauen(db, _holen(db, "lexem", lexem["id"]),
+                           mit_aufgaben=True)
+
+
 @app.get("/api/lexeme/{lexem_id}")
 def lexem_lesen(lexem_id: int, db: sqlite3.Connection = DB):
     return _lexem_ausbauen(db, _holen(db, "lexem", lexem_id), mit_aufgaben=True)
@@ -1984,11 +2042,32 @@ def bedeutung_anlegen(lexem_id: int, eingabe: BedeutungEingabe,
     return _holen(db, "bedeutung", bedeutung_id)
 
 
-@app.delete("/api/bedeutungen/{bedeutung_id}", status_code=204)
+@app.delete("/api/bedeutungen/{bedeutung_id}")
 def bedeutung_loeschen(bedeutung_id: int, db: sqlite3.Connection = DB):
+    """Eine Bedeutung entfernen — die anderen behalten ihre Kennung.
+
+    Die Aufgabe zu DIESER Bedeutung verschwindet mitsamt ihrem
+    Lernstand; das ist gewollt, sie wird ja abgeschafft. Die Aufgaben
+    zu den übrigen bleiben unberührt — anders als bei `lexem_aendern`
+    mit `bedeutungen`, das alle löscht und neu anlegt.
+
+    Die letzte lässt sich nicht löschen: ohne Bedeutung entsteht keine
+    Bedeutungsaufgabe, und dann ist das Wort gemeint und nicht die
+    Bedeutung.
+    """
     b = _holen(db, "bedeutung", bedeutung_id)
+    uebrig = dbm.wert(db, """SELECT COUNT(*) FROM bedeutung
+                              WHERE lexem_id = ? AND id != ?""",
+                      (b["lexem_id"], bedeutung_id)) or 0
+    if not uebrig:
+        raise HTTPException(
+            400, "Das ist die letzte Bedeutung. Ohne eine entsteht keine "
+                 "Bedeutungsaufgabe — um das Wort ganz zu entfernen, das "
+                 "Lexem löschen.")
     db.execute("DELETE FROM bedeutung WHERE id = ?", (bedeutung_id,))
     aufgaben.erzeugen(db, b["lexem_id"])
+    return _lexem_ausbauen(db, _holen(db, "lexem", b["lexem_id"]),
+                           mit_aufgaben=True)
 
 
 @app.post("/api/bedeutungen/{bedeutung_id}/uebersetzungen", status_code=201)

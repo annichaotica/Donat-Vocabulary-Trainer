@@ -457,6 +457,25 @@ class EintragPruefen(BaseModel):
     nur_mangelhafte: bool = True
 
 
+class BedeutungAendern(BaseModel):
+    """EINE Bedeutung ändern, ohne die anderen anzufassen.
+
+    Der Unterschied zu `LexemAendern.bedeutungen` ist nicht Bequemlich-
+    keit: dort werden alle Bedeutungen gelöscht und neu angelegt, und
+    weil die Aufgabe »Wort bilden« an der Kennung der Bedeutung hängt
+    (`bedeutung_deutsch_fremd:<lexem>:bedeutung:<id>`), bekommt jede
+    einen neuen Schlüssel — der Lernstand fängt von vorn an. Für eine
+    berichtigte Fußnote ist das ein zu hoher Preis.
+
+    Leerer String bei `kontext` heißt ausdrücklich »Kontext entfernen«;
+    None heißt »nicht genannt«.
+    """
+    uebersetzungen: list[str] | None = Field(default=None, max_length=20)
+    kontext: str | None = Field(default=None, max_length=300)
+    notiz: str | None = Field(default=None, max_length=2000)
+    reihenfolge: int | None = None
+
+
 class BuchAnlegen(BaseModel):
     benutzer_id: int
     sammlung_id: int

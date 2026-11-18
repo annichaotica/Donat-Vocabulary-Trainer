@@ -16,6 +16,23 @@ Eintrag wiederfindet.
 
 ## 18.11.2026
 
+### Eine Bedeutung berichtigen, ohne den Lernstand zu verlieren
+
+Für das Aufräumen der 116 Fälle von oben fehlte das richtige Werkzeug.
+`vokabel_aendern` ersetzt **alle** Bedeutungen eines Wortes — und weil
+die Aufgabe »Wort bilden« an der Kennung der Bedeutung hängt, bekommt
+danach jede einen neuen Schlüssel und der Lernstand fängt von vorn an.
+Für eine berichtigte Fußnote ist das ein zu hoher Preis.
+
+Neu: `bedeutung_aendern` und `bedeutung_loeschen` fassen **eine**
+Bedeutung an. Die übrigen behalten ihre Kennung und damit ihren
+Lernstand. Die letzte lässt sich nicht löschen — ohne Bedeutung
+entsteht keine Aufgabe, und dann ist das Wort gemeint.
+
+Die Prüfung lässt sich jetzt außerdem auf **eine Befundart**
+eingrenzen. Ungefiltert ist die Antwort für den griechischen Bestand
+744 KB groß; gefiltert sind es 68.
+
 ### Die Artikelfrage zeigte die Antwort
 
 »Artikel wird bereits angezeigt.«

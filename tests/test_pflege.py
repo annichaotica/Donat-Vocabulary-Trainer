@@ -259,3 +259,98 @@ def test_fremdes_wort_ist_nicht_aenderbar(mcp, klient):
                                   "lemma": "γράφω"}),
             ("vokabeln_auflisten", {"sammlung_id": s["sammlung_id"]})):
         assert werkzeug(andere, name, **args).get("_werkzeugfehler"), name
+
+
+def test_eine_bedeutung_zu_berichtigen_kostet_keinen_lernstand(mcp, klient):
+    """Der ganze Zweck des Werkzeugs.
+
+    `vokabel_aendern` mit `bedeutungen` löscht alle und legt sie neu
+    an. Die Aufgabe »Wort bilden« hängt an der Kennung der Bedeutung
+    (bedeutung_deutsch_fremd:<lexem>:bedeutung:<id>) — also bekommt
+    jede einen neuen Schlüssel, und der Lernstand fängt von vorn an.
+
+    Für 111 berichtigte Fußnoten wäre das ein zu hoher Preis.
+    """
+    s = _sammlung(mcp)
+    werkzeug(mcp, "vokabeln_importieren", sammlung_id=s["sammlung_id"],
+             eintraege=[{"lemma": "τράπεζα", "wortart": "substantiv",
+                         "bedeutungen": [
+                             {"uebersetzungen": ["die Bank"],
+                              "kontext": "Geldinstitut"},
+                             {"uebersetzungen": ["der Tisch"]}]}])
+    wort = werkzeug(mcp, "vokabeln_auflisten",
+                    sammlung_id=s["sammlung_id"])["vokabeln"][0]
+    voll = werkzeug(mcp, "vokabel_lesen", lexem_id=wort["lexem_id"])
+
+    import datenbank as dbm
+    db = dbm.verbindung()
+    try:
+        vorher = {z["schluessel"] for z in dbm.zeilen(
+            db, """SELECT schluessel FROM aufgabe
+                    WHERE lexem_id = ? AND typ = 'bedeutung_deutsch_fremd'
+                      AND aktiv = 1""", (wort["lexem_id"],))}
+        assert len(vorher) == 2
+
+        erste = voll["bedeutungen"][0]["bedeutung_id"]
+        werkzeug(mcp, "bedeutung_aendern", bedeutung_id=erste,
+                 kontext="Geldinstitut, nicht das Möbel")
+
+        nachher = {z["schluessel"] for z in dbm.zeilen(
+            db, """SELECT schluessel FROM aufgabe
+                    WHERE lexem_id = ? AND typ = 'bedeutung_deutsch_fremd'
+                      AND aktiv = 1""", (wort["lexem_id"],))}
+    finally:
+        db.close()
+    assert nachher == vorher, "die Schlüssel müssen dieselben bleiben"
+
+
+def test_eine_bedeutung_loeschen_laesst_die_anderen_unberuehrt(mcp, klient):
+    """»gegessen« gehört zur FORM φαγωμένος und nicht zum Wort τρώω.
+    Sie zu entfernen darf »essen« nicht mitreißen."""
+    s = _sammlung(mcp)
+    werkzeug(mcp, "vokabeln_importieren", sammlung_id=s["sammlung_id"],
+             eintraege=[{"lemma": "τρώω", "wortart": "verb",
+                         "bedeutungen": [
+                             {"uebersetzungen": ["essen"]},
+                             {"uebersetzungen": ["gegessen"],
+                              "kontext": "Partizip φαγωμένος"}]}])
+    wort = werkzeug(mcp, "vokabeln_auflisten",
+                    sammlung_id=s["sammlung_id"])["vokabeln"][0]
+    voll = werkzeug(mcp, "vokabel_lesen", lexem_id=wort["lexem_id"])
+    falsche = [b for b in voll["bedeutungen"]
+               if "gegessen" in b["uebersetzungen"]][0]
+
+    import datenbank as dbm
+    db = dbm.verbindung()
+    try:
+        bleibt = dbm.wert(
+            db, """SELECT schluessel FROM aufgabe
+                    WHERE lexem_id = ? AND typ = 'bedeutung_deutsch_fremd'
+                      AND ziel_id != ?""",
+            (wort["lexem_id"], falsche["bedeutung_id"]))
+        d = werkzeug(mcp, "bedeutung_loeschen",
+                     bedeutung_id=falsche["bedeutung_id"])
+        assert not d.get("_werkzeugfehler"), d
+        assert [b["uebersetzungen"] for b in d["bedeutungen"]] == [["essen"]]
+        noch_da = dbm.wert(
+            db, """SELECT schluessel FROM aufgabe
+                    WHERE lexem_id = ? AND typ = 'bedeutung_deutsch_fremd'
+                      AND aktiv = 1""", (wort["lexem_id"],))
+    finally:
+        db.close()
+    assert noch_da == bleibt, "die übrige Aufgabe behält ihren Schlüssel"
+
+
+def test_die_letzte_bedeutung_laesst_sich_nicht_loeschen(mcp, klient):
+    """Ohne Bedeutung entsteht keine Aufgabe — dann ist das Wort
+    gemeint und nicht die Bedeutung."""
+    s = _sammlung(mcp)
+    werkzeug(mcp, "vokabeln_importieren", sammlung_id=s["sammlung_id"],
+             eintraege=[{"lemma": "νερό", "wortart": "substantiv",
+                         "bedeutungen": [{"uebersetzungen": ["das Wasser"]}]}])
+    wort = werkzeug(mcp, "vokabeln_auflisten",
+                    sammlung_id=s["sammlung_id"])["vokabeln"][0]
+    voll = werkzeug(mcp, "vokabel_lesen", lexem_id=wort["lexem_id"])
+    d = werkzeug(mcp, "bedeutung_loeschen",
+                 bedeutung_id=voll["bedeutungen"][0]["bedeutung_id"])
+    assert d.get("_werkzeugfehler"), d

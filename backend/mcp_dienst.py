@@ -496,7 +496,12 @@ def vokabel_lesen(db: sqlite3.Connection, person: dict, lexem_id: int):
                     "beschriftung": f["beschriftung"],
                     "geprueft": bool(f["geprueft"]), "quelle": f["quelle"],
                     "gruppe": f["gruppe"]} for f in lexem["formen"]],
-        "bedeutungen": [{"id": b["id"], "kontext": b["kontext"],
+        # »bedeutung_id« und nicht »id«: genau so heißt der Parameter
+        # von bedeutung_aendern, erklaerung_setzen und
+        # bedeutung_loeschen. Ein Feld, das anders heißt als das Feld,
+        # in das es gehört, ist eine Falle — und derjenige, der hier
+        # liest, ist meistens eine Maschine.
+        "bedeutungen": [{"bedeutung_id": b["id"], "kontext": b["kontext"],
                          "erklaerung": b["notiz"],
                          "uebersetzungen": [u["text"] for u in b["uebersetzungen"]]}
                         for b in lexem["bedeutungen"]],
@@ -813,6 +818,53 @@ def zuspruch_lesen(db: sqlite3.Connection, person: dict,
         "von_mir": _fehler_wandeln(zuspruchmodul.von_mir, db, ziel_id),
         "empfaenger": _fehler_wandeln(zuspruchmodul.empfaenger, db, ziel_id),
     }
+
+
+def bedeutung_aendern(db: sqlite3.Connection, person: dict,
+                      bedeutung_id: int, uebersetzungen: list | None = None,
+                      kontext: str | None = None, notiz: str | None = None):
+    """EINE Bedeutung berichtigen, ohne die anderen anzufassen."""
+    from modelle import BedeutungAendern
+    b = dbm.zeile(db, """SELECT l.sammlung_id FROM bedeutung b
+                           JOIN lexem l ON l.id = b.lexem_id
+                          WHERE b.id = ?""", (bedeutung_id,))
+    if b is None:
+        raise WerkzeugFehler(f"Bedeutung {bedeutung_id} gibt es nicht")
+    zugang.sammlung_pruefen(db, person["id"], b["sammlung_id"],
+                            schreiben=True)
+    eingabe = _fehler_wandeln(
+        BedeutungAendern, uebersetzungen=uebersetzungen, kontext=kontext,
+        notiz=notiz)
+    ergebnis = _fehler_wandeln(_app().bedeutung_aendern, bedeutung_id,
+                               eingabe=eingabe, db=db)
+    return {"lexem_id": ergebnis["id"], "lemma": ergebnis["lemma"],
+            "bedeutungen": [{"bedeutung_id": x["id"],
+                             "uebersetzungen": [u["text"] for u
+                                                in x["uebersetzungen"]],
+                             "kontext": x["kontext"]}
+                            for x in ergebnis["bedeutungen"]]}
+
+
+def bedeutung_loeschen(db: sqlite3.Connection, person: dict,
+                       bedeutung_id: int):
+    """Eine Bedeutung entfernen — die anderen behalten ihren Lernstand."""
+    b = dbm.zeile(db, """SELECT l.sammlung_id FROM bedeutung b
+                           JOIN lexem l ON l.id = b.lexem_id
+                          WHERE b.id = ?""", (bedeutung_id,))
+    if b is None:
+        raise WerkzeugFehler(f"Bedeutung {bedeutung_id} gibt es nicht")
+    zugang.sammlung_pruefen(db, person["id"], b["sammlung_id"],
+                            schreiben=True)
+    ergebnis = _fehler_wandeln(_app().bedeutung_loeschen, bedeutung_id,
+                               db=db)
+    # Die Route gibt das ganze Wort zurück; davon braucht die KI die
+    # Bedeutungen mit ihren Kennungen, um weiterarbeiten zu können.
+    return {"lexem_id": ergebnis["id"], "lemma": ergebnis["lemma"],
+            "bedeutungen": [{"bedeutung_id": x["id"],
+                             "uebersetzungen": [u["text"] for u
+                                                in x["uebersetzungen"]],
+                             "kontext": x["kontext"]}
+                            for x in ergebnis["bedeutungen"]]}
 
 
 def abfrage_setzen(db: sqlite3.Connection, person: dict,
@@ -1695,6 +1747,45 @@ WERKZEUGE: list[dict] = [
         "inputSchema": {
             "type": "object",
             "properties": {"fuer": _s("string", "Name des Profils")},
+        },
+    },
+    {
+        "name": "bedeutung_aendern",
+        "funktion": bedeutung_aendern,
+        "description": (
+            "Berichtigt EINE Bedeutung, ohne die anderen anzufassen. Dafür "
+            "gedacht, einen Kontext umzuformulieren oder Übersetzungen zu "
+            "ersetzen. Unbedingt diesem Werkzeug den Vorzug geben vor "
+            "vokabel_aendern mit 'bedeutungen': das löscht alle Bedeutungen "
+            "und legt sie neu an, und weil die Aufgabe »Wort bilden« an der "
+            "Kennung der Bedeutung hängt, fängt der Lernstand des Wortes "
+            "dann von vorn an. Leerer Kontext entfernt ihn."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "bedeutung_id": _s("integer", "aus vokabel_lesen"),
+                "uebersetzungen": {"type": "array",
+                                   "items": {"type": "string"},
+                                   "description": "ersetzt die bisherigen"},
+                "kontext": _s("string", "Unterscheidung, z.B. »Geldinstitut«"),
+                "notiz": _s("string", "freier Vermerk"),
+            },
+            "required": ["bedeutung_id"],
+        },
+    },
+    {
+        "name": "bedeutung_loeschen",
+        "funktion": bedeutung_loeschen,
+        "description": "Entfernt EINE Bedeutung. Die übrigen behalten ihre "
+                       "Kennung und damit ihren Lernstand. Die letzte "
+                       "Bedeutung lässt sich nicht löschen — ohne eine "
+                       "entsteht keine Aufgabe; dafür gibt es "
+                       "vokabel_loeschen.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "bedeutung_id": _s("integer", "aus vokabel_lesen")},
+            "required": ["bedeutung_id"],
         },
     },
     {

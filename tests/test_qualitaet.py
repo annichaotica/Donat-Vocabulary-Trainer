@@ -464,3 +464,31 @@ def test_die_pruefung_laesst_sich_auf_eine_befundart_eingrenzen(klient):
     assert eng["zaehler"] == alles["zaehler"], \
         "der Zähler zählt alles, auch das Ausgeblendete"
     assert eng["nach_art"]["kontext_nennt_form"] == 1
+
+
+def test_keine_zwei_routenfunktionen_heissen_gleich():
+    """Der zweite `def` überschreibt den ersten im Modul.
+
+    Am 18.11.2026 bekam app.py eine zweite Funktion namens
+    `bedeutung_loeschen`. Über HTTP ging weiterhin alles — FastAPI
+    merkt sich die Route und nicht den Namen. Der MCP-Dienst ruft die
+    Routenfunktionen aber ÜBER DEN NAMEN auf (`_app().bedeutung_...`)
+    und bekam damit stillschweigend die andere: eine, die nichts
+    zurückgibt. Der Fehler sah aus wie ein Tippfehler in den
+    Argumenten (»'NoneType' object is not subscriptable«) und stand
+    zwei Stockwerke von seiner Ursache entfernt.
+
+    Dabei fiel ein zweiter Fall auf, der schon länger so war: zwei
+    verschiedene Dinge hießen `text_deckung`.
+    """
+    import ast
+    import collections
+    import pathlib
+
+    baum = ast.parse(pathlib.Path("backend/app.py").read_text())
+    namen = collections.defaultdict(list)
+    for knoten in baum.body:
+        if isinstance(knoten, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            namen[knoten.name].append(knoten.lineno)
+    doppelt = {n: z for n, z in namen.items() if len(z) > 1}
+    assert not doppelt, f"Doppelt vergebene Namen in app.py: {doppelt}"

@@ -13,6 +13,8 @@ Im Betrieb läuft dasselbe im Docker-Container auf dem Familienserver.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 import os
 import pathlib
@@ -35,6 +37,7 @@ import datenbank as dbm
 import erstbefuellung
 import legasthenie
 import marke
+import pakete
 import lernen as lernmodul
 import beispielkurs
 import buecher
@@ -56,7 +59,8 @@ import uebungen
 import wache
 import zugang
 import zuspruch as zuspruchmodul
-from modelle import (RegelEingabe, RegelAendern, ZuspruchEingabe,
+from modelle import (PaketEinspielen, RegelEingabe, RegelAendern,
+                     ZuspruchEingabe,
                      LexemeVerschieben, TexteVerschieben,
                      BuchAnlegen, BuchAendern, TexteZuordnen,
                      BedeutungAendern, NeuAufteilen,
@@ -2136,6 +2140,38 @@ def import_vorschau(sammlung_id: int, eingabe: ImportEingabe,
     try:
         return einlesen.vorschau(db, sammlung_id, eingabe.text, eingabe.trenner,
                                  eingabe.zuordnung, eingabe.hat_kopfzeile)
+    except KeyError as fehler:
+        raise HTTPException(404, str(fehler))
+
+
+@app.post("/api/sammlungen/{sammlung_id}/paket")
+def paket_einspielen(sammlung_id: int, eingabe: PaketEinspielen,
+                     request: Request = None, db: sqlite3.Connection = DB):
+    """Ein Kurspaket einspielen — ganz oder gar nicht.
+
+    Vokabeln, Übungen, Texte, Regeln und Lehrgangszuordnung in EINER
+    Handlung statt in fünf. Schlägt ein Teil fehl, war nichts: es
+    liegt eine Transaktionsklammer um alles.
+
+    Die Formen landen UNGEPRÜFT im Bestand, solange das Paket keinen
+    Prüfvermerk mitbringt, der sagt, wer wann was geprüft hat. Das ist
+    dieselbe Regel wie bei Einträgen über die KI-Schnittstelle, und
+    sie gilt hier genauso: der Trainer fragt nichts ab, was kein
+    Mensch bestätigt hat.
+    """
+    _wache_rumpf(db, request, sammlung_id=sammlung_id)
+    try:
+        roh = base64.b64decode(eingabe.zip_base64, validate=True)
+    except (ValueError, binascii.Error):
+        raise HTTPException(400, "zip_base64 ist kein gültiges Base64.")
+    if len(roh) > pakete.HOECHSTENS_BYTE:
+        raise HTTPException(413, "Das Paket ist zu groß.")
+    try:
+        return pakete.einspielen(db, sammlung_id, roh, eingabe.nur_pruefen)
+    except pakete.PaketFehler as fehler:
+        raise HTTPException(400, str(fehler))
+    except mk.MerkmalFehler as fehler:
+        raise HTTPException(400, str(fehler))
     except KeyError as fehler:
         raise HTTPException(404, str(fehler))
 

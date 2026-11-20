@@ -36,6 +36,68 @@ def verbindung(pfad: pathlib.Path | str | None = None) -> sqlite3.Connection:
     return db
 
 
+# --------------------------------------------------- Schachtelbare Klammer
+
+class Klammer:
+    """BEGIN — oder SAVEPOINT, wenn schon eine Transaktion läuft.
+
+    SQLite kennt kein BEGIN im BEGIN: der zweite Aufruf scheitert mit
+    »cannot start a transaction within a transaction«. Das fiel nicht
+    auf, solange jeder Import für sich lief. Sobald aber ein PAKET
+    mehrere Importe zu EINER Einheit zusammenfasst — Vokabeln, Übungen,
+    Texte, Regeln, Lehrgang, ganz oder gar nicht —, muss sich die
+    Klammer schachteln lassen.
+
+    Ein SAVEPOINT tut genau das: Zurückrollen bis hierher, ohne die
+    äußere Transaktion anzutasten. Freigeben (RELEASE) heißt nicht
+    schreiben, sondern nur: dieser Abschnitt hat nichts mehr
+    zurückzunehmen. Geschrieben wird erst, wenn die äußerste Klammer
+    festschreibt.
+
+        with dbm.Klammer(db) as k:
+            ...
+            if nur_pruefen:
+                k.zuruecknehmen()
+
+    `zuruecknehmen` ist ausdrücklich erlaubt und kein Fehler: ein
+    Probelauf soll alle Befunde erzeugen, als wäre geschrieben worden,
+    und am Ende nichts hinterlassen.
+    """
+
+    _zaehler = 0
+
+    def __init__(self, db: sqlite3.Connection):
+        self.db = db
+        self.marke: str | None = None
+        self.zurueck = False
+
+    def __enter__(self) -> "Klammer":
+        if self.db.in_transaction:
+            Klammer._zaehler += 1
+            self.marke = f"klammer_{Klammer._zaehler}"
+            self.db.execute(f"SAVEPOINT {self.marke}")
+        else:
+            self.db.execute("BEGIN")
+        return self
+
+    def zuruecknehmen(self) -> None:
+        """Alles seit dem Beginn dieser Klammer verwerfen."""
+        self.zurueck = True
+
+    def __exit__(self, art, wert, spur) -> bool:
+        if art is not None or self.zurueck:
+            if self.marke:
+                self.db.execute(f"ROLLBACK TO {self.marke}")
+                self.db.execute(f"RELEASE {self.marke}")
+            else:
+                self.db.execute("ROLLBACK")
+        elif self.marke:
+            self.db.execute(f"RELEASE {self.marke}")
+        else:
+            self.db.execute("COMMIT")
+        return False
+
+
 def einrichten(db: sqlite3.Connection) -> None:
     """Legt das Schema an, falls es fehlt, und pflegt die Sprachliste."""
     schema = (pathlib.Path(__file__).resolve().parent / "schema.sql").read_text()

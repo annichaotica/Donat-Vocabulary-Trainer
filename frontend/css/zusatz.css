@@ -1015,3 +1015,35 @@ input[type="file"] { max-width: 100%; }
 .gezielt-zeile.ist-aus b { color: var(--leise); font-weight: 500; }
 .gezielt-zeile button { width: 100%; }
 .gezielt-stapel { position: sticky; top: .5rem; z-index: 2; }
+
+/* Der Weitersprung nach »richtig«.
+ *
+ * Der Balken ist die ehrlichste Anzeige: er sagt nicht nur, DASS
+ * gleich etwas passiert, sondern auch, wie viel Zeit noch bleibt —
+ * und er hält sichtbar an, wenn man die Seite anfasst. Die Dauer
+ * setzt die Oberfläche am Element; sie hängt am Legastheniemodus. */
+.sprung {
+  display: flex; align-items: center; gap: .6rem;
+  margin-top: .7rem; flex-wrap: wrap;
+}
+.sprungbalken {
+  flex: 1 1 6rem; min-width: 4rem; height: 4px;
+  background: var(--grund-3); border-radius: 99px; overflow: hidden;
+}
+.sprungbalken i {
+  display: block; height: 100%; width: 100%;
+  background: var(--richtig);
+  transform-origin: left center;
+  animation-name: sprung-ablauf;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes sprung-ablauf {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+/* Wer Bewegung abbestellt hat, bekommt keine — der Knopf daneben
+   bleibt die Bremse, und die Zeit läuft unverändert. */
+@media (prefers-reduced-motion: reduce) {
+  .sprungbalken i { animation: none; }
+}

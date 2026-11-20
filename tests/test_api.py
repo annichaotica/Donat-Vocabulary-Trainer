@@ -359,6 +359,29 @@ def test_legastheniemodus_aendert_die_lernvorgaben(klient):
     assert nachher["legasthenie"]["zeichenabstand"] > 0
 
 
+def test_weiterspringen_ist_aus_und_laesst_sich_einschalten(klient):
+    """Eine Seite, die sich von allein bewegt, muss man wollen.
+
+    »Optionales Weiterspringen in die Einstellungen packen.« Optional
+    heißt hier: voreingestellt AUS. Wer den Schalter nie findet, merkt
+    vom ganzen Verhalten nichts.
+    """
+    b, _s = _aufbau(klient)
+    assert klient.get(f"/api/benutzer/{b['id']}/einstellungen"
+                      ).json()["weiterspringen"] is False
+
+    klient.patch(f"/api/benutzer/{b['id']}", json={"weiterspringen": True})
+    assert klient.get(f"/api/benutzer/{b['id']}/einstellungen"
+                      ).json()["weiterspringen"] is True
+
+    # Und wieder aus: ein Schalter, der nur in eine Richtung geht, ist
+    # keiner. `if ... is not None` im Endpunkt ist genau dafür da —
+    # False darf nicht als »nichts gesendet« durchfallen.
+    klient.patch(f"/api/benutzer/{b['id']}", json={"weiterspringen": False})
+    assert klient.get(f"/api/benutzer/{b['id']}/einstellungen"
+                      ).json()["weiterspringen"] is False
+
+
 def test_eigene_vorgabe_schlaegt_den_modus(klient):
     b, _s = _aufbau(klient)
     klient.patch(f"/api/benutzer/{b['id']}", json={"wunschretention": 0.85})

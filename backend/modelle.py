@@ -49,6 +49,11 @@ class BenutzerAendern(BaseModel):
     beschriftung: Literal["fach", "einfach", "beides"] | None = None
     # Lateinische Tasten in die Zielschrift umsetzen (Griechisch).
     tastatur_umschrift: bool | None = None
+    # Nach einer sauber richtigen Antwort von selbst weiterspringen.
+    # Spart den zweiten Tipp je Aufgabe — gilt aber NUR bei »richtig«
+    # ohne Tipp und ohne nachgesehenes Wort: überall sonst steht in der
+    # Rückmeldung etwas, das man gelesen haben soll.
+    weiterspringen: bool | None = None
 
 
 class LegasthenieEinstellungen(BaseModel):

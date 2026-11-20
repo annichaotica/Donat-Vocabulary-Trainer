@@ -566,6 +566,29 @@ async function teilLernen(behaelter) {
                   text: 'Eingeschaltet ist jede dritte Frage etwas Neues — '
                       + 'dafür rücken echte Wiederholungen etwas nach hinten.' }))));
 
+  // »Jede Aufgabe kostet auf dem Touchgerät einen zweiten Tipp.« Der
+  // zweite ist »Weiter« — und nach einer sauber richtigen Antwort steht
+  // in der Rückmeldung nichts, was man noch lesen müsste.
+  //
+  // NUR dort. Bei »fast richtig« soll man die Schreibung sehen, bei
+  // »nicht richtig« die Lösung, und wer einen Tipp genommen oder das
+  // Wort nachgesehen hat, soll die gedeckelte Wertung sehen. Deshalb
+  // ist das hier keine Einstellung »Rückmeldung überspringen«.
+  const springen = h('input', {
+    type: 'checkbox', checked: Boolean(e.weiterspringen),
+  });
+  kasten.append(h('label', { class: 'schalter' }, springen,
+    h('span', { class: 'schalter-text' },
+      h('b', { text: 'Nach »richtig« von selbst weiterspringen' }),
+      h('span', { text: 'Spart den zweiten Tipp je Aufgabe. Gilt nur bei '
+                      + 'einer sauber richtigen Antwort — ohne Tipp und ohne '
+                      + 'nachgesehenes Wort. Bei »fast richtig« und bei '
+                      + 'Fehlern bleibt die Rückmeldung stehen, bis du '
+                      + 'weitergehst.' }),
+      h('span', { class: 'beispielzeile',
+                  text: 'Während es läuft, steht in der Wertung »Hierbleiben« '
+                      + '— ein Tipp darauf hält an.' }))));
+
   // Wie eine Form benannt wird. "Genitiv Singular" ist richtig und für
   // viele eine Mauer; wer daran scheitert, scheitert nicht an der Vokabel.
   const stil = h('select', {},
@@ -589,6 +612,7 @@ async function teilLernen(behaelter) {
                           dosis: e.fragen_je_tag, ziel: e.tagesziel,
                           stil: e.beschriftung || 'fach',
                           einstreuen: Boolean(e.neues_einstreuen),
+                          springen: Boolean(e.weiterspringen),
                           umschrift: e.tastatur_umschrift !== false };
   if (e.legasthenie?.aktiv) {
     kasten.append(h('p', { class: 'leise',
@@ -620,6 +644,9 @@ async function teilLernen(behaelter) {
       }
       if (einstreuen.checked !== ausgangswerte.einstreuen) {
         aenderungen.neues_einstreuen = einstreuen.checked;
+      }
+      if (springen.checked !== ausgangswerte.springen) {
+        aenderungen.weiterspringen = springen.checked;
       }
       if (!Object.keys(aenderungen).length) {
         meldung('Nichts geändert.');

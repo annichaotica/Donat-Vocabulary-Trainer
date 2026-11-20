@@ -16,6 +16,33 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Nach »richtig« springt der Trainer weiter — wenn du willst
+
+Jede Aufgabe kostete auf dem Handy einen zweiten Tipp: erst antworten,
+dann »Weiter«. Nach einer sauber richtigen Antwort steht in der
+Rückmeldung aber nichts, was man noch lesen müsste.
+
+Neu in den **Einstellungen → Lernverhalten**: *»Nach »richtig« von
+selbst weiterspringen«*. Voreingestellt **aus** — eine Seite, die sich
+von allein bewegt, muss man wollen.
+
+Es gilt nur bei **sauber richtig**, und die Ausnahmen sind der Grund,
+warum der Schalter vertretbar ist:
+
+- bei *fast richtig* steht die richtige Schreibung da,
+- bei einem Fehler die Lösung,
+- wer einen **Tipp** genommen oder das **Wort angesehen** hat, dem ist
+  die Wertung auf »Schwer« gedeckelt — auch das gehört gelesen,
+- und wer *»Anders werten«* aufklappt, will gerade nicht weiter.
+
+Während es läuft, steht in der Wertung ein Balken, der abläuft, und
+daneben **»Hierbleiben«**. Wer irgendwo auf der Seite hinfasst — die
+Regel aufklappt, »Warum kommt das jetzt?« liest —, hält damit ebenfalls
+an; der Balken bleibt sichtbar stehen. Im Legastheniemodus läuft er
+länger (2,4 statt 1,4 Sekunden): dort wächst die Schrift, und gelesen
+wird langsamer.
+
+
 ### Sieben Eingriffe in die Gestaltung
 
 Vorher als Artefakt angesehen und Stück für Stück entschieden, nicht

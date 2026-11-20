@@ -177,6 +177,10 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
         # umgeschaltet hat, merkt nichts davon — Zeichen, die schon in
         # der Zielschrift ankommen, gehen unangetastet durch.
         "tastatur_umschrift": bool(e.get("tastatur_umschrift", True)),
+        # Nach einer sauber richtigen Antwort von selbst weiterspringen.
+        # Voreingestellt AUS: eine Seite, die sich von allein bewegt,
+        # muss man wollen.
+        "weiterspringen": bool(e.get("weiterspringen", False)),
     }
 
 

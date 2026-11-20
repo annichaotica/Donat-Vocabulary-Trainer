@@ -755,3 +755,53 @@ def test_kein_filter_brightness_statt_einer_mischung():
     assert not funde, (
         "Helligkeitsfilter statt einer Mischung in der Palette:\n"
         + "\n".join(funde))
+
+
+def test_der_weitersprung_haelt_ueberall_an_wo_es_weitergeht():
+    """Eine Uhr, die nach dem Seitenwechsel noch feuert, bewertet die
+    FALSCHE Aufgabe.
+
+    Der Weitersprung nach »richtig« ist ein `setTimeout`, der nach
+    1,4 Sekunden `weiter()` aufruft. Jede Stelle, an der die Sitzung
+    weitergeht oder endet, muss ihn vorher anhalten — sonst läuft er in
+    die nächste Frage hinein und wertet sie ab, ohne dass sie jemand
+    gelesen hat.
+
+    Drei Stellen sind es: `weiter` (von Hand weitergeklickt),
+    `naechste` (die nächste Aufgabe wird geholt) und `beenden` (die
+    Ansicht wird verlassen).
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_lernen.js").read_text()
+    for name in ("async weiter(", "async naechste(", "beenden()"):
+        anfang = quelle.index(name)
+        # Bis zur nächsten Methode auf derselben Einrückungsebene.
+        rest = quelle[anfang:]
+        ende = rest.index("\n  }\n")
+        rumpf = rest[:ende]
+        assert re.search(r"\bsprungAbbrechen\(\)", rumpf), \
+            f"{name} hält den Weitersprung nicht an"
+
+
+def test_der_weitersprung_gilt_nur_bei_sauber_richtig():
+    """Sonst wäre es ein »Rückmeldung überspringen«.
+
+    Und genau die will man sehen: bei »fast richtig« steht dort die
+    richtige Schreibung, bei einem Fehler die Lösung, und wer einen
+    Tipp genommen oder das Wort nachgesehen hat, dem ist die Wertung
+    auf »Schwer« gedeckelt — auch das gehört gelesen.
+
+    Die vier Ausschlüsse sind nicht Beiwerk, sie sind der Grund, warum
+    der Schalter vertretbar ist.
+    """
+    import pathlib
+
+    quelle = pathlib.Path("frontend/js/ansicht_lernen.js").read_text()
+    anfang = quelle.index("  springtGleich()")
+    rumpf = quelle[anfang:anfang + quelle[anfang:].index("\n  }\n")]
+    for bedingung in ("'richtig'", "this.tipps", "this.aufgedeckt",
+                      "this.wertungOffen"):
+        assert bedingung in rumpf, \
+            f"springtGleich() prüft {bedingung} nicht — der Sprung käme zu oft"

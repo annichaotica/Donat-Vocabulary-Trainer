@@ -51,6 +51,13 @@ export class Sitzung {
     this.reihenWerte = {};
     this.merkmalsWahl = {};
     this.lg = {};
+    // Nach »richtig« von selbst weiterspringen? Kommt aus den
+    // Einstellungen; `sprung` ist die laufende Uhr, `sprungAus` das
+    // »Hierbleiben« für GENAU diese Aufgabe.
+    this.weiterspringen = false;
+    this.sprung = null;
+    this.sprungHalt = null;
+    this.sprungAus = false;
     this.tastatur = (e) => this.aufTaste(e);
     /* Lag die Seite zwischendurch im Hintergrund?
      *
@@ -76,6 +83,7 @@ export class Sitzung {
     try {
       const e = await api.benutzerEinstellungen(zustand.benutzerId);
       this.umschrift = e.tastatur_umschrift !== false;
+      this.weiterspringen = Boolean(e.weiterspringen);
     } catch { this.umschrift = true; }
     // Das Tagespensum einmal zu Beginn: daran misst der Balken, und
     // daran sieht man, ob die Abfrage in zehn Fragen zu Ende ist oder
@@ -114,6 +122,7 @@ export class Sitzung {
     // Auch das Zeichnen stilllegen: sonst schreibt eine Sitzung, die noch
     // auf eine Antwort wartet, in den Inhaltsbereich der neuen Ansicht.
     this.abgebrochen = true;
+    this.sprungAbbrechen();
     document.removeEventListener('keydown', this.tastatur);
     document.removeEventListener('visibilitychange', this.sichtbarkeit);
     if (this._umschriftLoesen) this._umschriftLoesen();
@@ -123,6 +132,8 @@ export class Sitzung {
   /* ------------------------------------------------------------- Laden */
 
   async naechste() {
+    this.sprungAbbrechen();
+    this.sprungAus = false;       // gilt immer nur für EINE Aufgabe
     this.ergebnis = null;
     this.eingabeWert = '';
     this.reihenWerte = {};
@@ -952,8 +963,29 @@ export class Sitzung {
       h('button', { class: 'wichtig', onclick: () => this.weiter() }, 'Weiter'),
       h('button', {
         class: 'schlicht',
-        onclick: () => { this.wertungOffen = !this.wertungOffen; this.zeichnen(); },
+        onclick: () => {
+          // Wer von Hand werten will, will gerade nicht weiter.
+          this.sprungAbbrechen();
+          this.sprungAus = true;
+          this.wertungOffen = !this.wertungOffen;
+          this.zeichnen();
+        },
       }, this.wertungOffen ? 'Doch automatisch' : 'Anders werten')));
+
+    // Eine Seite, die sich von allein bewegt, braucht eine Bremse in
+    // Reichweite — und sie muss zu SEHEN sein, bevor sie sich bewegt.
+    // Der Balken ist die ehrlichste Anzeige: er sagt nicht nur DASS
+    // gleich etwas passiert, sondern auch wie viel Zeit noch bleibt.
+    if (this.springtGleich()) {
+      kasten.append(h('div', { class: 'sprung' },
+        h('div', { class: 'sprungbalken' },
+          h('i', { style: `animation-duration:${this.sprungdauer()}ms` })),
+        h('button', {
+          class: 'schlicht',
+          onclick: () => { this.sprungAbbrechen(); this.sprungAus = true;
+                           this.zeichnen(); },
+        }, 'Hierbleiben')));
+    }
 
     if (this.wertungOffen) {
       kasten.append(
@@ -1158,6 +1190,74 @@ export class Sitzung {
 
   /* ------------------------------------------------------------- Ablauf */
 
+  /** Springt der Trainer nach dieser Antwort von selbst weiter?
+   *
+   * »Jede Aufgabe kostet auf dem Touchgerät einen zweiten Tipp.« Der
+   * zweite ist »Weiter«, und nach einer sauber richtigen Antwort steht
+   * in der Rückmeldung nichts mehr, was man lesen müsste.
+   *
+   * Die vier Ausschlüsse sind der ganze Punkt — ohne sie wäre das hier
+   * ein »Rückmeldung überspringen«, und genau die will man sehen:
+   *   fast richtig  → die richtige Schreibung steht da
+   *   nicht richtig → die Lösung steht da
+   *   Tipp genommen → die Wertung ist auf »Schwer« gedeckelt
+   *   nachgesehen   → dasselbe, und das Wort steht da
+   * Dazu »Anders werten«: wer das aufklappt, will gerade nicht weiter.
+   */
+  springtGleich() {
+    return this.weiterspringen
+        && !this.sprungAus
+        && this.phase === 'rueckmeldung'
+        && this.ergebnis?.urteil?.urteil === 'richtig'
+        && !this.tipps
+        && !this.aufgedeckt
+        && !this.wertungOffen;
+  }
+
+  /** Wie lange die Rückmeldung stehen bleibt.
+   *
+   * Im Legastheniemodus länger: dort wächst die Schrift, und gelesen
+   * wird langsamer — eine Zeitspanne, die für die einen flott ist, ist
+   * für die anderen ein Wegschnappen.
+   */
+  sprungdauer() { return this.lg?.aktiv ? 2400 : 1400; }
+
+  sprungStarten() {
+    this.sprungAbbrechen();
+    if (!this.springtGleich()) return;
+    this.sprung = setTimeout(() => { this.sprung = null; this.weiter(); },
+                             this.sprungdauer());
+
+    // Wer in dieser Sekunde irgendwo hinfasst — »Warum kommt das
+    // jetzt?« aufklappt, die Regel liest, zum Aussetzen greift —, der
+    // will nicht weggeschoben werden. Das hält an.
+    //
+    // Und zwar OHNE neu zu zeichnen: pointerdown kommt vor click, ein
+    // Neuaufbau nähme dem Finger den Knopf unter der Berührung weg und
+    // der Klick ginge ins Leere. Stattdessen hält der Balken sichtbar
+    // an — das ist die Rückmeldung.
+    this.sprungHalt = () => {
+      this.sprungAbbrechen();
+      this.sprungAus = true;
+      const balken = this.behaelter.querySelector('.sprungbalken i');
+      if (balken) balken.style.animationPlayState = 'paused';
+    };
+    this.behaelter.addEventListener('pointerdown', this.sprungHalt);
+  }
+
+  /** Die Uhr anhalten. Muss von überall aufrufbar sein, wo die Sitzung
+   *  weitergeht oder endet — eine Uhr, die nach dem Seitenwechsel noch
+   *  feuert, bewertet die nächste Aufgabe. Ebenso der Horcher: ein
+   *  übrig gebliebener würde die nächste Berührung als »Hierbleiben«
+   *  für eine Aufgabe lesen, die noch gar nicht gestellt ist. */
+  sprungAbbrechen() {
+    if (this.sprung) { clearTimeout(this.sprung); this.sprung = null; }
+    if (this.sprungHalt) {
+      this.behaelter.removeEventListener('pointerdown', this.sprungHalt);
+      this.sprungHalt = null;
+    }
+  }
+
   /** Die Wertung in den Blick holen.
    *
    * »Jede Aufgabe kostet auf dem Touchgerät einen zweiten Tipp.« Auf
@@ -1272,6 +1372,7 @@ export class Sitzung {
     else if (u === 'falsch') this.gezaehlt.falsch += 1;
     this.zeichnen();
     this.wertungZeigen();
+    this.sprungStarten();
   }
 
   async weissNicht() {
@@ -1309,6 +1410,10 @@ export class Sitzung {
   /** Weiter zur nächsten Aufgabe. Ohne `note` gilt die automatische
    *  Bewertung; mit `note` ist es ein Eingriff von Hand. */
   async weiter(note = null) {
+    // ZUERST die Uhr anhalten, nicht erst nach der Prüfung darunter:
+    // sonst liefe sie weiter, wenn hier wegen `laeuft` abgebrochen
+    // wird — und feuerte in die nächste Aufgabe hinein.
+    this.sprungAbbrechen();
     if (this.phase !== 'rueckmeldung' || this.laeuft) return;
     const u = this.ergebnis?.urteil || {};
     this.laeuft = true;

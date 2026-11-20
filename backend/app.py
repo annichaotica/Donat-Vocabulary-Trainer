@@ -530,6 +530,8 @@ def benutzer_aendern(benutzer_id: int, eingabe: BenutzerAendern,
         e["beschriftung"] = eingabe.beschriftung
     if eingabe.tastatur_umschrift is not None:
         e["tastatur_umschrift"] = eingabe.tastatur_umschrift
+    if eingabe.weiterspringen is not None:
+        e["weiterspringen"] = eingabe.weiterspringen
     db.execute("UPDATE benutzer SET einstellungen = ? WHERE id = ?",
                (dbm.j_schreiben(e), benutzer_id))
     return _holen(db, "benutzer", benutzer_id)

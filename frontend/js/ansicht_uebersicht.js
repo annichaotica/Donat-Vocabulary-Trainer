@@ -1,7 +1,7 @@
 /* Profilwahl und Übersicht über die Sammlungen. */
 
 import { api } from './api.js';
-import { h, leeren, meldung, anfuegen } from './hilfen.js';
+import { h, leeren, meldung, anfuegen, lesbareSchrift } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 import * as fuehrung from './fuehrung.js';
@@ -79,6 +79,7 @@ function profilpunkt(p) {
   const punkt = h('span', { class: 'profil-knopf',
                             text: (p.name || '?').slice(0, 1).toUpperCase() });
   punkt.style.background = p.farbe || '';
+  punkt.style.color = lesbareSchrift(p.farbe);
   return punkt;
 }
 

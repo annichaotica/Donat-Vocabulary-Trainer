@@ -453,7 +453,7 @@ input[type="file"] { max-width: 100%; }
    muss man sehen, wo man steht, ohne zu suchen. */
 .karte.dran {
   border-color: var(--akzent);
-  box-shadow: 0 0 0 2px var(--akzent-grund, rgba(107, 127, 215, .25));
+  box-shadow: 0 0 0 2px var(--akzent-grund);
 }
 .karte.dran > .freigabe-kopf h2::before {
   content: '▸ ';
@@ -528,7 +528,10 @@ input[type="file"] { max-width: 100%; }
 .uebung-zeile { margin: .2rem 0; }
 
 /* Eine Fehlermeldung soll man als solche erkennen, nicht nur lesen. */
-#meldung.fehler { background: var(--falsch, #b3261e); color: #fff; }
+/* --auf-falsch statt festem #fff: im Dunkeln ist --falsch hell, und
+   weiße Schrift darauf kam auf 1,94 — ausgerechnet die Fehlermeldung
+   war dann nicht zu lesen. */
+#meldung.fehler { background: var(--falsch); color: var(--auf-falsch); }
 
 
 /* Noch eine Spur zurückhaltender als `.leise` — für Vorsätze wie
@@ -709,7 +712,7 @@ input[type="file"] { max-width: 100%; }
   display: block;
   font-size: .62em;
   line-height: 1.2;
-  color: var(--leise, #667);
+  color: var(--leise);
   /* Die Glosse darf den Satz nicht auseinanderziehen: sie ist Beiwerk,
      das Wort ist die Hauptsache. Ein eigenes `white-space: nowrap`,
      damit eine zweiteilige Bedeutung (»in das/dem«) nicht umbricht
@@ -907,26 +910,31 @@ input[type="file"] { max-width: 100%; }
   margin-bottom: .4rem;
 }
 .abtippen-balken {
-  height: 4px; border-radius: 2px; background: rgba(0, 0, 0, .08);
+  height: 4px; border-radius: 2px; background: var(--grund-3);
   overflow: hidden; margin-bottom: 1rem;
 }
 .abtippen-balken i { display: block; height: 100%; background: var(--akzent); }
 .abtippkarte { text-align: center; padding: 1.4rem 1rem; }
-.abtipp-deutsch { margin: 0; font-size: 1.05rem; color: var(--leise, #667); }
+/* em statt rem: rem hängt am Wurzelelement, und --mass sitzt auf
+   body. In rem wächst im Legastheniemodus also GAR NICHTS mit — und
+   das Abtippen ist die Ansicht, in der am längsten gelesen wird.
+   1.05rem und 1.05em sind bei --mass: 1 derselbe Wert. */
+.abtipp-deutsch { margin: 0; font-size: 1.05em; color: var(--leise); }
 .abtipp-fremd {
-  margin: .5rem 0 0; font-size: 2rem; font-weight: 600; line-height: 1.25;
+  margin: .5rem 0 0; font-size: 2em; font-weight: 600; line-height: 1.25;
   /* Umbruch erlauben: »Entschuldigung« passt sonst nicht aufs Handy. */
   overflow-wrap: anywhere;
 }
 .abtippfeld {
-  width: 100%; font: inherit; font-size: 1.4rem; text-align: center;
+  width: 100%; font: inherit; font-size: 1.4em; text-align: center;
   padding: .6rem .8rem; margin: .8rem 0;
-  border: 1px solid #ccc; border-radius: .4rem;
+  border: 1px solid var(--rand-stark); border-radius: var(--rund-klein);
 }
 .abtippfeld:focus { outline: 2px solid var(--akzent); outline-offset: 1px; }
 /* Kurz grün, dann kommt von selbst die nächste Karte. */
 .abtippfeld.richtig {
-  border-color: var(--richtig); background: #e8f5e9; color: #1b5e20;
+  border-color: var(--richtig); background: var(--richtig-grund);
+  color: var(--text);
 }
 
 
@@ -941,12 +949,14 @@ input[type="file"] { max-width: 100%; }
   grid-template-columns: 1.6rem 1fr 4rem 5rem;
   align-items: center; gap: .6rem;
   padding: .4rem .6rem;
-  border-bottom: 1px solid rgba(0, 0, 0, .07);
+  border-bottom: 1px solid var(--rand);
 }
 .gezielt-kopf { border-bottom-width: 2px; }
-.gezielt-zeile:hover { background: rgba(0, 0, 0, .03); }
+@media (hover: hover) and (pointer: fine) {
+  .gezielt-zeile:hover { background: var(--grund-3); }
+}
 /* Ausgeschaltetes bleibt lesbar, tritt aber zurück: es steht ja
    weiter im Wortschatz und deckt die Lesetexte. */
-.gezielt-zeile.ist-aus b { color: var(--leise, #667); font-weight: 500; }
+.gezielt-zeile.ist-aus b { color: var(--leise); font-weight: 500; }
 .gezielt-zeile button { width: 100%; }
 .gezielt-stapel { position: sticky; top: .5rem; z-index: 2; }

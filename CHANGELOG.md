@@ -16,6 +16,38 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Noch sechs Stellen weiß auf weiß
+
+Der weiße Tipp war nicht der einzige. Nachgemessen in allen fünf
+Farbstimmungen fanden sich sechs weitere feste Farben in den neueren
+Ansichten — mit Werten, gegen die 1,08 noch gut aussieht:
+
+```
+.wort-unbekannt   #fdecea       1,07  unlesbar
+.wort-gewuenscht  #e8f0fe       1,07  unlesbar
+Fehlermeldung     color: #fff   1,94  ausgerechnet die Fehlermeldung
+Abtippen-Balken   rgba(0,0,0,.08)  1,05
+Gezielt-Zeilen    rgba(0,0,0,.07)  1,03
+```
+
+Alle sprechen jetzt die Sprache des übrigen Werkzeugs: was sitzt, ist
+»richtig«, was wackelt, ist »fast«, was fehlt, ist »falsch«. Das ist
+nicht nur sicher, sondern stimmiger — dieselben vier Farben bedeuten
+überall dasselbe. Gemessen nachher: **12,96** statt 1,07.
+
+**Und im Legastheniemodus wuchs in drei Ansichten nichts mit.** `--mass`
+sitzt auf `body`, `rem` hängt am Wurzelelement — in `rem` gesetzte
+Schriftgrößen ignorieren die Einstellung vollständig. Betroffen waren
+ausgerechnet Lesetexte, Abtippen und die Wortkarten, also die
+Ansichten, in denen am längsten gelesen wird.
+
+**Die Profilfarbe wählt jeder selbst** — und darauf stand fest weiße
+Schrift. Bei einem hellen Gelb sind das 1,41:1. Die Schriftfarbe wird
+jetzt aus der gewählten Farbe gerechnet.
+
+Zwei Tests halten das fest: keine unbekannte Variable, und keine feste
+Farbe außerhalb der Palette.
+
 ### Die Bedeutung steht jetzt über der Formenreihe
 
 »Beim Verben abfragen (Reihe) kannst du bitte die deutsche Übersetzung

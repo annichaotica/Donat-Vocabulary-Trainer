@@ -2,7 +2,7 @@
  * der alle Pfade auf index.html umschreibt. */
 
 import { api } from './api.js';
-import { h, leeren, meldung } from './hilfen.js';
+import { h, leeren, meldung, lesbareSchrift } from './hilfen.js';
 import { zustand, merken, darstellungSetzen } from './zustand.js';
 import * as uebersicht from './ansicht_uebersicht.js';
 import * as lernansicht from './ansicht_lernen.js';
@@ -72,6 +72,9 @@ async function kopfzeile() {
   const knopf = document.getElementById('knopf-profil');
   knopf.textContent = person.name.slice(0, 1).toUpperCase();
   knopf.style.background = person.farbe;
+  // Die Profilfarbe wählt jeder selbst; auf einem hellen Gelb ist
+  // weiße Schrift nicht zu lesen.
+  knopf.style.color = lesbareSchrift(person.farbe);
   knopf.title = `${person.name} — Profil wechseln`;
 
   let zusatz = '';

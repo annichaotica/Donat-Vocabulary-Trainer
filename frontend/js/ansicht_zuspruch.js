@@ -20,7 +20,8 @@
  */
 
 import { api } from './api.js';
-import { h, leeren, meldung, anfuegen, tun } from './hilfen.js';
+import { h, leeren, meldung, anfuegen, tun,
+         lesbareSchrift } from './hilfen.js';
 import { zustand } from './zustand.js';
 
 const ARTEN = {
@@ -124,7 +125,8 @@ export function karteFuerMich(behaelter, offene, ziele, neuZeichnen) {
 
     karte.append(h('div', { class: 'zuspruch' + (fertig ? ' ist-faellig' : '') },
       h('span', { class: 'zuspruch-punkt',
-                  style: `background:${z.von_farbe || '#6b7fd7'}`,
+                  style: `background:${z.von_farbe || '#6b7fd7'};`
+                       + `color:${lesbareSchrift(z.von_farbe || '#6b7fd7')}`,
                   text: (z.von_name || '?').slice(0, 1).toUpperCase() }),
       h('div', { class: 'zuspruch-text' },
         h('p', { style: 'margin:0', text: satz(z, ziele) }),

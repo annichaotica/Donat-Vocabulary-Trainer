@@ -524,3 +524,48 @@ def test_kein_stil_greift_auf_eine_unbekannte_variable_zurueck():
     erklaert |= {"--sammlungsfarbe"}
     fehlend = {n: d for n, d in benutzt.items() if n not in erklaert}
     assert not fehlend, f"Unbekannte CSS-Variablen: {fehlend}"
+
+
+def test_keine_festen_farben_im_stil():
+    """Farben gehören in die Palette, nicht in die Regel.
+
+    Der weiße Tipp war nur der auffälligste Fall. Nachgemessen fanden
+    sich sechs weitere feste Farben in den neueren Ansichten, mit
+    Werten bis hinunter zu 1,03:1 im Dunkeln:
+
+        .wort-unbekannt  background: #fdecea      -> 1,07
+        .wort-gewuenscht background: #e8f0fe      -> 1,07
+        #meldung.fehler  color: #fff              -> 1,94
+        .abtippen-balken rgba(0,0,0,.08)          -> 1,05
+        .gezielt-zeile   rgba(0,0,0,.07)          -> 1,03
+
+    Eine feste Farbe kennt nur eine Richtung. Die Palette kennt beide
+    — und sie kennt dazu die drei Hintergründe, die sich in den
+    Einstellungen wählen lassen.
+
+    Erlaubt bleiben Schwarz und Weiß in Schatten und Schleiern: dort
+    ist die Deckkraft die Aussage, nicht der Farbton.
+    """
+    import pathlib
+    import re
+
+    muster = re.compile(
+        r"(?:color|background(?:-color)?|border(?:-[a-z]+)?(?:-color)?)\s*:"
+        r"[^;{}]*?(#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\))")
+    unschuldig = re.compile(
+        r"^(?:rgba?\(\s*0\s*,?\s*0\s*,?\s*0\s*[,/]|rgba?\(\s*255\s+255\s+255\s*/|"
+        r"rgba?\(\s*255\s*,\s*255\s*,\s*255\s*,)", re.I)
+    funde = []
+    for datei in sorted(pathlib.Path("frontend/css").glob("*.css")):
+        ohne_kommentar = re.sub(r"/\*.*?\*/", "", datei.read_text(), flags=re.S)
+        for zeile in ohne_kommentar.splitlines():
+            # Die Palette selbst DARF feste Farben nennen — sie ist der
+            # eine Ort, an dem sie hingehören.
+            if re.match(r"\s*--", zeile.strip()):
+                continue
+            for treffer in muster.finditer(zeile):
+                farbe = treffer.group(1)
+                if unschuldig.match(farbe):
+                    continue
+                funde.append(f"{datei.name}: {zeile.strip()[:72]}")
+    assert not funde, "Feste Farben außerhalb der Palette:\n" + "\n".join(funde)

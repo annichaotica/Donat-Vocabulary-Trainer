@@ -47,6 +47,29 @@ export function anfuegen(el, ...kinder) {
 
 export function leeren(el) { while (el.firstChild) el.firstChild.remove(); return el; }
 
+/** Welche Schriftfarbe auf einer frei gewählten Fläche lesbar ist.
+ *
+ * Die Profilfarbe sucht sich jeder selbst aus — in einem
+ * `input[type=color]`, der alle 16 Millionen zulässt. Im Stil stand
+ * dafür fest `color: #fff`. Bei einem hellen Ton wie #ffd54f sind das
+ * 1,41:1, bei #4caf50 2,78:1: der Buchstabe im Punkt verschwindet.
+ *
+ * Per CSS ist das nicht zu retten — die Farbe steht erst zur Laufzeit
+ * fest. Also hier: Relativluminanz nach WCAG, und oberhalb von 0,18
+ * (ungefähr dort kreuzen sich die beiden Kontraste) wird die Schrift
+ * dunkel statt hell.
+ */
+export function lesbareSchrift(farbe) {
+  const m = /^#?([0-9a-f]{6})$/i.exec((farbe || '').trim());
+  if (!m) return '#fff';
+  const kanaele = [0, 2, 4]
+    .map((i) => parseInt(m[1].substr(i, 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const luminanz = 0.2126 * kanaele[0] + 0.7152 * kanaele[1]
+                 + 0.0722 * kanaele[2];
+  return luminanz > 0.18 ? '#1a1a1a' : '#fff';
+}
+
 /** Dasselbe für SVG. `h` kann es nicht: createElement legt im HTML-Raum
  *  an, und ein <circle> ohne Namensraum wird nie gezeichnet — es steht
  *  dann unsichtbar in der Seite, was beim Suchen eine Stunde kostet.

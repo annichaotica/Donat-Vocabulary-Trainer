@@ -36,6 +36,11 @@
   /* Schrift auf der Akzentfläche. Im Dunkeln ist der Akzent hell, dann muss
      die Schrift darauf dunkel werden — sonst steht Weiß auf Hellblau. */
   --auf-akzent: #ffffff;
+  /* Schrift auf der Fehlerfläche. Dieselbe Begründung wie eine Zeile
+     höher: im Dunkeln ist --falsch hell, dann muss die Schrift darauf
+     dunkel werden. Stand bisher als festes #fff in der Meldung —
+     Kontrast im Dunkeln 1,94. */
+  --auf-falsch: #ffffff;
   --richtig: #2a6a4a;
   --richtig-grund: #e0f0e6;
   --fast: #80590f;
@@ -56,6 +61,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-grund]) {
+    --auf-falsch: #2b1512;
     --grund: #171614;
     --grund-2: #211f1d;
     --grund-3: #2b2926;
@@ -92,6 +98,7 @@
   --grund: #131619; --grund-2: #1d2024; --grund-3: #262a2f;
   --text: #e8eaec; --leise: #a2a8ae; --rand: #353a40; --rand-stark: #4c525a;
   --akzent: #9cbbe6; --akzent-grund: #212b38; --auf-akzent: #121820;
+  --auf-falsch: #2b1512;
   --richtig: #8fd6ab; --richtig-grund: #1b2922;
   --fast: #e5c47f; --fast-grund: #2a2416;
   --falsch: #f0a8a1; --falsch-grund: #2d1d1b;
@@ -287,7 +294,10 @@ h3.kapitelkopf { font-size: .95em; margin: 1rem 0 .3rem; }
 .zuspruch-punkt {
   display: inline-flex; align-items: center; justify-content: center;
   width: 1.8rem; height: 1.8rem; flex: none; border-radius: 50%;
-  color: #fff; font-weight: 650; font-size: .85rem;
+  /* Wie beim Profilpunkt: die Fläche trägt die frei gewählte Farbe
+     der Person, die Schriftfarbe rechnet hilfen.lesbareSchrift dazu.
+     Hier nur der Rückfall. */
+  color: var(--auf-akzent); font-weight: 650; font-size: .85rem;
 }
 .zuspruch-punkt-still { background: var(--rand-stark); }
 /* Ein fälliges Versprechen: die eine Stelle, an der etwas eingelöst
@@ -314,7 +324,12 @@ h3.kapitelkopf { font-size: .95em; margin: 1rem 0 .3rem; }
   display: inline-flex; align-items: center; justify-content: center;
   width: 2.2rem; height: 2.2rem; min-height: 0; flex: none;
   border-radius: 50%; padding: 0;
-  font-weight: 650; font-size: .95em; color: #fff; border: none; cursor: pointer;
+  /* Die Schriftfarbe setzt das JS (hilfen.lesbareSchrift): die
+     Hintergrundfarbe wählt die Person selbst, und auf einem hellen
+     Gelb ist Weiß nicht zu lesen. Hier nur der Rückfall, falls
+     einmal keine gesetzt wird. */
+  font-weight: 650; font-size: .95em; color: var(--auf-akzent);
+  border: none; cursor: pointer;
 }
 .kopf-knoepfe .profil-knopf {
   width: var(--tipp); height: var(--tipp); margin-left: .2rem;
@@ -830,7 +845,7 @@ table.paradigma .marke { align-self: auto; }
   .kopf-knoepfe .profil-knopf {
     width: var(--tipp); height: var(--tipp); min-height: 0; margin: 0 auto;
     border-radius: 50%; align-self: center; justify-self: center;
-    font-size: .95rem; box-shadow: inset 0 0 0 5px var(--grund-2);
+    font-size: .95em; box-shadow: inset 0 0 0 5px var(--grund-2);
   }
 
   h2 { margin-top: 1.5em; }
@@ -879,7 +894,10 @@ table.paradigma .marke { align-self: auto; }
    sonst liest sich ein Absatz wie eine Werkzeugleiste. Nur die Unterlage
    verrät, was man über das Wort weiß. */
 .textabschnitt-original {
-  font-size: 1.15rem;
+  /* em, nicht rem: --mass sitzt auf body, rem hängt am Wurzelelement.
+     In rem wüchse der Lesetext im Legastheniemodus als einziger nicht
+     mit — und das ist die Ansicht, in der am längsten gelesen wird. */
+  font-size: 1.15em;
   line-height: 2;
   margin-bottom: .8rem;
 }
@@ -898,16 +916,34 @@ table.paradigma .marke { align-self: auto; }
   border-radius: .2em .2em 0 0;
   box-shadow: inset 0 -2px 0 transparent;
 }
-.wortknopf:hover { background: rgba(0, 0, 0, .06); }
-.wort-sitzt      { box-shadow: inset 0 -2px 0 #2e7d32; }
-.wort-lernen     { box-shadow: inset 0 -2px 0 #f9a825; }
-.wort-neu        { box-shadow: inset 0 -2px 0 #90a4ae; }
+/* Die Wortfarben im Lesetext.
+ *
+ * Hier standen feste Farben (#fdecea, #e8f0fe, rgba(0,0,0,.1)). Im
+ * Dunkeln hieß das helle Fläche unter heller Schrift: gemessen 1,07:1
+ * für das unbekannte Wort — unlesbar, und zwar genau dort, wo man
+ * hinsehen soll. Dieselbe Falle wie `var(--sanft, …)` beim Tipp.
+ *
+ * Jetzt sprechen sie die Sprache des übrigen Werkzeugs: was sitzt, ist
+ * »richtig«, was wackelt, ist »fast«, was fehlt, ist »falsch«, was
+ * angefordert wurde, trägt den Akzent. Das ist nicht nur sicher,
+ * sondern auch stimmiger — dieselben vier Farben bedeuten überall
+ * dasselbe. */
+@media (hover: hover) and (pointer: fine) {
+  /* Ohne diese Klammer blieb der Hover auf dem iPad kleben —
+     der Grundsatz dazu steht im Dateikopf. */
+  .wortknopf:hover { background: var(--grund-3); }
+}
+.wort-sitzt      { box-shadow: inset 0 -2px 0 var(--richtig); }
+.wort-lernen     { box-shadow: inset 0 -2px 0 var(--fast); }
+.wort-neu        { box-shadow: inset 0 -2px 0 var(--leise); }
 /* Nur das Unbekannte ist flächig: es ist das Einzige, was beim
    Übersetzen wirklich im Weg steht. */
-.wort-unbekannt  { background: #fdecea; box-shadow: inset 0 -2px 0 #c62828; }
-.wort-gewuenscht { background: #e8f0fe; box-shadow: inset 0 -2px 0 #1565c0; }
+.wort-unbekannt  { background: var(--falsch-grund); color: var(--text);
+                   box-shadow: inset 0 -2px 0 var(--falsch); }
+.wort-gewuenscht { background: var(--akzent-grund); color: var(--text);
+                   box-shadow: inset 0 -2px 0 var(--akzent); }
 /* Welches Wort gerade aufgeschlagen ist. */
-.wort-offen      { background: rgba(0, 0, 0, .1); }
+.wort-offen      { background: var(--grund-3); color: var(--text); }
 
 .wortkarte {
   display: block;

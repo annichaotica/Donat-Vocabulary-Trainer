@@ -32,7 +32,9 @@ import einlesen
 import drossel
 import freigabe as freigabemodul
 import datenbank as dbm
+import erstbefuellung
 import legasthenie
+import marke
 import lernen as lernmodul
 import beispielkurs
 import buecher
@@ -99,12 +101,16 @@ async def lebenslauf(app: FastAPI):
     db = dbm.verbindung()
     try:
         dbm.einrichten(db)
+        # Nur wenn ausdrücklich gewünscht UND die Datenbank leer ist.
+        # Beides prüft das Modul selbst; hier steht nur, wann es dran
+        # ist: nach dem Einrichten, vor der ersten Anfrage.
+        erstbefuellung.vielleicht_befuellen(db)
     finally:
         db.close()
     yield
 
 
-app = FastAPI(title="Vokabeltrainer", version="0.2.0", lifespan=lebenslauf)
+app = FastAPI(title=marke.NAME, version=marke.VERSION, lifespan=lebenslauf)
 
 # Die Wache steht VOR allen Routen. Als Mittelschicht und nicht als Prüfung
 # in jeder einzelnen Route — so gilt sie auch für Routen, die später
@@ -3351,7 +3357,8 @@ QUELLTEXT = "https://github.com/annichaotica/vokabeltrainer"
 @app.get("/api/zustand")
 def zustand():
     return {
-        "name": "Vokabeltrainer",
+        "name": marke.NAME,
+        "untertitel": marke.UNTERTITEL,
         "version": app.version,
         "datenbank": str(dbm.PFAD),
         # AGPL §13: eine über das Netz erreichbare Fassung muss ihren

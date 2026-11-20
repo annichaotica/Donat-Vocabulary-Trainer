@@ -1,0 +1,36 @@
+# Zum Ausprobieren: das fertige Abbild, ohne Klonen und ohne Bauen.
+#
+#   curl -O https://raw.githubusercontent.com/annichaotica/vokabeltrainer/main/docker-compose.beispiel.yml
+#   docker compose -f docker-compose.beispiel.yml up
+#
+# Dann http://localhost:8030 aufrufen. Beim ersten Start entsteht ein
+# Beispielbestand (BEISPIELDATEN=1) — ein Profil, ein kleiner englischer
+# Übungskurs mit vollständigen Paradigmen, ein Lesetext, ein Lernziel
+# und ein paar ungeprüfte Einträge in der Freigabe.
+#
+# Für den EIGENEN Betrieb: BEISPIELDATEN weglassen und docker-compose.yml
+# benutzen — die baut aus dem Quelltext und hat die Einstellungen für
+# den Zugang von außen.
+
+services:
+  donat:
+    # Die Fassung ausdrücklich nennen und nicht `neuste`: wer heute
+    # etwas ausprobiert und morgen neu startet, soll dasselbe bekommen.
+    image: ghcr.io/annichaotica/donat:0.1.0
+    container_name: donat
+    restart: unless-stopped
+    ports:
+      - "8030:8030"
+    volumes:
+      # Ein benanntes Volume, kein Verzeichnis des Wirts: so gibt es
+      # keinen Streit um Dateirechte, und zum Wegwerfen genügt
+      # `docker compose down -v`.
+      - donat-daten:/daten
+    environment:
+      - TZ=Europe/Berlin
+      # Wirkt nur bei LEERER Datenbank. Steht die Variable morgen noch
+      # da, passiert nichts mehr — siehe backend/erstbefuellung.py.
+      - BEISPIELDATEN=1
+
+volumes:
+  donat-daten:

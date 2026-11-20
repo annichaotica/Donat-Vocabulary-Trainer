@@ -1,0 +1,55 @@
+{
+  // Ein Codespace, in dem der Trainer von selbst läuft.
+  //
+  // Der Zweck ist ein Blick, kein Betrieb: wer auf »Open in Codespaces«
+  // drückt, soll nach dem Bau eine gefüllte Oberfläche sehen und nicht
+  // eine leere Datenbank mit der Frage, wie man sie befüllt. Darum
+  // BEISPIELDATEN=1 — es wirkt ohnehin nur, wenn noch kein Profil da
+  // ist (siehe backend/erstbefuellung.py).
+  "name": "Donat",
+
+  // Dasselbe Python wie im Abbild. Zwei Fassungen für dasselbe
+  // Programm sind eine Fehlerquelle, die niemand sucht.
+  "image": "mcr.microsoft.com/devcontainers/python:3.13-bookworm",
+
+  "features": {
+    // Nur für tests/test_oberflaeche.py: `node --check` auf die
+    // JS-Module. Ohne node überspringt der Test sich selbst, aber dann
+    // prüft im Codespace niemand die Oberfläche.
+    "ghcr.io/devcontainers/features/node:1": { "version": "lts" }
+  },
+
+  "onCreateCommand": "pip install --user -r requirements.txt -r requirements-test.txt",
+
+  "postAttachCommand": {
+    // Im Hintergrund, damit der Reiter nicht an der Ausgabe hängt.
+    "trainer": "BEISPIELDATEN=1 python -m uvicorn app:app --app-dir backend --host 0.0.0.0 --port 8030"
+  },
+
+  "forwardPorts": [8030],
+  "portsAttributes": {
+    "8030": {
+      "label": "Donat",
+      "onAutoForward": "openBrowser"
+    }
+  },
+
+  "containerEnv": {
+    // Die Datenbank im Arbeitsbereich, nicht unter /daten: im
+    // Codespace gibt es kein eingehängtes Verzeichnis, und /daten
+    // gehört dort niemandem.
+    "VOKABEL_DB": "${containerWorkspaceFolder}/daten/vokabeltrainer.db",
+    "BEISPIELDATEN": "1",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"]
+      }
+    }
+  }
+}

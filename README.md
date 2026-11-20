@@ -1,6 +1,15 @@
 # Vokabeltrainer
 
 [![Lizenz: AGPL v3](https://img.shields.io/badge/Lizenz-AGPL%20v3-blue.svg)](LICENSE)
+[![In GitHub Codespaces öffnen](https://github.com/codespaces/badge.svg)](https://codespaces.new/annichaotica/vokabeltrainer)
+
+*English: [README.en.md](README.en.md)*
+
+> **Arbeitsname: Donat.** Nach Aelius Donatus, dessen *Ars minor* das
+> Lateinlehrbuch des Mittelalters war — und »Donat« wurde im Deutschen
+> zum Wort für das Schulbuch selbst. Der Name steht an EINER Stelle:
+> [`backend/marke.py`](backend/marke.py). Das Verzeichnis heißt weiter
+> `vokabeltrainer`.
 
 Browserbasiert, eigene Datenbank, läuft im Heimnetz. Gebaut, weil die
 üblichen Trainer eine Vokabel als *Paar aus zwei Zeichenketten* begreifen und

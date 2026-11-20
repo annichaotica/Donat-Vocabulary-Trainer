@@ -4,6 +4,7 @@
 import { api } from './api.js';
 import { h, leeren, meldung, lesbareSchrift } from './hilfen.js';
 import { zustand, merken, darstellungSetzen } from './zustand.js';
+import * as marke from './marke.js';
 import * as uebersicht from './ansicht_uebersicht.js';
 import * as lernansicht from './ansicht_lernen.js';
 import * as texte from './ansicht_texte.js';
@@ -112,7 +113,7 @@ async function kopfzeile() {
     lehrgang: 'Lehrgang',
     einstellungen: 'Einstellungen',
     tastatur: 'Tastatur', profile: 'Profil wählen',
-  }[weg[0]] || 'Vokabeltrainer';
+  }[weg[0]] || marke.NAME;
 
   // Den laufenden Reiter kennzeichnen.
   for (const knopf of document.querySelectorAll('.kopf-knoepfe button[data-ziel]')) {
@@ -307,7 +308,9 @@ async function wegweisen() {
 }
 
 verdrahten();
-wegweisen();
+// Den Namen holen, bevor der erste Titel gesetzt wird — sonst steht
+// eine Sekunde lang der Anfangswert aus dem HTML da und springt dann um.
+marke.markeLaden().then(() => wegweisen());
 
 // Hilfe über die Tastatur — auf dem Mac der schnellste Weg.
 document.addEventListener('keydown', (e) => {

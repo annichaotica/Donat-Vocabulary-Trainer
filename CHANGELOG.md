@@ -14,6 +14,41 @@ Eintrag wiederfindet.
 
 ---
 
+## 0.1.0 — vorbereitet, noch nicht veröffentlicht
+
+Die erste benannte Fassung. Der Tag wird **nicht** gesetzt, bevor er
+ausdrücklich freigegeben ist; bis dahin steht hier nur, was zu ihr
+gehören würde.
+
+Die Fassungsnummer steht an einer Stelle: `VERSION` in
+[`backend/marke.py`](backend/marke.py). Von dort liest der
+FastAPI-Titel, die Auskunft unter `/api/zustand` und — nach dem Tag —
+die Marke des Abbilds.
+
+**Für Besuch vorbereitet**
+
+- **Arbeitsname »Donat«**, geführt an einer Stelle (`backend/marke.py`,
+  `frontend/js/marke.js` holt ihn über `/api/zustand`). Verzeichnis und
+  Module heißen weiter `vokabeltrainer`.
+- **`BEISPIELDATEN=1`** legt beim Start einen Beispielbestand an — aber
+  nur, wenn noch kein Profil da ist. Ein laufender Bestand wird nie
+  angefasst, auch wenn die Variable stehenbleibt.
+- **Codespaces**: `.devcontainer/devcontainer.json` installiert,
+  befüllt, startet und öffnet den Trainer.
+- **Fertiges Abbild**: eine Action baut bei jeder Veröffentlichung nach
+  `ghcr.io`, `docker-compose.beispiel.yml` zieht es ohne Klonen.
+- **Englische README** (`README.en.md`), beide verlinkt.
+
+**Behoben**
+
+- `tests/test_oberflaeche.py` rief `pytest.skip`, ohne `pytest` zu
+  importieren. Der Fehler zeigte sich nur dort, wo **node fehlt** — also
+  in jedem Container und in jeder Fertigungsstraße, und genau dort nie
+  jemandem, der ihn gesehen hätte. Lokal lief der Test durch, weil node
+  da ist.
+
+---
+
 ## 20.11.2026
 
 ### Im Lernziel zählt jetzt das Lernziel

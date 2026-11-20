@@ -861,3 +861,67 @@ def test_die_textwerkstatt_baut_nur_fuer_die_lesart_neu():
     rumpf = ohne[anfang:anfang + ohne[anfang:].index("\n}\n")]
     assert "zeichnenText(behaelter" in rumpf, \
         "Der verbliebene Neuaufbau steht nicht in teilLesart"
+
+
+def test_ziele_mit_termin_stehen_vor_dem_allgemeinen():
+    """»Die sind ja das, worauf der Fokus liegen sollte.«
+
+    Die Lernziele standen nicht nur unter der Heute-Karte, sondern
+    auch noch unter dem Bücherregal — fünfter Block. Bei Lernende 2 stand
+    dort »heute fällig, 60 offen«.
+
+    Entscheidender als die Reihenfolge ist aber der Knopf: der große
+    »Lernen« auf der Heute-Karte kennt die Lernziele NICHT (er schickt
+    kein lernziel_id mit, und der Planer fragt keines ab). Eine Zeile,
+    die einen Termin anzeigt und dann auf denselben allgemeinen Knopf
+    verweist, ließe einen mit dem Termin allein.
+    """
+    import pathlib
+
+    quelle = pathlib.Path("frontend/js/ansicht_uebersicht.js").read_text()
+
+    # Oben, vor dem Allgemeinen.
+    assert (quelle.index("teilTermine(ziele)")
+            < quelle.index("h('h1', { text: 'Heute' })")
+            + len("h('h1', { text: 'Heute' })")), \
+        "Der Terminstreifen gehört unter die Überschrift »Heute«"
+    assert quelle.index("anfuegen(el, teilTermine(ziele))") \
+        < quelle.index("zahlKasten(gesamt.faellig"), \
+        "Der Terminstreifen steht nicht vor der Heute-Karte"
+
+    # Ein Regal ist Stöbern, ein Ziel ist eine Zusage.
+    assert quelle.index("h('h2', { text: 'Lernziele' })") \
+        < quelle.index("h('h2', { text: 'Bücher und Texte' })"), \
+        "Die Lernziele stehen immer noch unter dem Bücherregal"
+
+    # Und der Knopf startet DIESES Ziel.
+    anfang = quelle.index("function teilTermine(")
+    rumpf = quelle[anfang:anfang + quelle[anfang:].index("\n}\n")]
+    assert "z.termin" in rumpf, "Der Streifen filtert nicht auf einen Termin"
+    assert "#/lernen/ziel/" in rumpf, \
+        "Der Knopf startet nicht das Ziel, sondern irgendetwas anderes"
+    assert "'#/lernen'" not in rumpf, \
+        "Der Knopf fällt auf die allgemeine Abfrage zurück"
+
+
+def test_die_abfrage_sagt_in_welchem_lernziel_man_steckt():
+    """Der Server schickt es mit, die Oberfläche zeigte es nie.
+
+    Das fiel nicht auf, solange ein Ziel nur über die Lernzielseite zu
+    starten war — man kam ja gerade von dort. Seit der Terminstreifen
+    auf der Übersicht unmittelbar eine Zielabfrage startet, ist der
+    Unterschied zwischen »planmäßig über alles« und »genau dieses
+    Ziel« nicht mehr am Weg abzulesen.
+
+    Und der Unterschied ist groß: gemessen am echten Stand lieferte
+    »Lernen« Karotte, Minimarkt und Reis, während das Ziel, das in
+    zwei Tagen ablief, bei Lektion 2 und 3 stand.
+    """
+    import pathlib
+
+    quelle = pathlib.Path("frontend/js/ansicht_lernen.js").read_text()
+    anfang = quelle.index("  teilFortschritt()")
+    rumpf = quelle[anfang:anfang + quelle[anfang:].index("\n  }\n")]
+    assert "lernziel" in rumpf, \
+        "Die Abfrage verrät nicht, ob sie aus einem Lernziel zieht"
+    assert "ziel.name" in rumpf, "Der Name des Lernziels fehlt"

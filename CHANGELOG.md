@@ -16,6 +16,48 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Was einen Termin hat, steht jetzt oben — und ist der Knopf
+
+Die Lernziele standen auf der Übersicht nicht nur unter der
+Heute-Karte, sondern auch noch unter dem Bücherregal: fünfter Block.
+Bei Lernende 2 stand dort »heute fällig, 60 offen«.
+
+Wichtiger als die Reihenfolge war aber etwas anderes, das beim
+Nachsehen herauskam: **der große »Lernen« auf der Heute-Karte kennt
+die Lernziele nicht.** Er startet die planmäßige Abfrage über den
+ganzen Bestand — verlernt, dann fällig, dann neu, begrenzt durch die
+Tagesdosis. Ein Lernziel steuert die Abfrage nur über seinen eigenen
+Weg. Nebeneinander geholt sah das so aus:
+
+```
+»Lernen« auf der Heute-Karte     Ziel »Jetzt mal wirklich«
+  die Karotte                      hallo    (fällig)
+  der Minimarkt                    Eleni    (fällig)
+  der Reis                         τα λέμε  (fällig)
+```
+
+Das Ziel lief in zwei Tagen ab, der Trainer rechnete »täglich etwa 12
+neue Aufgaben« aus — und der Knopf lieferte sie nicht.
+
+Deshalb steht jetzt unter der Überschrift **Heute** zuerst, was eine
+Frist hat: Name, Lage (»noch 2 Tage — dafür täglich etwa 12 neue
+Aufgaben«), Balken, und rechts **Lernen ›**. Die Zeile *ist* der
+Knopf und startet genau dieses Ziel. Heute fällig oder überfällig wird
+hervorgehoben — Rand **und** Beschriftung, nicht nur Farbe.
+
+Nur Ziele **mit** Termin, höchstens drei: ein Ziel ohne Termin ist ein
+Vorhaben und steht weiter unten, und der Streifen soll die Heute-Karte
+nicht unter die Falz schieben. Die Heute-Karte selbst bleibt direkt
+darunter — die Zielzeile sagt *warum*, die Karte *womit*.
+
+Dazu zwei Kleinigkeiten: der Abschnitt **Lernziele** steht jetzt vor
+**Bücher und Texte** (ein Regal ist Stöbern, ein Ziel ist eine
+Zusage), und die Abfrage schreibt oben hin, aus welchem Lernziel sie
+gerade zieht. Der Server schickt das seit jeher mit; angezeigt wurde
+es nie, weil man bis heute immer von der Lernzielseite kam und es
+wusste.
+
+
 ### Drei Dinge bei den Reihen
 
 **Der Tipp tat etwas Schlimmeres als nichts.** Bei einer Reihe ist die

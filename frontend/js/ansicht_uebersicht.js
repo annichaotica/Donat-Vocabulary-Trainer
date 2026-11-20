@@ -406,6 +406,63 @@ function lernwahlZeile(s) {
  * Zahlen, die etwas über den Lernstand sagen, nicht über ihnen. Wer
  * eine Stufe aufsteigt, merkt es trotzdem.
  */
+/** Die Ziele mit Termin — über allem Allgemeinen.
+ *
+ * »Die sind ja das, worauf der Fokus liegen sollte, wenn welche mit
+ * Terminen da sind.« Und das stimmt doppelt: sie standen nicht nur
+ * unter der Heute-Karte, sondern auch noch unter dem Bücherregal —
+ * fünfter Block. Bei Lernende 2 stand dort »heute fällig, 60 offen«.
+ *
+ * ENTSCHEIDEND ist aber nicht die Reihenfolge, sondern der Knopf: der
+ * große »Lernen« auf der Heute-Karte kennt die Lernziele NICHT. Er
+ * startet die planmäßige Abfrage über den ganzen Bestand; ein Ziel
+ * steuert die Abfrage nur über seinen eigenen Weg. Gemessen am echten
+ * Stand lieferte »Lernen« Karotte, Minimarkt und Reis, während das
+ * Ziel, das in zwei Tagen ablief, bei Lektion 2 und 3 stand.
+ *
+ * Darum ist die Zeile hier der Knopf, der genau dieses Ziel startet —
+ * sonst zeigte sie einen Termin an und ließe einen damit allein.
+ *
+ * NUR MIT TERMIN. Ein Ziel ohne Termin ist ein Vorhaben und gehört
+ * nach unten; hier oben steht, was eine Frist hat. Und nur drei: der
+ * Streifen soll die Heute-Karte nicht unter die Falz schieben, sonst
+ * wäre die Heilung schlimmer als die Krankheit.
+ */
+function teilTermine(ziele) {
+  const mitTermin = (ziele || [])
+    .filter((z) => z.termin && z.aktiv && (z.fortschritt?.gesamt || 0) > 0)
+    .sort((a, b) => a.termin.localeCompare(b.termin))
+    .slice(0, 3);
+  if (!mitTermin.length) return null;
+
+  const streifen = h('div', { class: 'termine' });
+  for (const z of mitTermin) {
+    const f = z.fortschritt || {};
+    const tage = f.tage_bis_termin;
+    // Heute oder vorbei: das ist kein Hinweis mehr, das ist eine Lage.
+    const dringend = typeof tage === 'number' && tage <= 0;
+    streifen.append(h('button', {
+      class: 'termin' + (dringend ? ' dringend' : ''),
+      title: `»${z.name}« jetzt lernen`,
+      onclick: () => {
+        merken({ lernzielId: z.id });
+        location.hash = `#/lernen/ziel/${z.id}`;
+      },
+    },
+      h('span', { class: 'termin-kopf' },
+        h('strong', { text: z.name }),
+        h('span', { class: 'termin-lage', text: f.lage || '' })),
+      h('span', { class: 'zielbalken' },
+        h('i', { style: `width:${Math.round((f.anteil || 0) * 100)}%` })),
+      h('span', { class: 'termin-fuss' },
+        h('span', { class: 'leise',
+                    text: `${f.geschafft ?? 0} von ${f.gesamt ?? 0}` }),
+        h('span', { class: 'termin-los', text: 'Lernen \u203a' }))));
+  }
+  return streifen;
+}
+
+
 function stufenzeile(spielstand) {
   if (!spielstand) return null;
   const p = spielstand.punkte;
@@ -463,15 +520,19 @@ export async function zeichnen(behaelter) {
   // Vor allem anderen: ein Satz von der Mutter ist wichtiger als die
   // Zahl der fälligen Aufgaben. Wer ihn erst nach dem Scrollen fände,
   // fände ihn nicht.
-  const zieleFuerZuspruch = await api.lernziele(zustand.benutzerId)
-    .catch(() => []);
+  // Einmal geholt, zweimal gebraucht: oben für die Termine, unten für
+  // den Abschnitt. Vorher stand derselbe Aufruf zweimal in dieser
+  // Funktion.
+  const ziele = await api.lernziele(zustand.benutzerId).catch(() => []);
   anfuegen(el, post && zuspruch.karteFuerMich(
-    behaelter, post.fuer_mich, zieleFuerZuspruch,
-    () => zeichnen(behaelter)));
+    behaelter, post.fuer_mich, ziele, () => zeichnen(behaelter)));
 
   anfuegen(el, willkommen(behaelter, sammlungen));
 
   el.append(h('h1', { text: 'Heute' }));
+  // Was einen Termin hat, steht VOR dem Allgemeinen — und ist der
+  // Knopf, der genau das startet.
+  anfuegen(el, teilTermine(ziele));
   el.append(h('div', { class: 'karte' },
     h('div', { class: 'zahlen' },
       zahlKasten(gesamt.faellig, 'fällig', 'faellig'),
@@ -518,31 +579,11 @@ export async function zeichnen(behaelter) {
     anfuegen(h('p', { class: 'leise', style: 'margin:.8rem 0 0' }),
              stufenzeile(spielstand))));
 
-  // Bücher und Texte: eine eigene Karte, denn sie gehören dem Konto
-  // und nicht einer Sammlung. Der Iwein gehört nicht zu
-  // »Mittelhochdeutsch, Stammformen« — er ist Literatur, die man MIT
-  // diesem Wortschatz liest.
-  const buecher = await api.buecher(zustand.benutzerId).catch(() => []);
-  const alleTexte = await api.alleTexte(zustand.benutzerId).catch(() => []);
-  if (buecher.length || alleTexte.length) {
-    const offeneAbschnitte = alleTexte.reduce(
-      (summe, t) => summe + (t.abschnitte - t.uebersetzt), 0);
-    el.append(h('h2', { text: 'Bücher und Texte' }));
-    el.append(h('div', { class: 'karte' },
-      h('div', { class: 'zahlen' },
-        zahlKasten(buecher.length, buecher.length === 1 ? 'Buch' : 'Bücher'),
-        zahlKasten(alleTexte.length, 'Texte'),
-        zahlKasten(offeneAbschnitte, 'Abschnitte ohne Übersetzung')),
-      h('div', { class: 'frage-werkzeuge',
-                 style: 'margin-top:.8rem' },
-        h('button', { class: 'wichtig',
-                      onclick: () => { location.hash = '#/texte'; } },
-          'Zum Regal'))));
-  }
-
   // Lernziele: Ausschnitte des Bestands mit Termin, auch über Lektionen
-  // und Sammlungen hinweg.
-  const ziele = await api.lernziele(zustand.benutzerId).catch(() => []);
+  // und Sammlungen hinweg. Hier stehen ALLE — die mit Termin sind oben
+  // schon einzeln zu sehen, die ohne nur hier.
+  //
+  // Vor den Büchern: ein Regal ist Stöbern, ein Ziel ist eine Zusage.
   el.append(h('h2', { text: 'Lernziele' }));
   if (ziele.length) {
     const reihe = h('div', { class: 'karte-reihe' });
@@ -570,6 +611,28 @@ export async function zeichnen(behaelter) {
   el.append(h('div', { class: 'frage-werkzeuge' },
     h('button', { onclick: () => { location.hash = '#/ziele'; } },
       ziele.length ? 'Alle Lernziele' : 'Lernziel anlegen')));
+
+  // Bücher und Texte: eine eigene Karte, denn sie gehören dem Konto
+  // und nicht einer Sammlung. Der Iwein gehört nicht zu
+  // »Mittelhochdeutsch, Stammformen« — er ist Literatur, die man MIT
+  // diesem Wortschatz liest.
+  const buecher = await api.buecher(zustand.benutzerId).catch(() => []);
+  const alleTexte = await api.alleTexte(zustand.benutzerId).catch(() => []);
+  if (buecher.length || alleTexte.length) {
+    const offeneAbschnitte = alleTexte.reduce(
+      (summe, t) => summe + (t.abschnitte - t.uebersetzt), 0);
+    el.append(h('h2', { text: 'Bücher und Texte' }));
+    el.append(h('div', { class: 'karte' },
+      h('div', { class: 'zahlen' },
+        zahlKasten(buecher.length, buecher.length === 1 ? 'Buch' : 'Bücher'),
+        zahlKasten(alleTexte.length, 'Texte'),
+        zahlKasten(offeneAbschnitte, 'Abschnitte ohne Übersetzung')),
+      h('div', { class: 'frage-werkzeuge',
+                 style: 'margin-top:.8rem' },
+        h('button', { class: 'wichtig',
+                      onclick: () => { location.hash = '#/texte'; } },
+          'Zum Regal'))));
+  }
 
   el.append(h('h2', { text: 'Sammlungen' }));
   if (!sammlungen.length) {

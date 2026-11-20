@@ -610,7 +610,21 @@ export class Sitzung {
       ? `${p.heute_erledigt} von ${marke} heute`
         + (g.gesamt ? ` · ${g.richtig} richtig` : '')
       : (g.gesamt ? `${g.gesamt} bearbeitet · ${g.richtig} richtig` : 'Los geht’s');
+    // In welchem Lernziel man steckt.
+    //
+    // Der Server schickt es seit jeher an jeder Aufgabe mit, die
+    // Oberfläche hat es nie angezeigt. Das fiel nicht auf, solange ein
+    // Ziel nur über die Lernzielseite zu starten war — man kam ja
+    // gerade von dort. Seit der Terminstreifen auf der Übersicht
+    // unmittelbar eine Zielabfrage startet, ist der Unterschied
+    // zwischen »planmäßig über alles« und »dieses Ziel« nicht mehr am
+    // Weg abzulesen. Dann muss er dastehen.
+    const ziel = this.aufgabe?.lernziel;
     return h('div', {},
+      ziel && ziel.name
+        ? h('p', { class: 'leise lernzielzeile', style: 'margin:0 0 .3rem' },
+            'Lernziel: ', h('b', { text: ziel.name }))
+        : null,
       h('div', { class: 'fortschritt' }, h('i', { style: `width:${anteil}%` })),
       h('p', { class: 'leise', style: 'margin:.3rem 0 0', text }));
   }

@@ -1015,3 +1015,63 @@ def test_ein_wort_ohne_artikel_bleibt_unangetastet(klient):
     finally:
         db.close()
     assert f["frage_text"] == "τοίχος", f["frage_text"]
+
+
+def test_die_reihe_nennt_die_deutsche_bedeutung(klient):
+    """»Beim Verben abfragen (Reihe) kannst du bitte die deutsche
+    Übersetzung danebenschreiben, das ist dort ok.«
+
+    »Dort ok« ist der entscheidende Teil: bei einer Bedeutungsaufgabe
+    wäre die Übersetzung die Lösung, bei einer Reihe ist sie es nicht.
+    Wer weiß, dass »aller« gehen heißt, hat davon keine einzige der
+    sechs Formen.
+    """
+    import datenbank as dbm
+    import aufgaben
+
+    b = klient.post("/api/benutzer", json={"name": "Lernende 1"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Französisch", "sprache": "fr"}).json()
+    # `ungeprueft_abfragen`, weil eingelesene Formen als ungeprüft
+    # eintreffen — und ohne Freigabe entsteht keine Reihenaufgabe.
+    klient.put(f"/api/sammlungen/{s['id']}/einstellungen",
+               json={"typen": ["bedeutung_deutsch_fremd", "formenreihe"],
+                     "ungeprueft_abfragen": True})
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{
+            "lemma": "aller", "wortart": "verb",
+            "bedeutungen": [{"uebersetzungen": ["gehen", "laufen"]},
+                            {"uebersetzungen": ["fahren"],
+                             "kontext": "mit Fahrzeug"}],
+            "formen": [{"text": t, "merkmale": {
+                "modus": "indikativ", "tempus": "praesens",
+                "person": p, "numerus": n}}
+                for t, (p, n) in zip(
+                    ["vais", "vas", "va", "allons", "allez", "vont"],
+                    [("1", "sg"), ("2", "sg"), ("3", "sg"),
+                     ("1", "pl"), ("2", "pl"), ("3", "pl")])]}]})
+
+    db = dbm.verbindung()
+    try:
+        reihe = dbm.zeile(db, """SELECT a.id FROM aufgabe a
+                                   JOIN lexem l ON l.id = a.lexem_id
+                                  WHERE l.sammlung_id = ?
+                                    AND a.typ = 'formenreihe'""", (s["id"],))
+        assert reihe, "es muss eine Reihenaufgabe geben"
+        f_reihe = aufgaben.frage(db, reihe["id"])
+
+        wort = dbm.zeile(db, """SELECT a.id FROM aufgabe a
+                                  JOIN lexem l ON l.id = a.lexem_id
+                                 WHERE l.sammlung_id = ?
+                                   AND a.typ = 'bedeutung_deutsch_fremd'""",
+                         (s["id"],))
+        f_wort = aufgaben.frage(db, wort["id"])
+    finally:
+        db.close()
+
+    # Je Bedeutung die erste Übersetzung — nicht alle. »gehen, laufen,
+    # fahren« wäre eine Liste, »gehen, fahren« ist eine Auskunft.
+    assert f_reihe["bedeutung"] == "gehen, fahren", f_reihe["bedeutung"]
+    # Und bei der Bedeutungsaufgabe steht sie NICHT da: dort wäre sie
+    # die Lösung.
+    assert f_wort.get("bedeutung") is None, f_wort

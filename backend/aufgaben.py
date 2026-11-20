@@ -476,6 +476,31 @@ def _alle_bedeutungen(db: sqlite3.Connection, lexem_id: int,
     return ergebnis
 
 
+def _bedeutungstext(db: sqlite3.Connection, lexem_id: int,
+                    grundsprache: str) -> str | None:
+    """Die deutsche Bedeutung eines Wortes, kurz — je Bedeutung die
+    erste Übersetzung.
+
+    »Beim Verben abfragen (Reihe) kannst du bitte die deutsche
+    Übersetzung danebenschreiben, das ist dort ok.«
+
+    »Dort ok« ist der entscheidende Teil. Bei einer Bedeutungsaufgabe
+    wäre die Übersetzung die Lösung; bei einer Reihe ist sie es nicht —
+    gefragt sind sechs Formen, und wer weiß, dass »aller« gehen heißt,
+    hat davon keine einzige. Er weiß nur, wovon er redet, und das hilft
+    beim Behalten.
+
+    Je Bedeutung die ERSTE Übersetzung und nicht alle: »gehen, laufen,
+    zu Fuß gehen, fahren« ist eine Liste, »gehen, fahren« eine
+    Auskunft.
+    """
+    texte = []
+    for b in _alle_bedeutungen(db, lexem_id, grundsprache):
+        if b["uebersetzungen"]:
+            texte.append(b["uebersetzungen"][0]["text"])
+    return ", ".join(texte[:3]) or None
+
+
 def _verwechslungen(db: sqlite3.Connection, lexem: dict, code: str,
                     ausser_text: str | None) -> list[tuple[str, str]]:
     """Andere Formen desselben Wortes, mit Beschriftung.
@@ -901,6 +926,9 @@ def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
                 "frage_text": lexem["lemma"],
                 "frage_sprache": code,
                 "frage_zusatz": gruppe["name"] if gruppe else "",
+                # Die Bedeutung darf hier mitstehen — sie ist nicht die
+                # Lösung. Gefragt sind die Formen.
+                "bedeutung": _bedeutungstext(db, lexem["id"], grund),
                 "antwort_sprache": code,
                 # Ohne die erwarteten Antworten — die Lösung gehört nicht
                 # in die Frage.
@@ -924,6 +952,11 @@ def frage(db: sqlite3.Connection, aufgabe_id: int, stil: str = "fach") -> dict:
                 "frage_text": lexem["lemma"],
                 "frage_sprache": code,
                 "frage_zusatz": "Stammformen",
+                # Wie bei der Reihe: die Bedeutung verrät hier nichts.
+                # Bei »nëmen – nam – nâmen – genomen« hilft es sogar
+                # besonders, weil man das Wort beim Üben sonst nur als
+                # Lautfolge behandelt.
+                "bedeutung": _bedeutungstext(db, lexem["id"], grund),
                 "antwort_sprache": code,
                 "zellen": [{k: v for k, v in z.items() if k != "erwartet"}
                            for z in zellen],

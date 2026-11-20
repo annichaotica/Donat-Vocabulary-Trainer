@@ -554,6 +554,17 @@ export class Sitzung {
     if (a.frage_zusatz) {
       kasten.append(h('p', { class: 'frage-zusatz', text: a.frage_zusatz }));
     }
+    // Die deutsche Bedeutung — aber NUR bei den Reihen.
+    //
+    // »Das ist dort ok«: bei einer Bedeutungsaufgabe wäre sie die
+    // Lösung, bei einer Reihe ist sie es nicht. Wer weiß, dass »aller«
+    // gehen heißt, hat davon keine einzige der sechs Formen — er weiß
+    // nur, wovon er redet. Der Server schickt sie darum auch nur für
+    // diese beiden Aufgabenarten mit.
+    if (a.bedeutung) {
+      kasten.append(h('p', { class: 'frage-bedeutung', lang: 'de' },
+        h('span', { class: 'leise', text: 'heißt: ' }), a.bedeutung));
+    }
     // Ein Beispiel auf Deutsch. "wen oder was?" ist schon besser als
     // "Akkusativ", aber erst "ich sehe DEN Hund" macht es in einer
     // Sekunde klar — und zwar auch dem, der nie Latein hatte.
@@ -713,8 +724,15 @@ export class Sitzung {
                             text: z.pronomen.join('/') + ' ' })
               : null,
             z.beschriftung),
+          // »wie bei:« davor, seit die Bedeutung des Wortes oben steht.
+          // Ohne das las sich »ich ging immer wieder« unter »heißt:
+          // arbeiten« wie die Übersetzung dieser Zeile — dabei
+          // erklärt das Beispiel die ZEITFORM und nimmt dafür immer
+          // dasselbe Verb. Derselbe Vorsatz steht bei der einzelnen
+          // Form schon.
           z.beispiel
-            ? h('span', { class: 'leise', text: z.beispiel })
+            ? h('span', { class: 'leise' },
+                h('span', { class: 'leiser', text: 'wie bei: ' }), z.beispiel)
             : null),
         feld,
         r && r.urteil !== 'richtig'

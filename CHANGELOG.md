@@ -16,6 +16,33 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Die Bedeutung steht jetzt über der Formenreihe
+
+»Beim Verben abfragen (Reihe) kannst du bitte die deutsche Übersetzung
+danebenschreiben, das ist dort ok.«
+
+»Dort ok« ist der entscheidende Teil. Bei einer Bedeutungsaufgabe wäre
+die Übersetzung die Lösung — bei einer Reihe ist sie es nicht: gefragt
+sind sechs Formen, und wer weiß, dass *aller* gehen heißt, hat davon
+keine einzige. Er weiß nur, wovon er redet.
+
+```
+            travailler
+             Imparfait
+         heißt: arbeiten
+```
+
+Je Bedeutung die erste Übersetzung, nicht alle: »gehen, fahren« ist
+eine Auskunft, »gehen, laufen, zu Fuß gehen, fahren« eine Liste. Gilt
+auch für die Stammformen — gerade dort, wo man *nëmen – nam – nâmen –
+genomen* sonst als bloße Lautfolge übt.
+
+Dadurch fiel etwas anderes auf: die Beispiele an den Zeilen (»ich ging
+immer wieder«) erklären die **Zeitform** und nehmen dafür immer
+dasselbe Verb. Unter »heißt: arbeiten« lasen sie sich plötzlich wie
+die Übersetzung der Zeile. Sie stehen jetzt mit dem Vorsatz »wie bei:«
+da — so wie bei der einzelnen Form auch.
+
 ### Der Tipp stand weiß auf weiß
 
 »Auf dem Handy sind sie weiß auf weiß.«

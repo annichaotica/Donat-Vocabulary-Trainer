@@ -531,6 +531,18 @@ input[type="file"] { max-width: 100%; }
 #meldung.fehler { background: var(--falsch, #b3261e); color: #fff; }
 
 
+/* Noch eine Spur zurückhaltender als `.leise` — für Vorsätze wie
+   »wie bei:«, die nur sagen, wie das Folgende zu lesen ist. */
+.leiser { opacity: .75; }
+
+/* Die deutsche Bedeutung über einer Formenreihe. Ruhig gesetzt: sie
+   ist Begleitung, nicht die Frage. */
+.frage-bedeutung {
+  margin: .3rem 0 0;
+  font-size: .95em;
+  color: var(--text);
+}
+
 /* Die Hilfen beim Antworten: Tipp und »Weiß ich nicht«.
    Dicht unter dem Feld und etwas eingerückt — sie gehören dorthin und
    nicht zu den Knöpfen am Fuß der Seite. */

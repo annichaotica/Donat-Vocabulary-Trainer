@@ -4,6 +4,7 @@
 import { api } from './api.js';
 import { h, leeren, meldung, lesbareSchrift } from './hilfen.js';
 import { zustand, merken, darstellungSetzen } from './zustand.js';
+import * as marke from './marke.js';
 import * as uebersicht from './ansicht_uebersicht.js';
 import * as lernansicht from './ansicht_lernen.js';
 import * as texte from './ansicht_texte.js';
@@ -112,7 +113,7 @@ async function kopfzeile() {
     lehrgang: 'Lehrgang',
     einstellungen: 'Einstellungen',
     tastatur: 'Tastatur', profile: 'Profil wählen',
-  }[weg[0]] || 'Vokabeltrainer';
+  }[weg[0]] || marke.NAME;
 
   // Den laufenden Reiter kennzeichnen.
   for (const knopf of document.querySelectorAll('.kopf-knoepfe button[data-ziel]')) {
@@ -136,8 +137,21 @@ function verdrahten() {
   for (const knopf of document.querySelectorAll('.kopf-knoepfe button[data-ziel]')) {
     knopf.addEventListener('click', () => { location.hash = knopf.dataset.ziel; });
   }
+  // Der Ring zeigt den Tagesstand und die Strähne — und führte bisher
+  // mitten in eine Abfrage.
+  //
+  // »Da wurde mir jetzt aber ein spanischer Begriff gezeigt. Macht es
+  // denn überhaupt Sinn, über diesen Button zum allgemeinen Lernen zu
+  // springen?« — Nein. Er sprang nach #/lernen OHNE die Sammlung zu
+  // leeren, also in das, was zuletzt eingestellt war; und er ist eine
+  // Anzeige, kein Startknopf. Wer auf eine Zahl tippt, will wissen,
+  // was dahintersteckt.
+  //
+  // »Dein Fortschritt« ist genau die Seite dazu: Stufe, Punkte,
+  // Strähne, überbrückte Fehltage. Gestartet wird von der Übersicht,
+  // wo auch steht, WAS man lernt.
   document.getElementById('kopf-spiel').addEventListener('click', () => {
-    location.hash = '#/lernen';
+    location.hash = '#/statistik';
   });
   document.getElementById('knopf-profil').addEventListener('click', () => {
     // Von außen gibt es nichts zu wechseln.
@@ -294,7 +308,9 @@ async function wegweisen() {
 }
 
 verdrahten();
-wegweisen();
+// Den Namen holen, bevor der erste Titel gesetzt wird — sonst steht
+// eine Sekunde lang der Anfangswert aus dem HTML da und springt dann um.
+marke.markeLaden().then(() => wegweisen());
 
 // Hilfe über die Tastatur — auf dem Mac der schnellste Weg.
 document.addEventListener('keydown', (e) => {

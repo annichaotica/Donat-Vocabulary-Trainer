@@ -132,7 +132,7 @@ export function karteFuerMich(behaelter, offene, ziele, neuZeichnen) {
         h('p', { style: 'margin:0', text: satz(z, ziele) }),
         knoepfe.length
           ? h('div', { class: 'frage-werkzeuge',
-                       style: 'justify-content:flex-start;margin-top:.4rem' },
+                       style: 'margin-top:.4rem' },
               ...knoepfe)
           : null)));
   }
@@ -225,7 +225,7 @@ function teilSchicken(behaelter, d, meineZiele, neu) {
     h('div', { style: 'margin-top:.6rem' }, belohnung),
     h('div', { style: 'margin-top:.6rem' }, text),
     h('div', { class: 'frage-werkzeuge',
-               style: 'justify-content:flex-start;margin-top:.8rem' },
+               style: 'margin-top:.8rem' },
       h('button', {
         class: 'wichtig',
         onclick: () => tun(async () => {
@@ -261,7 +261,7 @@ function teilVonMir(d, neu) {
         h('p', { class: 'leise', style: 'margin:.1rem 0 0',
                  text: `an ${z.an_name} · ${stand}` }),
         h('div', { class: 'frage-werkzeuge',
-                   style: 'justify-content:flex-start;margin-top:.3rem' },
+                   style: 'margin-top:.3rem' },
           // Ein Versprechen hakt ab, wer es gegeben hat. Wer sich selbst
           // bescheinigen könnte, das Kino sei abgegolten, bräuchte keins.
           (z.art === 'versprechen' && !z.erledigt)

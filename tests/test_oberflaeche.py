@@ -11,6 +11,8 @@ import pathlib
 import re
 import subprocess
 
+import pytest
+
 WURZEL = pathlib.Path(__file__).resolve().parents[1]
 JS = sorted((WURZEL / "frontend" / "js").glob("*.js"))
 CSS = WURZEL / "frontend" / "css"

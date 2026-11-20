@@ -6,6 +6,34 @@ import { datumText, h, leeren, meldung, zahl, tun } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, darstellungSetzen } from './zustand.js';
 
+/** Eine einzelne Karte neu zeichnen — nicht die ganze Seite.
+ *
+ * Die Seite hat vier Karten und in jeder einen Speichern-Knopf. Drei
+ * von ihnen riefen danach `zeichnen(behaelter)` auf, und das leert den
+ * Behälter vollständig: was in einer ANDEREN Karte eingetippt und noch
+ * nicht gespeichert war, entstand aus dem gespeicherten Wert neu und
+ * war damit weg. Ohne Nachfrage, ohne Meldung.
+ *
+ * Nachzustellen war es so: Tagesziel auf 30 ändern, NICHT speichern,
+ * dann oben im Lehrwerk eine Lektionsnummer speichern — das Tagesziel
+ * stand wieder auf 20.
+ *
+ * Ein Neuaufbau ist trotzdem nötig: die Karten zeigen abgeleitete
+ * Angaben, die sich erst beim Speichern ergeben (die Begründung je
+ * Formgruppe, die Zahl der neu angelegten Aufgaben). Also die eine
+ * Karte austauschen und die anderen in Ruhe lassen.
+ */
+async function karteErneuern(behaelter, alt, bauen) {
+  const neu = await bauen(behaelter);
+  if (!neu || !alt.isConnected) return neu;
+  // Eine aufklappbare Karte bleibt offen, wenn sie offen war — sonst
+  // klappt das Speichern sie unter den Fingern zu.
+  if (alt.tagName === 'DETAILS' && neu.tagName === 'DETAILS') neu.open = alt.open;
+  alt.replaceWith(neu);
+  return neu;
+}
+
+
 export async function zeichnen(behaelter) {
   const el = leeren(behaelter);
   el.append(h('h1', { text: 'Einstellungen' }));
@@ -149,7 +177,7 @@ async function teilZugriff(behaelter) {
     h('b', { text: 'Pflegen' }), ' heißt zusätzlich, Wörter ändern und '
     + 'freigeben zu dürfen.'));
 
-  const neu = async () => zeichnen(behaelter);
+  const neu = async () => karteErneuern(behaelter, kasten, teilZugriff);
 
   kasten.append(h('p', { style: 'margin:.6rem 0 .2rem' },
     h('b', { text: z.besitzer.name }),
@@ -323,10 +351,10 @@ async function teilLehrgang(behaelter) {
                                     stand.value.trim()
                                       ? Number(stand.value) : null);
           meldung('Gespeichert.');
-          zeichnen(behaelter);
+          karteErneuern(behaelter, kasten, teilLehrgang);
         } catch (fehler) { meldung(fehler.message, 'fehler'); }
       },
-    }, 'Speichern'),
+    }, 'Lehrwerk speichern'),
     h('button', {
       onclick: () => {
         // Den Vorschlag in die Felder schreiben — nicht speichern. Wer
@@ -446,7 +474,7 @@ async function teilSammlung(behaelter) {
         const b = ergebnis.aufgaben;
         meldung(`Gespeichert — ${b.angelegt} neu, ${b.reaktiviert} wieder dabei, `
               + `${b.abgeschaltet} abgeschaltet.`, 4000);
-        zeichnen(behaelter);
+        karteErneuern(behaelter, kasten, teilSammlung);
       } catch (fehler) { meldung(fehler.message); }
     },
   }, 'Speichern und Aufgaben neu rechnen'));
@@ -538,6 +566,29 @@ async function teilLernen(behaelter) {
                   text: 'Eingeschaltet ist jede dritte Frage etwas Neues — '
                       + 'dafür rücken echte Wiederholungen etwas nach hinten.' }))));
 
+  // »Jede Aufgabe kostet auf dem Touchgerät einen zweiten Tipp.« Der
+  // zweite ist »Weiter« — und nach einer sauber richtigen Antwort steht
+  // in der Rückmeldung nichts, was man noch lesen müsste.
+  //
+  // NUR dort. Bei »fast richtig« soll man die Schreibung sehen, bei
+  // »nicht richtig« die Lösung, und wer einen Tipp genommen oder das
+  // Wort nachgesehen hat, soll die gedeckelte Wertung sehen. Deshalb
+  // ist das hier keine Einstellung »Rückmeldung überspringen«.
+  const springen = h('input', {
+    type: 'checkbox', checked: Boolean(e.weiterspringen),
+  });
+  kasten.append(h('label', { class: 'schalter' }, springen,
+    h('span', { class: 'schalter-text' },
+      h('b', { text: 'Nach »richtig« von selbst weiterspringen' }),
+      h('span', { text: 'Spart den zweiten Tipp je Aufgabe. Gilt nur bei '
+                      + 'einer sauber richtigen Antwort — ohne Tipp und ohne '
+                      + 'nachgesehenes Wort. Bei »fast richtig« und bei '
+                      + 'Fehlern bleibt die Rückmeldung stehen, bis du '
+                      + 'weitergehst.' }),
+      h('span', { class: 'beispielzeile',
+                  text: 'Während es läuft, steht in der Wertung »Hierbleiben« '
+                      + '— ein Tipp darauf hält an.' }))));
+
   // Wie eine Form benannt wird. "Genitiv Singular" ist richtig und für
   // viele eine Mauer; wer daran scheitert, scheitert nicht an der Vokabel.
   const stil = h('select', {},
@@ -561,6 +612,7 @@ async function teilLernen(behaelter) {
                           dosis: e.fragen_je_tag, ziel: e.tagesziel,
                           stil: e.beschriftung || 'fach',
                           einstreuen: Boolean(e.neues_einstreuen),
+                          springen: Boolean(e.weiterspringen),
                           umschrift: e.tastatur_umschrift !== false };
   if (e.legasthenie?.aktiv) {
     kasten.append(h('p', { class: 'leise',
@@ -593,6 +645,9 @@ async function teilLernen(behaelter) {
       if (einstreuen.checked !== ausgangswerte.einstreuen) {
         aenderungen.neues_einstreuen = einstreuen.checked;
       }
+      if (springen.checked !== ausgangswerte.springen) {
+        aenderungen.weiterspringen = springen.checked;
+      }
       if (!Object.keys(aenderungen).length) {
         meldung('Nichts geändert.');
         return;
@@ -602,7 +657,7 @@ async function teilLernen(behaelter) {
         meldung('Gespeichert.');
       } catch (fehler) { meldung(fehler.message); }
     },
-  }, 'Speichern'));
+  }, 'Lernverhalten speichern'));
   return kasten;
 }
 
@@ -642,7 +697,7 @@ async function teilZugaenge(behaelter) {
                   if (!confirm(`Zugang „${t.name}" zurücknehmen? Claude kann `
                              + 'damit sofort nichts mehr eintragen.')) return;
                   await api.mcpTokenZuruecknehmen(t.id);
-                  zeichnen(behaelter);
+                  karteErneuern(behaelter, kasten, teilZugaenge);
               }),
             }, 'Zurücknehmen')
           : h('span', { class: 'marke warnung', text: 'zurückgenommen' })));
@@ -751,7 +806,7 @@ async function teilOAuth(behaelter) {
                        + 'ausgegebene Zugänge nimmst du oben einzeln '
                        + 'zurück.')) return;
             await api.oauthClientZuruecknehmen(c.client_id);
-            zeichnen(behaelter);
+            karteErneuern(behaelter, kasten, teilOAuth);
           }),
         }, 'Zurücknehmen')));
     }
@@ -828,7 +883,7 @@ function zeigeToken(kasten, neu) {
     h('p', { text: 'Das Zugangsmerkmal wird nicht gespeichert, nur sein '
                  + 'Streuwert. Jetzt kopieren — nachher ist es weg.' }),
     feld,
-    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    h('div', { class: 'frage-werkzeuge' },
       h('button', {
         onclick: async () => {
           try {
@@ -961,7 +1016,7 @@ async function teilLegasthenie(behaelter) {
   kasten.append(h('div', { class: 'regler' },
     h('label', { text: 'Gerüst beim Schreiben' }), h('span', {}), maske, h('span', {})));
 
-  kasten.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+  kasten.append(h('div', { class: 'frage-werkzeuge' },
     h('button', {
       class: 'wichtig',
       onclick: async () => {
@@ -971,9 +1026,12 @@ async function teilLegasthenie(behaelter) {
           meldung('Gespeichert.');
         } catch (fehler) { meldung(fehler.message); }
       },
-    }, 'Speichern'),
+    }, 'Darstellung speichern'),
     h('button', {
-      onclick: async () => { darstellungSetzen(lg); zeichnen(behaelter); },
+      onclick: () => {
+        darstellungSetzen(lg);
+        karteErneuern(behaelter, kasten, teilLegasthenie);
+      },
     }, 'Verwerfen')));
   return kasten;
 }

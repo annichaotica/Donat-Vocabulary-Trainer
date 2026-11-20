@@ -1,0 +1,87 @@
+{
+  // Ein Codespace, in dem der Trainer von selbst läuft.
+  //
+  // Der Zweck ist ein Blick, kein Betrieb: wer auf »Open in Codespaces«
+  // drückt, soll nach dem Bau eine gefüllte Oberfläche sehen und nicht
+  // eine leere Datenbank mit der Frage, wie man sie befüllt. Darum
+  // BEISPIELDATEN=1 — es wirkt ohnehin nur, wenn noch kein Profil da
+  // ist (siehe backend/erstbefuellung.py).
+  "name": "Donat",
+
+  // Dasselbe Python wie im Abbild. Zwei Fassungen für dasselbe
+  // Programm sind eine Fehlerquelle, die niemand sucht.
+  "image": "mcr.microsoft.com/devcontainers/python:3.13-bookworm",
+
+  "features": {
+    // Nur für tests/test_oberflaeche.py: `node --check` auf die
+    // JS-Module. Ohne node überspringt der Test sich selbst, aber dann
+    // prüft im Codespace niemand die Oberfläche.
+    "ghcr.io/devcontainers/features/node:1": { "version": "lts" },
+
+    // Damit `gh codespace ssh` und `gh codespace logs` funktionieren.
+    // Ohne sshd antwortet beides nur mit der Bitte, genau diese Zeilen
+    // hier einzutragen — und dann ist von außen nicht nachzusehen, ob
+    // der Trainer überhaupt läuft.
+    "ghcr.io/devcontainers/features/sshd:1": { "version": "latest" }
+  },
+
+  "onCreateCommand": "pip install --user -r requirements.txt -r requirements-test.txt",
+
+  // postATTACHcommand, nicht postStartCommand — und zwar nach einem
+  // Umweg, der hier stehen soll, damit ihn niemand noch einmal geht.
+  //
+  // Erst stand hier »attach«, dann habe ich auf »start« umgestellt, weil
+  // attach bei JEDEM Verbinden läuft und ein zweites uvicorn auf
+  // demselben Anschluss startet. Im echten Codespace stellte sich
+  // heraus: ein aus postStartCommand im Hintergrund gestarteter Prozess
+  // ÜBERLEBT NICHT. Der Haken meldet »Outcome: success«, und danach gibt
+  // es weder Prozess noch Protokolldatei — die Umgebung räumt die
+  // Prozessgruppe des Hakens ab. Von Hand in einer Sitzung gestartet
+  // läuft derselbe Befehl anstandslos.
+  //
+  // Für den Zweck ist attach ohnehin das Richtige: wer auf den Knopf
+  // drückt, dockt an, und genau dann soll der Trainer hochkommen und
+  // der Anschluss sich öffnen. Im Vordergrund, in einem eigenen
+  // benannten Terminal — so sieht man die Ausgabe und kann ihn mit
+  // Strg-C anhalten.
+  //
+  // Das Doppelstart-Problem löst der Riegel davor: läuft schon eines,
+  // passiert nichts.
+  //
+  // BEISPIELDATEN steht HIER und nicht in containerEnv: als Teil der
+  // Umgebung gälte es auch für `pytest` im Terminal, und dann entstünde
+  // der Beispielbestand in jeder Testdatenbank. Gemessen waren das 40
+  // Fehlschläge — das Demoprofil bekommt die 1, und Tests, die mit
+  // benutzer_id=1 ihr eigenes Profil meinen, prüfen fremde Rechte.
+  // (Die conftest entfernt die Variable zusätzlich; zwei Riegel, weil
+  // der eine im Codespace und der andere überall wirkt.)
+  "postAttachCommand": {
+    "trainer": "pgrep -f 'uvicorn app:app' > /dev/null || BEISPIELDATEN=1 python -m uvicorn app:app --app-dir backend --host 0.0.0.0 --port 8030"
+  },
+
+  "forwardPorts": [8030],
+  "portsAttributes": {
+    "8030": {
+      "label": "Donat",
+      "onAutoForward": "openBrowser"
+    }
+  },
+
+  "containerEnv": {
+    // Die Datenbank im Arbeitsbereich, nicht unter /daten: im
+    // Codespace gibt es kein eingehängtes Verzeichnis, und /daten
+    // gehört dort niemandem.
+    "VOKABEL_DB": "${containerWorkspaceFolder}/daten/vokabeltrainer.db",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"]
+      }
+    }
+  }
+}

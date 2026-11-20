@@ -51,6 +51,13 @@ export class Sitzung {
     this.reihenWerte = {};
     this.merkmalsWahl = {};
     this.lg = {};
+    // Nach »richtig« von selbst weiterspringen? Kommt aus den
+    // Einstellungen; `sprung` ist die laufende Uhr, `sprungAus` das
+    // »Hierbleiben« für GENAU diese Aufgabe.
+    this.weiterspringen = false;
+    this.sprung = null;
+    this.sprungHalt = null;
+    this.sprungAus = false;
     this.tastatur = (e) => this.aufTaste(e);
     /* Lag die Seite zwischendurch im Hintergrund?
      *
@@ -76,6 +83,7 @@ export class Sitzung {
     try {
       const e = await api.benutzerEinstellungen(zustand.benutzerId);
       this.umschrift = e.tastatur_umschrift !== false;
+      this.weiterspringen = Boolean(e.weiterspringen);
     } catch { this.umschrift = true; }
     // Das Tagespensum einmal zu Beginn: daran misst der Balken, und
     // daran sieht man, ob die Abfrage in zehn Fragen zu Ende ist oder
@@ -114,6 +122,7 @@ export class Sitzung {
     // Auch das Zeichnen stilllegen: sonst schreibt eine Sitzung, die noch
     // auf eine Antwort wartet, in den Inhaltsbereich der neuen Ansicht.
     this.abgebrochen = true;
+    this.sprungAbbrechen();
     document.removeEventListener('keydown', this.tastatur);
     document.removeEventListener('visibilitychange', this.sichtbarkeit);
     if (this._umschriftLoesen) this._umschriftLoesen();
@@ -123,6 +132,8 @@ export class Sitzung {
   /* ------------------------------------------------------------- Laden */
 
   async naechste() {
+    this.sprungAbbrechen();
+    this.sprungAus = false;       // gilt immer nur für EINE Aufgabe
     this.ergebnis = null;
     this.eingabeWert = '';
     this.reihenWerte = {};
@@ -232,6 +243,18 @@ export class Sitzung {
   teilTipp() {
     const t = this.tippText;
     if (!t) return null;
+    if (t.zellen) {
+      // Die Gerüste stehen an ihren Feldern. Hier steht nur, was für
+      // die ganze Reihe gilt — und ohne das Kästchen sähe es aus, als
+      // wäre nichts passiert.
+      return h('div', { class: 'tipp' },
+        h('p', { class: 'leise', style: 'margin:0' },
+          `Gerüst für alle ${t.zellen.length} Formen steht an den Feldern.`,
+          t.stamm ? h('span', {}, ' · Stamm: ', h('b', { text: t.stamm })) : null,
+          t.stufe >= t.hoechste_stufe
+            ? h('span', { text: ' · mehr gibt es nicht' })
+            : null));
+    }
     return h('div', { class: 'tipp' },
       h('p', { class: 'tipp-maske', lang: this.aufgabe.antwort_sprache,
                text: t.maske || '' }),
@@ -548,7 +571,7 @@ export class Sitzung {
         h('b', { text: a.lemma || 'Die Aufgabe' }),
         ` ist ausgesetzt und kommt nicht mehr dran${a.typ ? ` (${a.typ})` : ''}.`),
       h('div', { class: 'frage-werkzeuge',
-                 style: 'justify-content:flex-start;margin-top:.5rem' },
+                 style: 'margin-top:.5rem' },
         h('button', {
           class: 'wichtig',
           onclick: () => tun(async () => {
@@ -587,6 +610,40 @@ export class Sitzung {
       ? `${p.heute_erledigt} von ${marke} heute`
         + (g.gesamt ? ` · ${g.richtig} richtig` : '')
       : (g.gesamt ? `${g.gesamt} bearbeitet · ${g.richtig} richtig` : 'Los geht’s');
+    // Steckt man in einem Lernziel, misst der Balken DAS ZIEL.
+    //
+    // »Warum steht bei meinem Lernziel 70 von 120 heute und in der
+    // Übersicht 0 von 28? Was wird da denn gezählt?« — Zweierlei, und
+    // beides richtig: 0 von 28 ist der Stand des Ziels, 70 von 120 das
+    // Tagespensum über alle Sammlungen und Ziele zusammen. Nur standen
+    // die beiden Brüche einen Fingertipp auseinander und sahen aus,
+    // als müssten sie zusammengehören.
+    //
+    // Wer ein Ziel abfragt, will dessen Fortschritt sehen. Die
+    // Tageszahl bleibt daneben stehen — sie sagt, wann Schluss ist —,
+    // aber sie ist nicht mehr der Balken.
+    const ziel = this.aufgabe?.lernziel;
+    if (ziel && ziel.name && ziel.gesamt) {
+      const zielanteil = Math.round((ziel.geschafft / ziel.gesamt) * 100);
+      // Bei Haken »reif« bewegt sich `geschafft` in den ersten drei
+      // Wochen nicht: reif heißt Intervall ab 21 Tagen. Ohne die Zahl
+      // der angefangenen sähe 0 von 28 nach Stillstand aus, während
+      // in Wahrheit schon sechs laufen.
+      const stockt = ziel.ziel === 'reif' && !ziel.geschafft
+                  && ziel.angefangen > 0;
+      return h('div', {},
+        h('div', { class: 'fortschritt' },
+          h('i', { style: `width:${zielanteil}%` })),
+        h('p', { class: 'leise lernzielzeile', style: 'margin:.3rem 0 0' },
+          h('b', { text: ziel.name }), ': ',
+          `${ziel.geschafft} von ${ziel.gesamt}`,
+          stockt
+            ? h('span', { text: ` · ${ziel.angefangen} angefangen` })
+            : null,
+          marke ? h('span', { class: 'leiser',
+                              text: ` · heute ${p.heute_erledigt} von ${marke}` })
+                : null));
+    }
     return h('div', {},
       h('div', { class: 'fortschritt' }, h('i', { style: `width:${anteil}%` })),
       h('p', { class: 'leise', style: 'margin:.3rem 0 0', text }));
@@ -740,16 +797,29 @@ export class Sitzung {
     for (const z of (this.ergebnis?.aufloesung?.zellen || [])) {
       ergebnisse[z.zelle] = z;
     }
+    // Der Tipp kommt bei einer Reihe je Zelle — ein Gerüst für alle
+    // sechs, nicht eins ohne Angabe, wozu es gehört.
+    const tippzellen = {};
+    for (const z of (this.tippText?.zellen || [])) tippzellen[z.zelle] = z;
+    // Im zweiten Versuch ist nur offen, was »fast« war.
+    //
+    // Die Lösung steht dabei NIRGENDS — sonst wäre der zweite Versuch
+    // ein Abschreiben. Beim einzelnen Wort heißt »fast richtig« auch
+    // nur: noch einmal, und nicht: hier ist die Antwort.
+    const nochmal = this.phase === 'nochmal';
     const kasten = h('div', { class: 'reihe' });
     const felder = [];
     for (const [i, z] of zellen.entries()) {
       const r = ergebnisse[z.zelle];
+      // Entschieden ist alles, was nicht »fast« war — die richtigen
+      // bleiben stehen, die falschen auch. Zurückgenommen wird nichts.
+      const entschieden = nochmal && r && r.urteil !== 'fast';
       const feld = h('input', {
         type: 'text', lang: a.antwort_sprache || a.sprache,
         autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false',
         autocomplete: 'off',
         value: this.reihenWerte[z.zelle] || '',
-        disabled: fertig,
+        disabled: fertig || entschieden,
         class: r ? r.urteil : null,
         oninput: (e) => {
           if (this.denkzeit === null && e.target.value) {
@@ -785,10 +855,17 @@ export class Sitzung {
                 h('span', { class: 'leiser', text: 'wie bei: ' }), z.beispiel)
             : null),
         feld,
-        r && r.urteil !== 'richtig'
+        // Dritte Spalte: während des Antwortens das Gerüst aus dem
+        // Tipp, nach der Wertung die Lösung. Dieselbe Stelle für
+        // dasselbe Wort — man sucht nicht zweimal woanders.
+        fertig && r && r.urteil !== 'richtig'
           ? h('div', { class: 'reihenloesung', lang: a.antwort_sprache },
               (r.erwartet || []).join(' / '))
-          : h('div', {})));
+          : (tippzellen[z.zelle]
+              ? h('div', { class: 'reihengeruest', lang: a.antwort_sprache,
+                           title: 'Gerüst aus dem Tipp',
+                           text: tippzellen[z.zelle].maske || '' })
+              : h('div', {}))));
     }
     this.feld = felder[0] || null;
     // Bei der ganzen Reihe hängt die Umschrift an jedem Feld.
@@ -802,8 +879,7 @@ export class Sitzung {
     }
     const unten = h('div', {});
     if (!fertig) {
-      unten.append(h('div', { class: 'frage-werkzeuge',
-                              style: 'justify-content:flex-start' },
+      unten.append(h('div', { class: 'frage-werkzeuge' },
         h('button', { class: 'wichtig', onclick: () => this.absenden() },
           'Prüfen')));
       if (this._antwortsprache) {
@@ -862,12 +938,28 @@ export class Sitzung {
 
   teilRueckmeldung() {
     const u = this.ergebnis.urteil;
-    const titel = { richtig: 'Richtig', fast: 'Fast richtig', falsch: 'Nicht richtig' }[u.urteil];
-    const kasten = h('div', { class: 'rueckmeldung ' + u.urteil });
+    // Solange noch einmal geschrieben werden darf, ist das Urteil
+    // nicht gefällt. Ein rotes »Nicht richtig« über einem Feld, in das
+    // man gerade tippen soll, sagt das Gegenteil.
+    //
+    // Bei der Reihe kommt das jetzt regelmäßig vor: als Ganzes ist sie
+    // falsch (ein Feld blieb leer), und trotzdem steht die fast
+    // richtige Form noch offen.
+    const nochmal = this.phase === 'nochmal';
+    const fastZellen = (this.ergebnis.aufloesung?.zellen || [])
+      .filter((z) => z.urteil === 'fast').length;
+    const art = nochmal ? 'fast' : u.urteil;
+    const titel = nochmal && u.urteil !== 'fast'
+      ? (fastZellen === 1 ? 'Eine Form ist fast richtig'
+                          : `${fastZellen} Formen sind fast richtig`)
+      : { richtig: 'Richtig', fast: 'Fast richtig',
+          falsch: 'Nicht richtig' }[u.urteil];
+    const kasten = h('div', { class: 'rueckmeldung ' + art });
     kasten.append(h('div', { class: 'rueckmeldung-kopf' },
-      h('span', { text: { richtig: '✓', fast: '≈', falsch: '✗' }[u.urteil] }),
+      h('span', { text: { richtig: '✓', fast: '≈', falsch: '✗' }[art] }),
       h('span', { text: titel }),
-      u.urteil === 'fast' ? h('span', { class: 'leise', text: '— zählt nicht als Fehler' }) : null));
+      art === 'fast' && !nochmal
+        ? h('span', { class: 'leise', text: '— zählt nicht als Fehler' }) : null));
 
     if (u.hinweis) kasten.append(h('p', { text: u.hinweis }));
 
@@ -895,9 +987,12 @@ export class Sitzung {
     if (this.aufgabe.eingabeart !== 'reihe') {
       anfuegen(kasten, this.teilAlternativen());
     }
-    if (u.urteil === 'fast') {
+    if (this.phase === 'nochmal') {
       kasten.append(h('p', { class: 'leise', style: 'margin-top:.6rem',
-        text: 'Noch einmal tippen — richtig geschrieben zählt es als gewusst.' }));
+        text: this.aufgabe.eingabeart === 'reihe'
+          ? 'Was fast stimmt, steht noch offen — richtig geschrieben zählt '
+            + 'es als gewusst. Die übrigen Felder sind entschieden.'
+          : 'Noch einmal tippen — richtig geschrieben zählt es als gewusst.' }));
     }
     return kasten;
   }
@@ -949,12 +1044,33 @@ export class Sitzung {
     // Wer nicht selbst bewertet, muss sehen, wonach bewertet wurde.
     kasten.append(h('p', { class: 'wertung-grund', text: w.begruendung }));
 
-    kasten.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    kasten.append(h('div', { class: 'frage-werkzeuge' },
       h('button', { class: 'wichtig', onclick: () => this.weiter() }, 'Weiter'),
       h('button', {
         class: 'schlicht',
-        onclick: () => { this.wertungOffen = !this.wertungOffen; this.zeichnen(); },
+        onclick: () => {
+          // Wer von Hand werten will, will gerade nicht weiter.
+          this.sprungAbbrechen();
+          this.sprungAus = true;
+          this.wertungOffen = !this.wertungOffen;
+          this.zeichnen();
+        },
       }, this.wertungOffen ? 'Doch automatisch' : 'Anders werten')));
+
+    // Eine Seite, die sich von allein bewegt, braucht eine Bremse in
+    // Reichweite — und sie muss zu SEHEN sein, bevor sie sich bewegt.
+    // Der Balken ist die ehrlichste Anzeige: er sagt nicht nur DASS
+    // gleich etwas passiert, sondern auch wie viel Zeit noch bleibt.
+    if (this.springtGleich()) {
+      kasten.append(h('div', { class: 'sprung' },
+        h('div', { class: 'sprungbalken' },
+          h('i', { style: `animation-duration:${this.sprungdauer()}ms` })),
+        h('button', {
+          class: 'schlicht',
+          onclick: () => { this.sprungAbbrechen(); this.sprungAus = true;
+                           this.zeichnen(); },
+        }, 'Hierbleiben')));
+    }
 
     if (this.wertungOffen) {
       kasten.append(
@@ -1109,7 +1225,7 @@ export class Sitzung {
     // gleich unter dem Antwortfeld (teilHilfen). Sie gehören zum
     // Antworten; hier stehen die Dinge, die man mit der AUFGABE macht.
     const reihe = h('div', { class: 'frage-werkzeuge',
-                             style: 'justify-content:flex-start;width:100%' });
+                             style: 'width:100%' });
     reihe.append(
       h('button', {
         class: 'schlicht', title: 'Diese Aufgabe nicht mehr abfragen',
@@ -1158,6 +1274,74 @@ export class Sitzung {
   }
 
   /* ------------------------------------------------------------- Ablauf */
+
+  /** Springt der Trainer nach dieser Antwort von selbst weiter?
+   *
+   * »Jede Aufgabe kostet auf dem Touchgerät einen zweiten Tipp.« Der
+   * zweite ist »Weiter«, und nach einer sauber richtigen Antwort steht
+   * in der Rückmeldung nichts mehr, was man lesen müsste.
+   *
+   * Die vier Ausschlüsse sind der ganze Punkt — ohne sie wäre das hier
+   * ein »Rückmeldung überspringen«, und genau die will man sehen:
+   *   fast richtig  → die richtige Schreibung steht da
+   *   nicht richtig → die Lösung steht da
+   *   Tipp genommen → die Wertung ist auf »Schwer« gedeckelt
+   *   nachgesehen   → dasselbe, und das Wort steht da
+   * Dazu »Anders werten«: wer das aufklappt, will gerade nicht weiter.
+   */
+  springtGleich() {
+    return this.weiterspringen
+        && !this.sprungAus
+        && this.phase === 'rueckmeldung'
+        && this.ergebnis?.urteil?.urteil === 'richtig'
+        && !this.tipps
+        && !this.aufgedeckt
+        && !this.wertungOffen;
+  }
+
+  /** Wie lange die Rückmeldung stehen bleibt.
+   *
+   * Im Legastheniemodus länger: dort wächst die Schrift, und gelesen
+   * wird langsamer — eine Zeitspanne, die für die einen flott ist, ist
+   * für die anderen ein Wegschnappen.
+   */
+  sprungdauer() { return this.lg?.aktiv ? 2400 : 1400; }
+
+  sprungStarten() {
+    this.sprungAbbrechen();
+    if (!this.springtGleich()) return;
+    this.sprung = setTimeout(() => { this.sprung = null; this.weiter(); },
+                             this.sprungdauer());
+
+    // Wer in dieser Sekunde irgendwo hinfasst — »Warum kommt das
+    // jetzt?« aufklappt, die Regel liest, zum Aussetzen greift —, der
+    // will nicht weggeschoben werden. Das hält an.
+    //
+    // Und zwar OHNE neu zu zeichnen: pointerdown kommt vor click, ein
+    // Neuaufbau nähme dem Finger den Knopf unter der Berührung weg und
+    // der Klick ginge ins Leere. Stattdessen hält der Balken sichtbar
+    // an — das ist die Rückmeldung.
+    this.sprungHalt = () => {
+      this.sprungAbbrechen();
+      this.sprungAus = true;
+      const balken = this.behaelter.querySelector('.sprungbalken i');
+      if (balken) balken.style.animationPlayState = 'paused';
+    };
+    this.behaelter.addEventListener('pointerdown', this.sprungHalt);
+  }
+
+  /** Die Uhr anhalten. Muss von überall aufrufbar sein, wo die Sitzung
+   *  weitergeht oder endet — eine Uhr, die nach dem Seitenwechsel noch
+   *  feuert, bewertet die nächste Aufgabe. Ebenso der Horcher: ein
+   *  übrig gebliebener würde die nächste Berührung als »Hierbleiben«
+   *  für eine Aufgabe lesen, die noch gar nicht gestellt ist. */
+  sprungAbbrechen() {
+    if (this.sprung) { clearTimeout(this.sprung); this.sprung = null; }
+    if (this.sprungHalt) {
+      this.behaelter.removeEventListener('pointerdown', this.sprungHalt);
+      this.sprungHalt = null;
+    }
+  }
 
   /** Die Wertung in den Blick holen.
    *
@@ -1264,7 +1448,12 @@ export class Sitzung {
       this.versuche += 1;
       this.gezaehlt.fast += 1;
       this.zeichnen();
-      if (this.feld) { this.feld.disabled = false; this.feld.focus(); this.feld.select(); }
+      // In das erste OFFENE Feld springen. Bei der Reihe ist das
+      // selten das erste: die entschiedenen sind gesperrt, und ein
+      // Fokus darauf wäre ein Fingerzeig ins Leere.
+      const ziel = this.behaelter.querySelector(
+        '.reihe input:not([disabled])') || this.feld;
+      if (ziel) { ziel.disabled = false; ziel.focus(); ziel.select(); }
       return;
     }
     this.phase = 'rueckmeldung';
@@ -1273,6 +1462,7 @@ export class Sitzung {
     else if (u === 'falsch') this.gezaehlt.falsch += 1;
     this.zeichnen();
     this.wertungZeigen();
+    this.sprungStarten();
   }
 
   async weissNicht() {
@@ -1310,6 +1500,10 @@ export class Sitzung {
   /** Weiter zur nächsten Aufgabe. Ohne `note` gilt die automatische
    *  Bewertung; mit `note` ist es ein Eingriff von Hand. */
   async weiter(note = null) {
+    // ZUERST die Uhr anhalten, nicht erst nach der Prüfung darunter:
+    // sonst liefe sie weiter, wenn hier wegen `laeuft` abgebrochen
+    // wird — und feuerte in die nächste Aufgabe hinein.
+    this.sprungAbbrechen();
     if (this.phase !== 'rueckmeldung' || this.laeuft) return;
     const u = this.ergebnis?.urteil || {};
     this.laeuft = true;

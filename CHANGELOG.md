@@ -14,7 +14,317 @@ Eintrag wiederfindet.
 
 ---
 
+## 0.1.0 — vorbereitet, noch nicht veröffentlicht
+
+Die erste benannte Fassung. Der Tag wird **nicht** gesetzt, bevor er
+ausdrücklich freigegeben ist; bis dahin steht hier nur, was zu ihr
+gehören würde.
+
+Die Fassungsnummer steht an einer Stelle: `VERSION` in
+[`backend/marke.py`](backend/marke.py). Von dort liest der
+FastAPI-Titel, die Auskunft unter `/api/zustand` und — nach dem Tag —
+die Marke des Abbilds.
+
+**Für Besuch vorbereitet**
+
+- **Arbeitsname »Donat«**, geführt an einer Stelle (`backend/marke.py`,
+  `frontend/js/marke.js` holt ihn über `/api/zustand`). Verzeichnis und
+  Module heißen weiter `vokabeltrainer`.
+- **`BEISPIELDATEN=1`** legt beim Start einen Beispielbestand an — aber
+  nur, wenn noch kein Profil da ist. Ein laufender Bestand wird nie
+  angefasst, auch wenn die Variable stehenbleibt.
+- **Codespaces**: `.devcontainer/devcontainer.json` installiert,
+  befüllt, startet und öffnet den Trainer.
+- **Fertiges Abbild**: eine Action baut bei jeder Veröffentlichung nach
+  `ghcr.io`, `docker-compose.beispiel.yml` zieht es ohne Klonen.
+- **Englische README** (`README.en.md`), beide verlinkt.
+
+**Behoben**
+
+- `tests/test_oberflaeche.py` rief `pytest.skip`, ohne `pytest` zu
+  importieren. Der Fehler zeigte sich nur dort, wo **node fehlt** — also
+  in jedem Container und in jeder Fertigungsstraße, und genau dort nie
+  jemandem, der ihn gesehen hätte. Lokal lief der Test durch, weil node
+  da ist.
+
+---
+
 ## 20.11.2026
+
+### Im Lernziel zählt jetzt das Lernziel
+
+»Warum steht bei meinem Lernziel *70 von 120 heute* und in der
+Übersicht *0 von 28*? Was wird da denn gezählt?«
+
+Zweierlei, und beides war richtig: **0 von 28** ist der Stand des
+Ziels, **70 von 120** das Tagespensum über alle Sammlungen und Ziele
+zusammen. Nur standen die beiden Brüche seit gestern einen Fingertipp
+auseinander und sahen aus, als müssten sie zusammengehören.
+
+Wer ein Ziel abfragt, sieht jetzt oben dessen Fortschritt:
+
+> **Verben alle: 0 von 19 · 12 angefangen · heute 19 von 80**
+
+Der Balken gehört dem Ziel, die Tageszahl steht leiser daneben — sie
+sagt ja, wann Schluss ist. In der allgemeinen Abfrage bleibt alles wie
+bisher.
+
+Neu dabei ist **»angefangen«**. Ein Ziel mit Haken *reif* (»sitzt
+dauerhaft«) verlangt einen Wiederholungsabstand von 21 Tagen — und der
+vergeht in 21 Tagen. Ohne diese Zahl stünde wochenlang »0 von 19« da
+und sähe nach Stillstand aus, während in Wahrheit schon zwölf laufen.
+
+### Der Ring in der Kopfzeile führt zum Fortschritt
+
+»Da wurde mir jetzt aber ein spanischer Begriff gezeigt. Macht es denn
+überhaupt Sinn, über diesen Button zum allgemeinen Lernen zu
+springen?«
+
+Nein. Er sprang nach *Lernen*, **ohne** vorher die Sammlung zu leeren —
+also in das, was zuletzt eingestellt war. Vor allem aber ist er eine
+Anzeige und kein Startknopf: wer auf eine Zahl tippt, will wissen, was
+dahintersteckt. Das steht unter **»Dein Fortschritt«** — Stufe,
+Punkte, Strähne, überbrückte Fehltage. Gelernt wird von der Übersicht
+aus, wo auch dasteht, *was* man lernt.
+
+### Knöpfe ohne Rand sahen aus wie Text
+
+*Fortschritt* und *Zuspruch schicken* standen in einer Reihe mit
+gerahmten Knöpfen, hatten selbst aber keinen Rand — sichtbar wurden
+sie erst beim Überfahren, und auf dem Handy fährt niemand über etwas.
+Sie sind jetzt gerahmt wie ihre Nachbarn, ebenso *Ausklappen* an der
+eingeklappten Sammlungskarte und *Einstellungen* / *Einklappen* unter
+»Mehr mit dieser Sammlung«.
+
+Die beiden, die wie ein Link in einer Textzeile stehen (»3
+eingeklappt — alle zeigen«, »Diese Karte ausblenden«), bleiben leise.
+Dort ist die Zurückhaltung richtig.
+
+
+### Was einen Termin hat, steht jetzt oben — und ist der Knopf
+
+Die Lernziele standen auf der Übersicht nicht nur unter der
+Heute-Karte, sondern auch noch unter dem Bücherregal: fünfter Block.
+Bei Lernende 2 stand dort »heute fällig, 60 offen«.
+
+Wichtiger als die Reihenfolge war aber etwas anderes, das beim
+Nachsehen herauskam: **der große »Lernen« auf der Heute-Karte kennt
+die Lernziele nicht.** Er startet die planmäßige Abfrage über den
+ganzen Bestand — verlernt, dann fällig, dann neu, begrenzt durch die
+Tagesdosis. Ein Lernziel steuert die Abfrage nur über seinen eigenen
+Weg. Nebeneinander geholt sah das so aus:
+
+```
+»Lernen« auf der Heute-Karte     Ziel »Jetzt mal wirklich«
+  die Karotte                      hallo    (fällig)
+  der Minimarkt                    Eleni    (fällig)
+  der Reis                         τα λέμε  (fällig)
+```
+
+Das Ziel lief in zwei Tagen ab, der Trainer rechnete »täglich etwa 12
+neue Aufgaben« aus — und der Knopf lieferte sie nicht.
+
+Deshalb steht jetzt unter der Überschrift **Heute** zuerst, was eine
+Frist hat: Name, Lage (»noch 2 Tage — dafür täglich etwa 12 neue
+Aufgaben«), Balken, und rechts **Lernen ›**. Die Zeile *ist* der
+Knopf und startet genau dieses Ziel. Heute fällig oder überfällig wird
+hervorgehoben — Rand **und** Beschriftung, nicht nur Farbe.
+
+Nur Ziele **mit** Termin, höchstens drei: ein Ziel ohne Termin ist ein
+Vorhaben und steht weiter unten, und der Streifen soll die Heute-Karte
+nicht unter die Falz schieben. Die Heute-Karte selbst bleibt direkt
+darunter — die Zielzeile sagt *warum*, die Karte *womit*.
+
+Dazu zwei Kleinigkeiten: der Abschnitt **Lernziele** steht jetzt vor
+**Bücher und Texte** (ein Regal ist Stöbern, ein Ziel ist eine
+Zusage), und die Abfrage schreibt oben hin, aus welchem Lernziel sie
+gerade zieht. Der Server schickt das seit jeher mit; angezeigt wurde
+es nie, weil man bis heute immer von der Lernzielseite kam und es
+wusste.
+
+
+### Drei Dinge bei den Reihen
+
+**Der Tipp tat etwas Schlimmeres als nichts.** Bei einer Reihe ist die
+erwartete Antwort die Liste *aller* sechs Formen — und der Tipp nahm
+davon die erste. Es stand also ein Gerüst da, ohne zu sagen, zu
+welchem Feld es gehört; wer es auf das Feld bezog, in dem er gerade
+steckte, bekam Unsinn.
+
+Jetzt gibt es **ein Gerüst je Feld**, rechts daneben, genau dort, wo
+nach der Wertung auch die Lösung steht. In Grau und nicht in der
+Lösungsfarbe: ein Gerüst ist weder eine Lösung noch ein Fehler. Der
+Wortstamm gilt für die ganze Reihe und steht einmal darunter.
+
+**Man kann jetzt noch einmal schreiben.** Beim einzelnen Wort gibt es
+für »fast richtig« den zweiten Versuch; in der Reihe gab es ihn
+praktisch nie, weil schon ein einziges leeres Feld das Urteil der
+ganzen Reihe auf »falsch« zieht — und damit war auch der verrutschte
+Akzent daneben erledigt.
+
+Ein Akzent ist aber auch in einer Reihe nur ein Akzent. Offen bleibt
+danach **nur, was »fast« war**; die richtigen Felder bleiben stehen,
+die falschen auch. Wer eine Form nicht wusste, bekommt keinen zweiten
+Rateversuch — das wäre mehr, als das einzelne Wort bietet. Die Lösung
+steht dabei nirgends: sonst wäre der zweite Versuch ein Abschreiben.
+Und der Kopf sagt nicht mehr rot »Nicht richtig« über einem Feld, in
+das man gerade tippen soll, sondern »Eine Form ist fast richtig«.
+
+An der Regel ändert das nichts: eine Reihe sitzt als Ganzes oder nicht.
+
+### Die Formen stehen jetzt wie im Lehrbuch
+
+»Zielführender nach Zeitform statt nach Person sortieren.« — Sortiert
+wurde nach der Reihenfolge, in der eine Form **benannt** wird (»1.
+Person Singular Präsens Indikativ«, deutscher Sprachgebrauch). Unter
+einem griechischen Verb mit 51 Formen stand damit:
+
+```
+ιδρύω      1. sg praesens          ιδρύω      1. sg praesens
+ιδρύομαι   1. sg praesens          ιδρύεις    2. sg praesens
+ιδρύσω     1. sg praesens   statt  ιδρύει     3. sg praesens
+ίδρυσα     1. sg aorist            ιδρύουμε   1. pl praesens
+θα ιδρύσω  1. sg futur             ιδρύετε    2. pl praesens
+```
+
+Links Aktiv und Passiv ineinandergeschoben und jede Zeitform einmal
+angerissen; rechts das Paradigma. Benannt wird weiter wie bisher — das
+sind zwei verschiedene Fragen. Für Substantive ändert sich nichts.
+
+
+### Die Seite springt nicht mehr nach oben
+
+Zwei Stellen bauten bei jeder Kleinigkeit die ganze Seite neu auf.
+
+**»Gezielt lernen«:** Jedes »ja/nein« an einer Wortzeile holte die
+Liste neu — bis zu 200 Zeilen, jede mit zwei Unterabfragen, und die
+Seite sprang nach oben. Bei 1927 griechischen Wörtern war das der
+Unterschied zwischen »ein Wort umgeschaltet« und »alles neu«. Dabei
+stand der Einwand in derselben Datei schon geschrieben: das Kästchen
+zum Auswählen daneben erneuert seit jeher nur den Stapelkasten, »beim
+Durchhaken von fünfzig Wörtern darf die Seite nicht unter den Fingern
+wegspringen«.
+
+Jetzt schickt der Server die geänderte Zeile zurück, und nur sie wird
+ausgetauscht. Gemessen: **eine** Anfrage statt zwei, Scrollposition
+unverändert, sieben von acht Zeilen unberührt. Dasselbe gilt für
+»alle auswählen«, »Auswahl aufheben« und die Stapelknöpfe. Neu
+gezeichnet wird nur noch, wenn die Zeile gar nicht mehr in die Liste
+gehört — unter »Nur ausgeschaltete« verschwindet ein wieder
+eingeschaltetes Wort ja daraus.
+
+**Die Textwerkstatt:** Ein einzelnes »Für die KI merken« baute den
+ganzen Text neu auf. Beim Iwein-Prolog sind das 85 Verse — man liest
+bei Vers 70, tippt ein unbekanntes Wort an und steht wieder bei
+Vers 1. Dabei ändert sich dadurch genau eine Farbe.
+
+Jetzt wechselt nur die Farbe, und zwar an **allen** Stellen, wo das
+Wort vorkommt. Gemessen an zehn Versen mit fünf Vorkommen von »ξενος«:
+Scrollposition unverändert, alle fünf umgefärbt, alle zehn Abschnitte
+unberührt, die Wortkarte bleibt offen und beschriftet ihren Knopf um.
+Auch die beiden Sammelknöpfe (»Alle 28 unbekannten anfordern«, »Aus
+diesem Text zurücknehmen«) arbeiten so.
+
+Ein Neuaufbau bleibt an einer Stelle richtig: bei **»Übersetzung
+daneben«**. Dort entsteht je Abschnitt ein anderer Aufbau — zwei
+Spalten statt einer —, und das ist tatsächlich der ganze Text.
+
+
+### Nach »richtig« springt der Trainer weiter — wenn du willst
+
+Jede Aufgabe kostete auf dem Handy einen zweiten Tipp: erst antworten,
+dann »Weiter«. Nach einer sauber richtigen Antwort steht in der
+Rückmeldung aber nichts, was man noch lesen müsste.
+
+Neu in den **Einstellungen → Lernverhalten**: *»Nach »richtig« von
+selbst weiterspringen«*. Voreingestellt **aus** — eine Seite, die sich
+von allein bewegt, muss man wollen.
+
+Es gilt nur bei **sauber richtig**, und die Ausnahmen sind der Grund,
+warum der Schalter vertretbar ist:
+
+- bei *fast richtig* steht die richtige Schreibung da,
+- bei einem Fehler die Lösung,
+- wer einen **Tipp** genommen oder das **Wort angesehen** hat, dem ist
+  die Wertung auf »Schwer« gedeckelt — auch das gehört gelesen,
+- und wer *»Anders werten«* aufklappt, will gerade nicht weiter.
+
+Während es läuft, steht in der Wertung ein Balken, der abläuft, und
+daneben **»Hierbleiben«**. Wer irgendwo auf der Seite hinfasst — die
+Regel aufklappt, »Warum kommt das jetzt?« liest —, hält damit ebenfalls
+an; der Balken bleibt sichtbar stehen. Im Legastheniemodus läuft er
+länger (2,4 statt 1,4 Sekunden): dort wächst die Schrift, und gelesen
+wird langsamer.
+
+
+### Sieben Eingriffe in die Gestaltung
+
+Vorher als Artefakt angesehen und Stück für Stück entschieden, nicht
+blind eingebaut.
+
+**Überschriften sehen jetzt wie Überschriften aus.** `h3` war kleiner
+als der Fließtext darunter und dazu grau — die dritte Gliederungsebene
+las sich wie Kleingedrucktes. Gegen den Kartengrund gemessen waren das
+6,3:1, jetzt sind es 16,7:1. `h2` war mit 1,15em so dicht am Absatz,
+dass die beiden Stufen zusammenfielen. Alles bleibt in `em` und wächst
+im Legastheniemodus mit.
+
+**Der Wortschatz ist eine Liste geworden.** Vorher hatte jeder Eintrag
+seinen eigenen Rahmen: bei dreißig Wörtern dreißig Kästen. Jetzt
+trennt eine Haarlinie, wie im Wörterverzeichnis eines Lehrwerks. Gilt
+überall, wo dieselbe Liste steht — Texte, Freigabe, Lernziele,
+Zugänge. Die Trefferfläche von 44 px bleibt; ohne Rahmen wechselt beim
+Überfahren der Grund statt der Randfarbe, sonst sähe man nicht mehr,
+dass die Zeile ein Schalter ist.
+
+**Die Abfrage hat Luft bekommen.** Ein Radius galt bisher für alles —
+für den 44-px-Knopf wie für die Abfragekarte. Große Flächen, die wie
+kleine zugeschnitten sind, wirken gedrängt; die Abfrage hat jetzt eine
+eigene Stufe. Im Dunkeln dazu eine hellere Oberkante, weil ein
+Schlagschatten auf Nahschwarz nichts zeigt.
+
+**Der aktive Reiter auf dem Handy** füllte seine Zelle vollflächig
+hellblau — der sichtbarste Rest alter Gestaltung auf genau dem Gerät,
+das benutzt wird. Jetzt Farbe und eine Oberkante, beides tragend
+(7,4:1), dazu das `aria-current`, das ohnehin gesetzt wird.
+
+**Gedrückte Knöpfe kennen die Richtung.** `filter: brightness()`
+rechnet am fertigen Bild statt in der Palette und hellt in jeder
+Farbstimmung auf. Gemischt wird jetzt Richtung Schriftfarbe: im Hellen
+wird der gedrückte Knopf dunkler (8,6:1 für die Beschriftung), im
+Dunkeln heller (9,8:1).
+
+### Knopfreihen stehen links
+
+Die gemeinsame Klasse für »eine Reihe Knöpfe« richtete **mittig** aus,
+weil sie für die Abfragekarte entstanden ist. Benutzt wird sie
+überall: 50-mal im Quelltext, und an **38** dieser Stellen stand
+daneben eine Angabe, die genau diese Zentrierung wieder aufhob. Die
+Vorgabe war damit in vier von fünf Fällen die falsche — und wer das
+Gegengift vergaß, bekam eine zentrierte Reihe unter linksbündigem
+Text. In der Regelfreigabe stand sie so.
+
+Jetzt gibt die Klasse linksbündig vor; die beiden Karten mit mittigem
+Inhalt zentrieren selbst. Die 38 Einzelangaben sind raus.
+
+### Die Einstellungen verwarfen, was man nicht gespeichert hatte
+
+Zu merken war es so: Tagesziel auf 30 ändern, **nicht** speichern,
+dann oben im Lehrwerk eine Lektionsnummer speichern — das Tagesziel
+stand wieder auf 20. Ohne Nachfrage, ohne Meldung.
+
+Die Seite hat vier Karten mit je einem Speichern-Knopf. Drei davon
+bauten danach die **ganze Seite** neu auf, und dabei entstanden die
+anderen Karten aus dem gespeicherten Wert neu. Dasselbe galt für die
+drei Zurücknehmen-Knöpfe bei den Zugängen. Ein Neuaufbau bleibt nötig
+— die Karten zeigen abgeleitete Angaben —, er betrifft jetzt nur noch
+die eigene Karte.
+
+Dazu heißt kein Knopf mehr bloß »Speichern«: **Lehrwerk speichern**,
+**Lernverhalten speichern**, **Darstellung speichern**. Auf einer
+Seite mit vier Karten ist »Speichern« keine Beschriftung, sondern eine
+Frage.
+
 
 ### Drei Knöpfe statt zehn auf der Sammlungskarte
 

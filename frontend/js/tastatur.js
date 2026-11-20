@@ -757,6 +757,6 @@ export function zeichnen(behaelter, sprache = null) {
       h('input', { type: 'text', placeholder: 'Probe…' })));
   }
 
-  el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+  el.append(h('div', { class: 'frage-werkzeuge' },
     h('button', { onclick: () => history.back() }, 'Zurück')));
 }

@@ -202,8 +202,7 @@ class Lauf {
     // Schließen des Reiters herauskommt, ist keine Strenge, sondern
     // eine Falle; und es gibt Einträge mit Zeichen, die auf keiner
     // Tastatur liegen.
-    el.append(h('div', { class: 'frage-werkzeuge',
-                         style: 'justify-content:flex-start' },
+    el.append(h('div', { class: 'frage-werkzeuge' },
       h('button', { class: 'wichtig', onclick: () => this.pruefen() },
         'Prüfen'),
       this.versuche > 0
@@ -277,7 +276,7 @@ class Lauf {
         text: 'Jetzt kennst du die Wörter vom Sehen und vom Schreiben. '
             + 'Die Abfrage prüft, ob sie auch ohne Vorlage sitzen — dort '
             + 'zählt es dann.' }),
-      h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+      h('div', { class: 'frage-werkzeuge' },
         h('button', { class: 'wichtig',
                       onclick: () => { this.stelle = 0;
                                        this.geschafft = new Set();

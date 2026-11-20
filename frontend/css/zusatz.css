@@ -965,6 +965,9 @@ input[type="file"] { max-width: 100%; }
 }
 .abtippen-balken i { display: block; height: 100%; background: var(--akzent); }
 .abtippkarte { text-align: center; padding: 1.4rem 1rem; }
+/* Die Karte ist mittig gesetzt, also auch ihre Knopfreihe — seit
+   .frage-werkzeuge linksbündig vorgibt, muss das hier stehen. */
+.abtippkarte .frage-werkzeuge { justify-content: center; }
 /* em statt rem: rem hängt am Wurzelelement, und --mass sitzt auf
    body. In rem wächst im Legastheniemodus also GAR NICHTS mit — und
    das Abtippen ist die Ansicht, in der am längsten gelesen wird.
@@ -1012,3 +1015,88 @@ input[type="file"] { max-width: 100%; }
 .gezielt-zeile.ist-aus b { color: var(--leise); font-weight: 500; }
 .gezielt-zeile button { width: 100%; }
 .gezielt-stapel { position: sticky; top: .5rem; z-index: 2; }
+
+/* Der Weitersprung nach »richtig«.
+ *
+ * Der Balken ist die ehrlichste Anzeige: er sagt nicht nur, DASS
+ * gleich etwas passiert, sondern auch, wie viel Zeit noch bleibt —
+ * und er hält sichtbar an, wenn man die Seite anfasst. Die Dauer
+ * setzt die Oberfläche am Element; sie hängt am Legastheniemodus. */
+.sprung {
+  display: flex; align-items: center; gap: .6rem;
+  margin-top: .7rem; flex-wrap: wrap;
+}
+.sprungbalken {
+  flex: 1 1 6rem; min-width: 4rem; height: 4px;
+  background: var(--grund-3); border-radius: 99px; overflow: hidden;
+}
+.sprungbalken i {
+  display: block; height: 100%; width: 100%;
+  background: var(--richtig);
+  transform-origin: left center;
+  animation-name: sprung-ablauf;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes sprung-ablauf {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+/* Wer Bewegung abbestellt hat, bekommt keine — der Knopf daneben
+   bleibt die Bremse, und die Zeit läuft unverändert. */
+@media (prefers-reduced-motion: reduce) {
+  .sprungbalken i { animation: none; }
+}
+
+/* Das Gerüst aus dem Tipp, in der Spalte der Reihe.
+ *
+ * Es steht dort, wo nach der Wertung die Lösung steht — dieselbe
+ * Stelle für dasselbe Wort, man sucht nicht zweimal woanders. Aber in
+ * --leise und nicht in der Lösungsfarbe: ein Gerüst ist weder eine
+ * Lösung noch ein Fehler. */
+.reihengeruest {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .14em; color: var(--leise);
+  overflow-x: auto; white-space: nowrap;
+}
+
+/* Ziele mit Termin — der Streifen über der Heute-Karte.
+ *
+ * Jede Zeile ist EIN Knopf und startet genau dieses Ziel. Sie sieht
+ * darum aus wie eine Karte und verhält sich wie ein Schalter: Grund
+ * beim Antippen, Akzentrand beim Überfahren, und rechts unten steht,
+ * wohin es geht.
+ *
+ * Die Beschriftungen stehen in der Zeile, nicht darüber: ein Termin
+ * ist kein Datenblatt, sondern ein Satz — »noch 2 Tage, dafür täglich
+ * etwa 12 neue Aufgaben«. */
+.termine { display: flex; flex-direction: column; gap: .5rem; margin-bottom: .75rem; }
+.termin {
+  display: flex; flex-direction: column; gap: .4rem;
+  width: 100%; text-align: left;
+  padding: var(--luft);
+  background: var(--grund-2);
+  border: 1px solid var(--rand); border-radius: var(--rund);
+  box-shadow: var(--kante);
+  cursor: pointer;
+}
+.termin:active { background: var(--grund-3); }
+@media (hover: hover) and (pointer: fine) {
+  .termin:hover { border-color: var(--akzent); }
+}
+.termin-kopf {
+  display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap;
+}
+.termin-kopf strong { font-size: 1.05em; }
+.termin-lage { font-size: .9em; color: var(--leise); }
+.termin-fuss {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: .75rem;
+}
+.termin-los { color: var(--akzent); font-weight: 600; white-space: nowrap; }
+
+/* Heute fällig oder vorbei: das ist kein Hinweis mehr, das ist eine
+   Lage. Zwei Merkmale, nicht nur Farbe — Rand UND Beschriftung. */
+.termin.dringend { border-color: var(--fast); background: var(--fast-grund); }
+.termin.dringend .termin-lage { color: var(--fast); font-weight: 600; }
+.termin.dringend .zielbalken { background: var(--grund-2); }

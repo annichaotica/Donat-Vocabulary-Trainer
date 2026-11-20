@@ -232,3 +232,31 @@ export function zerlegungZeigen(zerlegung) {
 // gab den Text unverändert zurück. In Verbindung mit einer HTML-Senke
 // hätte `h('p', { html: ESCAPE(wert) })` sicher ausgesehen und wäre
 // eine Lücke gewesen. Beides gibt es nicht mehr.
+
+/** Wie ein Kapitel heißt — EINMAL.
+ *
+ * »Bei ihr werden die Units irgendwie zweimal angezeigt, einmal
+ * generisch und einmal mit ihrer eigenen Benennung, und ihr würde eine
+ * Anzeige genügen.«
+ *
+ * Der Trainer führt je Sammlung eine laufende Nummer; die braucht er
+ * für die Reihenfolge und für die Lehrgangsschranke. Angezeigt wurde
+ * sie zusätzlich zum Namen, und bei einem Lehrwerk, dessen Kapitel
+ * schon »Unit 1.4 Zahlen« heißen, steht dann da:
+ *
+ *     5. Unit 1.4 Zahlen
+ *
+ * Zwei Zählungen für dieselbe Sache, und sie widersprechen sich auch
+ * noch — das Buch sagt 1.4, der Trainer sagt 5.
+ *
+ * Die Regel: hat das Kapitel einen eigenen Namen, IST der Name die
+ * Beschriftung. Die Nummer bleibt Sortierschlüssel und tritt nur dort
+ * auf, wo sie die einzige Auskunft ist. Beim Einlesen ohne Namen
+ * entsteht ohnehin »Lektion 5«, und das steht dann für sich.
+ */
+export function kapitelname(nr, name) {
+  const eigen = (name || '').trim();
+  if (eigen) return eigen;
+  if (nr !== null && nr !== undefined) return `Lektion ${nr}`;
+  return 'Ohne Kapitel';
+}

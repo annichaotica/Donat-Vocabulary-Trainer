@@ -1,3 +1,4 @@
+import os
 import pathlib
 import sys
 import tempfile
@@ -6,6 +7,29 @@ import pytest
 
 WURZEL = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WURZEL / "backend"))
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _ohne_beispieldaten():
+    """Die Testläufe sehen die Umgebung nicht.
+
+    `BEISPIELDATEN=1` legt beim Start einen Beispielbestand an. In einem
+    Codespace steht die Variable dauerhaft da — und dann entsteht sie in
+    JEDER Testdatenbank: das Demoprofil bekommt die 1, und vierzig Tests,
+    die mit `benutzer_id=1` ihr eigenes Profil meinen, prüfen plötzlich
+    fremde Rechte. Gemessen: 40 Fehlschläge mit der Variablen, 861 grün
+    ohne sie.
+
+    Der Fehler ist nicht die Variable, sondern die Annahme, die Umgebung
+    sei leer. Ein Testlauf muss von sich aus gelten, auf jedem Rechner.
+
+    Wer die Erstbefüllung selbst prüft, setzt sie ausdrücklich
+    (`monkeypatch.setenv`) — das sticht diese Entfernung hier aus.
+    """
+    vorher = os.environ.pop("BEISPIELDATEN", None)
+    yield
+    if vorher is not None:
+        os.environ["BEISPIELDATEN"] = vorher
 
 
 @pytest.fixture()

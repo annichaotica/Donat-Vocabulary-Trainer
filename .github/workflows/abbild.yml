@@ -1,0 +1,85 @@
+# Ein fertiges Abbild bei jeder Veröffentlichung.
+#
+# Wer den Trainer nur ausprobieren will, soll nicht erst klonen und
+# bauen müssen. Das Abbild liegt danach unter
+# ghcr.io/<konto>/donat:<fassung> und wird von der
+# docker-compose.yml gezogen.
+#
+# Nur bei `release: published` — NICHT bei jedem Schieben auf main.
+# Ein Abbild, das sich unter demselben Namen täglich ändert, ist keine
+# Fassung, sondern eine bewegliche Zielscheibe; und wer es einmal
+# gezogen hat, bekäme stillschweigend etwas anderes.
+
+name: Abbild bauen und veröffentlichen
+
+on:
+  release:
+    types: [published]
+  # Von Hand auslösbar, um den Ablauf zu prüfen, ohne zu veröffentlichen.
+  workflow_dispatch:
+    inputs:
+      marke:
+        description: "Marke für den Probelauf (ohne Veröffentlichung)"
+        required: false
+        default: "probe"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRIERUNG: ghcr.io
+  # Der Name des Abbilds. Er steht auch in backend/marke.py (ABBILD);
+  # wird der Arbeitsname geändert, gehört er hier mitgeändert — die
+  # Action kann den Quelltext nicht lesen, bevor sie ausgecheckt hat.
+  ABBILD_NAME: donat
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quelltext holen
+        uses: actions/checkout@v4
+
+      # Erst prüfen, dann bauen. Ein Abbild aus einem Stand, dessen
+      # Tests nicht laufen, ist schlimmer als keines: es sieht fertig aus.
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Abhängigkeiten
+        run: pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Tests
+        run: python -m pytest tests/ -q
+
+      - name: Anmelden bei ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRIERUNG }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Die Marken: die Fassung aus dem Tag, dazu `neuste` — aber
+      # `neuste` nur bei einer echten Veröffentlichung.
+      - name: Marken bestimmen
+        id: marken
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRIERUNG }}/${{ github.repository_owner }}/${{ env.ABBILD_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=neuste,enable=${{ github.event_name == 'release' }}
+            type=raw,value=${{ inputs.marke }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Bauen und schieben
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name == 'release' }}
+          tags: ${{ steps.marken.outputs.tags }}
+          labels: ${{ steps.marken.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

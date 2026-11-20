@@ -5,7 +5,7 @@
  * bekommt genau diese Felder — und nicht alle fünfzehn Zeiten. */
 
 import { api } from './api.js';
-import { h, leeren, meldung, sprechen, tun } from './hilfen.js';
+import { h, kapitelname, leeren, meldung, sprechen, tun } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 
@@ -71,8 +71,7 @@ export async function zeichnen(behaelter) {
     h('option', { value: '', text: 'alle Kapitel' }),
     lektionen.map((k) => h('option', {
       value: String(k.id),
-      text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen')
-          + ` (${k.lexeme})`,
+      text: `${kapitelname(k.nr, k.name)} (${k.lexeme})`,
     })),
     h('option', { value: OHNE_KAPITEL, text: 'ohne Kapitel' }));
   lektionWahl.value = filter.lektion;
@@ -118,7 +117,7 @@ export async function zeichnen(behaelter) {
       h('option', { value: '', text: 'Kapitel wählen …' }),
       lektionen.map((k) => h('option', {
         value: String(k.id),
-        text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen'),
+        text: kapitelname(k.nr, k.name),
       })),
       h('option', { value: OHNE_KAPITEL, text: 'ohne Kapitel' }));
     const neueNr = h('input', { type: 'number', min: '0', max: '9999',
@@ -127,7 +126,7 @@ export async function zeichnen(behaelter) {
     stapel.append(h('div', { class: 'karte gezielt-stapel' },
       h('b', { text: `${angehakt.size} ausgewählt` }),
       h('div', { class: 'frage-werkzeuge',
-                 style: 'justify-content:flex-start;flex-wrap:wrap' },
+                 style: 'flex-wrap:wrap' },
         wohin,
         h('button', {
           class: 'wichtig',
@@ -195,8 +194,7 @@ export async function zeichnen(behaelter) {
         liste.append(h('h2', { class: 'kapitelkopf',
           text: l.lektion_id === null
             ? 'Ohne Kapitel'
-            : (l.lektion_nr !== null ? `${l.lektion_nr}. ` : '')
-              + (l.lektion_name || 'ohne Namen') }));
+            : kapitelname(l.lektion_nr, l.lektion_name) }));
       }
 
       const kasten = h('input', { type: 'checkbox', class: 'eintrag-haken',
@@ -437,7 +435,7 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
       h('kbd', { text: '→' }), ' und ', h('kbd', { text: '←' }), ' blättern.'));
   }
 
-  el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:1.5rem' },
+  el.append(h('div', { class: 'frage-werkzeuge', style: 'margin-top:1.5rem' },
     h('button', { onclick: () => { location.hash = '#/wortschatz'; } }, 'Zurück zur Liste'),
     h('button', {
       class: 'schlicht gefahr',
@@ -666,7 +664,7 @@ async function formBearbeiten(behaelter, lexem, f, zeile) {
         ' nicht: der Lernstand hängt an der Zelle, nicht an der Form. '
         + 'Die Zelle, in die du sie hängst, fängt von vorn an — und die '
         + 'alte bleibt stehen, falls du es zurücknimmst.'),
-      h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+      h('div', { class: 'frage-werkzeuge' },
         h('button', { class: 'wichtig', onclick: () => sichern() }, 'Speichern'),
         h('button', { class: 'schlicht', onclick: () => schliessen() },
           'Abbrechen'))));
@@ -743,8 +741,7 @@ async function kopfBearbeiten(behaelter, lexem) {
           + 'Lexemmerkmale vorgesehen.' }));
   }
 
-  kasten.append(h('div', { class: 'frage-werkzeuge',
-                           style: 'justify-content:flex-start' },
+  kasten.append(h('div', { class: 'frage-werkzeuge' },
     h('button', {
       class: 'wichtig',
       onclick: () => tun(async () => {
@@ -804,7 +801,7 @@ function bedeutungBearbeiten(behaelter, lexem, b) {
       h('label', { class: 'leise', text: 'Hinzufügen' }), neuFeld),
     h('div', { class: 'feldzeile' },
       h('label', { class: 'leise', text: 'Erklärung' }), erklaerung),
-    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    h('div', { class: 'frage-werkzeuge' },
       h('button', {
         class: 'wichtig',
         onclick: () => tun(async () => {
@@ -903,7 +900,7 @@ export async function zeichnenNeu(behaelter) {
       lexemfelder)));
   el.append(h('h2', { text: 'Formen' }), formfelder);
 
-  el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:1rem' },
+  el.append(h('div', { class: 'frage-werkzeuge', style: 'margin-top:1rem' },
     h('button', {
       class: 'wichtig',
       onclick: async () => {

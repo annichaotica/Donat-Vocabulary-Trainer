@@ -621,3 +621,383 @@ def test_jedes_kaestchen_hat_ein_tippziel():
             assert "hakenfeld" in umgebung, (
                 f"{name}: ein Kästchen ohne Tippziel bei Zeichen "
                 f"{stelle.start()}")
+
+
+def test_keine_knopfreihe_nimmt_ihre_eigene_ausrichtung_zurueck():
+    """»Zur Anordnung der Buttons hat der Agent keine Vorschläge?«
+
+    `.frage-werkzeuge` heißt »eine Reihe Knöpfe« und richtete mittig
+    aus, weil die Klasse für die Abfragekarte entstanden ist. Benutzt
+    wird sie überall — und an 38 von 50 Stellen stand daneben ein
+    `justify-content:flex-start`, das die eigene Vorgabe wieder aufhob.
+    Die Vorgabe war damit in vier von fünf Fällen die falsche.
+
+    Wer das Gegengift vergaß, bekam eine zentrierte Reihe unter
+    linksbündigem Text; in der Regelfreigabe stand sie so und sah dort
+    nach einem anderen Bauteil aus.
+
+    Jetzt gibt die Klasse linksbündig vor, und die beiden Karten mit
+    mittigem Inhalt (`.frage`, `.abtippkarte`) zentrieren selbst. Eine
+    Angabe im Einzelfall heißt: die Vorgabe stimmt wieder nicht.
+    """
+    import pathlib
+    import re
+
+    funde = []
+    for datei in sorted(pathlib.Path("frontend/js").glob("*.js")):
+        text = datei.read_text()
+        for treffer in re.finditer(
+                r"class: '([^']*\bfrage-werkzeuge\b[^']*)',\s*style: '([^']*)'",
+                text):
+            if "justify-content" in treffer.group(2):
+                zeile = text[:treffer.start()].count("\n") + 1
+                funde.append(f"{datei.name}:{zeile}: {treffer.group(2)}")
+    assert not funde, (
+        "Knopfreihen mit eigener Ausrichtung — dann gehört sie in die "
+        "Klasse:\n" + "\n".join(funde))
+
+
+def test_in_den_einstellungen_sagt_jeder_speichern_knopf_wofuer():
+    """Vier Karten, vier Knöpfe, drei davon hießen »Speichern«.
+
+    Keiner sagte, wofür er gilt. Auf einer Seite mit vier Karten ist
+    »Speichern« keine Beschriftung, sondern eine Frage.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_einstellungen.js").read_text()
+    nackt = re.findall(r"\}, 'Speichern'\)|, 'Speichern'\)\)", quelle)
+    assert not nackt, (
+        f"{len(nackt)} Knopf/Knöpfe heißen bloß »Speichern« — welche Karte?")
+
+
+def test_die_einstellungen_zeichnen_nie_die_ganze_seite_neu():
+    """Der Fund hinter »die Anordnung der Buttons«.
+
+    Drei der Speichern-Knöpfe riefen nach dem Speichern
+    `zeichnen(behaelter)` auf, und drei Zurücknehmen-Knöpfe ebenfalls.
+    Das leert den Behälter vollständig: was in einer ANDEREN Karte
+    eingetippt und noch nicht gespeichert war, entstand aus dem
+    gespeicherten Wert neu und war damit weg. Ohne Nachfrage, ohne
+    Meldung.
+
+    Nachzustellen war es so: Tagesziel auf 30 ändern, NICHT speichern,
+    dann oben im Lehrwerk eine Lektionsnummer speichern — das Tagesziel
+    stand wieder auf 20.
+
+    Ein Neuaufbau bleibt nötig, weil die Karten abgeleitete Angaben
+    zeigen. Er gehört aber auf die eigene Karte: `karteErneuern`.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_einstellungen.js").read_text()
+    # Ohne Kommentare — dort steht, was einmal falsch war.
+    ohne = re.sub(r"/\*.*?\*/", "", quelle, flags=re.S)
+    ohne = re.sub(r"^\s*//.*$", "", ohne, flags=re.M)
+    # Die Deklaration selbst ist kein Aufruf.
+    aufrufe = re.findall(r"(?<!function )\bzeichnen\(behaelter\)", ohne)
+    assert not aufrufe, (
+        f"{len(aufrufe)}x Ganzseiten-Neuaufbau in den Einstellungen — "
+        "das verwirft ungespeicherte Eingaben in den anderen Karten. "
+        "karteErneuern(behaelter, kasten, teilX) benutzen.")
+
+
+def test_die_dritte_ueberschrift_ist_nicht_kleingedrucktes():
+    """h3 war kleiner als der Fließtext und dazu grau.
+
+    .95em bei `--leise` heißt: die dritte Gliederungsebene sieht aus
+    wie eine Fußnote. Gegen den Grund gemessen waren das im Hellen
+    6,27 — unter dem, was für Schrift gilt, die man lesen soll.
+
+    Die Größe bleibt in em, nicht in rem: `--mass` hängt an body, und
+    rem würde den Legastheniemodus übergehen.
+    """
+    import pathlib
+    import re
+
+    stil = pathlib.Path("frontend/css/stil.css").read_text()
+    regel = re.search(r"\nh3 \{([^}]*)\}", stil)
+    assert regel, "Keine h3-Regel in stil.css gefunden"
+    inhalt = regel.group(1)
+
+    groesse = re.search(r"font-size:\s*([\d.]+)em", inhalt)
+    assert groesse, f"h3 ohne Größe in em: {inhalt.strip()}"
+    assert float(groesse.group(1)) >= 1.0, (
+        f"h3 ist mit {groesse.group(1)}em kleiner als der Fließtext")
+
+    farbe = re.search(r"color:\s*var\((--[a-z-]+)\)", inhalt)
+    assert farbe and farbe.group(1) != "--leise", (
+        f"h3 ist leise gesetzt: {inhalt.strip()}")
+
+
+def test_kein_filter_brightness_statt_einer_mischung():
+    """`filter: brightness()` kennt die Richtung nicht.
+
+    Es rechnet am fertigen Bild statt in der Palette: aufhellen heißt
+    im Hellen dasselbe wie im Dunkeln. Ein gedrückter Knopf soll im
+    Hellen aber dunkler werden und im Dunkeln heller.
+
+    `color-mix(in oklab, var(--akzent) 86%, var(--text))` macht beides
+    mit einer Angabe, weil `--text` im Hellen nahschwarz und im
+    Dunkeln nahweiß ist.
+    """
+    import pathlib
+    import re
+
+    funde = []
+    for datei in sorted(pathlib.Path("frontend/css").glob("*.css")):
+        ohne = re.sub(r"/\*.*?\*/", "", datei.read_text(), flags=re.S)
+        for nr, zeile in enumerate(ohne.splitlines(), 1):
+            if re.search(r"filter:\s*brightness", zeile):
+                funde.append(f"{datei.name}:{nr}: {zeile.strip()}")
+    assert not funde, (
+        "Helligkeitsfilter statt einer Mischung in der Palette:\n"
+        + "\n".join(funde))
+
+
+def test_der_weitersprung_haelt_ueberall_an_wo_es_weitergeht():
+    """Eine Uhr, die nach dem Seitenwechsel noch feuert, bewertet die
+    FALSCHE Aufgabe.
+
+    Der Weitersprung nach »richtig« ist ein `setTimeout`, der nach
+    1,4 Sekunden `weiter()` aufruft. Jede Stelle, an der die Sitzung
+    weitergeht oder endet, muss ihn vorher anhalten — sonst läuft er in
+    die nächste Frage hinein und wertet sie ab, ohne dass sie jemand
+    gelesen hat.
+
+    Drei Stellen sind es: `weiter` (von Hand weitergeklickt),
+    `naechste` (die nächste Aufgabe wird geholt) und `beenden` (die
+    Ansicht wird verlassen).
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_lernen.js").read_text()
+    for name in ("async weiter(", "async naechste(", "beenden()"):
+        anfang = quelle.index(name)
+        # Bis zur nächsten Methode auf derselben Einrückungsebene.
+        rest = quelle[anfang:]
+        ende = rest.index("\n  }\n")
+        rumpf = rest[:ende]
+        assert re.search(r"\bsprungAbbrechen\(\)", rumpf), \
+            f"{name} hält den Weitersprung nicht an"
+
+
+def test_der_weitersprung_gilt_nur_bei_sauber_richtig():
+    """Sonst wäre es ein »Rückmeldung überspringen«.
+
+    Und genau die will man sehen: bei »fast richtig« steht dort die
+    richtige Schreibung, bei einem Fehler die Lösung, und wer einen
+    Tipp genommen oder das Wort nachgesehen hat, dem ist die Wertung
+    auf »Schwer« gedeckelt — auch das gehört gelesen.
+
+    Die vier Ausschlüsse sind nicht Beiwerk, sie sind der Grund, warum
+    der Schalter vertretbar ist.
+    """
+    import pathlib
+
+    quelle = pathlib.Path("frontend/js/ansicht_lernen.js").read_text()
+    anfang = quelle.index("  springtGleich()")
+    rumpf = quelle[anfang:anfang + quelle[anfang:].index("\n  }\n")]
+    for bedingung in ("'richtig'", "this.tipps", "this.aufgedeckt",
+                      "this.wertungOffen"):
+        assert bedingung in rumpf, \
+            f"springtGleich() prüft {bedingung} nicht — der Sprung käme zu oft"
+
+
+def test_gezieltes_lernen_benutzt_die_zurueckgeschickte_zeile():
+    """Sonst wäre der Umbau am Server umsonst.
+
+    »Gezielt lernen« baute nach jedem »ja/nein« die ganze Liste neu
+    auf — bis zu 200 Zeilen, und die Seite sprang nach oben. Dass das
+    falsch ist, stand in derselben Datei schon beschrieben: das
+    Kästchen daneben erneuert seit jeher nur den Stapelkasten, »beim
+    Durchhaken von fünfzig Wörtern darf die Seite nicht unter den
+    Fingern wegspringen«.
+
+    Der Server schickt die geänderte Zeile jetzt zurück. Ein Aufruf,
+    der die Antwort wegwirft, hat den Neuaufbau noch im Gepäck.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_gezielt.js").read_text()
+    weggeworfen = re.findall(r"^\s*await api\.abfrageSetzen", quelle, re.M)
+    assert not weggeworfen, (
+        f"{len(weggeworfen)}x wird die Antwort von abfrageSetzen verworfen — "
+        "dann bleibt nur der Neuaufbau der ganzen Liste")
+    assert "zeilenErneuern" in quelle, \
+        "Ohne zeilenErneuern wird wieder die ganze Liste gezeichnet"
+
+
+def test_die_textwerkstatt_baut_nur_fuer_die_lesart_neu():
+    """Ein angetipptes Wort baute 85 Verse neu auf.
+
+    »Für die KI merken« rief `zeichnenText`, und das holt Text UND
+    Deckung neu und baut jeden Abschnitt wieder auf. Beim Iwein-Prolog
+    sind das 85 Verse: man liest bei Vers 70, tippt ein unbekanntes
+    Wort an — und steht wieder bei Vers 1. Dabei ändert sich dadurch
+    genau eine Farbe.
+
+    Ein Neuaufbau bleibt richtig für »Übersetzung daneben«: dort
+    entsteht je Abschnitt ein anderer Aufbau, zwei Spalten statt
+    einer. Das ist die EINE Stelle, die ihn braucht.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_texte.js").read_text()
+    ohne = re.sub(r"/\*.*?\*/", "", quelle, flags=re.S)
+    ohne = re.sub(r"^\s*//.*$", "", ohne, flags=re.M)
+    aufrufe = re.findall(r"(?<!function )\bzeichnenText\(behaelter", ohne)
+    assert len(aufrufe) == 1, (
+        f"{len(aufrufe)} Neuaufbauten des ganzen Textes — erwartet ist der "
+        "eine für »Übersetzung daneben«")
+
+    # Und er steht dort, wo er hingehört.
+    anfang = ohne.index("function teilLesart(")
+    rumpf = ohne[anfang:anfang + ohne[anfang:].index("\n}\n")]
+    assert "zeichnenText(behaelter" in rumpf, \
+        "Der verbliebene Neuaufbau steht nicht in teilLesart"
+
+
+def test_ziele_mit_termin_stehen_vor_dem_allgemeinen():
+    """»Die sind ja das, worauf der Fokus liegen sollte.«
+
+    Die Lernziele standen nicht nur unter der Heute-Karte, sondern
+    auch noch unter dem Bücherregal — fünfter Block. Bei Lernende 2 stand
+    dort »heute fällig, 60 offen«.
+
+    Entscheidender als die Reihenfolge ist aber der Knopf: der große
+    »Lernen« auf der Heute-Karte kennt die Lernziele NICHT (er schickt
+    kein lernziel_id mit, und der Planer fragt keines ab). Eine Zeile,
+    die einen Termin anzeigt und dann auf denselben allgemeinen Knopf
+    verweist, ließe einen mit dem Termin allein.
+    """
+    import pathlib
+
+    quelle = pathlib.Path("frontend/js/ansicht_uebersicht.js").read_text()
+
+    # Oben, vor dem Allgemeinen.
+    assert (quelle.index("teilTermine(ziele)")
+            < quelle.index("h('h1', { text: 'Heute' })")
+            + len("h('h1', { text: 'Heute' })")), \
+        "Der Terminstreifen gehört unter die Überschrift »Heute«"
+    assert quelle.index("anfuegen(el, teilTermine(ziele))") \
+        < quelle.index("zahlKasten(gesamt.faellig"), \
+        "Der Terminstreifen steht nicht vor der Heute-Karte"
+
+    # Ein Regal ist Stöbern, ein Ziel ist eine Zusage.
+    assert quelle.index("h('h2', { text: 'Lernziele' })") \
+        < quelle.index("h('h2', { text: 'Bücher und Texte' })"), \
+        "Die Lernziele stehen immer noch unter dem Bücherregal"
+
+    # Und der Knopf startet DIESES Ziel.
+    anfang = quelle.index("function teilTermine(")
+    rumpf = quelle[anfang:anfang + quelle[anfang:].index("\n}\n")]
+    assert "z.termin" in rumpf, "Der Streifen filtert nicht auf einen Termin"
+    assert "#/lernen/ziel/" in rumpf, \
+        "Der Knopf startet nicht das Ziel, sondern irgendetwas anderes"
+    assert "'#/lernen'" not in rumpf, \
+        "Der Knopf fällt auf die allgemeine Abfrage zurück"
+
+
+def test_die_abfrage_sagt_in_welchem_lernziel_man_steckt():
+    """Der Server schickt es mit, die Oberfläche zeigte es nie.
+
+    Das fiel nicht auf, solange ein Ziel nur über die Lernzielseite zu
+    starten war — man kam ja gerade von dort. Seit der Terminstreifen
+    auf der Übersicht unmittelbar eine Zielabfrage startet, ist der
+    Unterschied zwischen »planmäßig über alles« und »genau dieses
+    Ziel« nicht mehr am Weg abzulesen.
+
+    Und der Unterschied ist groß: gemessen am echten Stand lieferte
+    »Lernen« Karotte, Minimarkt und Reis, während das Ziel, das in
+    zwei Tagen ablief, bei Lektion 2 und 3 stand.
+    """
+    import pathlib
+
+    quelle = pathlib.Path("frontend/js/ansicht_lernen.js").read_text()
+    anfang = quelle.index("  teilFortschritt()")
+    rumpf = quelle[anfang:anfang + quelle[anfang:].index("\n  }\n")]
+    assert "lernziel" in rumpf, \
+        "Die Abfrage verrät nicht, ob sie aus einem Lernziel zieht"
+    assert "ziel.name" in rumpf, "Der Name des Lernziels fehlt"
+
+
+def test_der_ring_im_kopf_startet_keine_abfrage():
+    """»Da wurde mir jetzt aber ein spanischer Begriff gezeigt.«
+
+    Der Ring zeigt den Tagesstand und die Strähne — und sprang beim
+    Antippen nach #/lernen, ohne vorher die Sammlung zu leeren. Also
+    in das, was zuletzt eingestellt war: wer gestern Spanisch
+    ausgewählt hatte, bekam Spanisch.
+
+    Der tiefere Grund ist aber nicht der fehlende Zweizeiler: er ist
+    eine ANZEIGE, kein Startknopf. Wer auf eine Zahl tippt, will
+    wissen, was dahintersteckt — und das steht unter »Dein
+    Fortschritt«: Stufe, Punkte, Strähne, überbrückte Fehltage.
+    Gestartet wird von der Übersicht, wo auch steht, WAS man lernt.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/app.js").read_text()
+    anfang = quelle.index("getElementById('kopf-spiel').addEventListener")
+    rumpf = quelle[anfang:anfang + quelle[anfang:].index("});")]
+    ziele = re.findall(r"location\.hash = '([^']+)'", rumpf)
+    assert ziele, "Der Ring führt nirgendwohin"
+    assert not any(z.startswith("#/lernen") for z in ziele), \
+        f"Der Ring startet eine Abfrage: {ziele}"
+
+
+def test_ein_kapitel_wird_nur_einmal_beschriftet():
+    """»Bei ihr werden die Units zweimal angezeigt.«
+
+    Der Trainer führt je Sammlung eine laufende Nummer — für die
+    Reihenfolge und für die Lehrgangsschranke. Angezeigt wurde sie
+    ZUSÄTZLICH zum Namen, und bei einem Lehrwerk, dessen Kapitel schon
+    »Unit 1.4 Zahlen« heißen, stand da »5. Unit 1.4 Zahlen«: zwei
+    Zählungen für dieselbe Sache, die sich auch noch widersprechen.
+
+    Die Regel steht in hilfen.kapitelname(). Wer sie umgeht und Nummer
+    und Namen selbst zusammensetzt, baut das Doppelte wieder ein.
+    """
+    import pathlib
+    import re
+
+    muster = re.compile(
+        r"\$\{[a-z_.]*(?:nr|lektion_nr)\}\.?\s*[`'\"]?\s*\+?\s*"
+        r"[^;\n]*(?:name|lektion_name)")
+    funde = []
+    for datei in sorted(pathlib.Path("frontend/js").glob("*.js")):
+        if datei.name == "hilfen.js":
+            continue          # dort steht die Regel selbst
+        text = datei.read_text()
+        for nr, zeile in enumerate(text.splitlines(), 1):
+            if muster.search(zeile):
+                funde.append(f"{datei.name}:{nr}: {zeile.strip()[:72]}")
+    assert not funde, (
+        "Nummer und Name zusammengesetzt — kapitelname() benutzen:\n"
+        + "\n".join(funde))
+
+
+def test_die_kapitelbeschriftung_steht_an_einer_stelle():
+    """Sonst läuft sie wieder auseinander.
+
+    In der Freigabe stand ein eigener Riegel: »Lektion 5 — Lektion 5 zu
+    schreiben wäre albern«. Er verglich auf Gleichheit und griff damit
+    nur beim Einlesen ohne Namen — wessen Kapitel anders heißen, las
+    weiter beides.
+    """
+    import pathlib
+
+    hilfen = pathlib.Path("frontend/js/hilfen.js").read_text()
+    assert "export function kapitelname(" in hilfen
+
+    for datei in ("ansicht_wortschatz.js", "ansicht_freigabe.js"):
+        quelle = pathlib.Path("frontend/js") / datei
+        text = quelle.read_text()
+        assert "kapitelname" in text, f"{datei} beschriftet Kapitel selbst"

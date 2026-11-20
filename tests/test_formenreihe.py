@@ -268,3 +268,110 @@ def test_beim_imperativ_steht_kein_pronomen(klient):
         "modus": "imperativ", "person": "2", "numerus": "sg"}) == []
     assert sprachen.personalpronomen("de", {
         "person": "1", "numerus": "pl"}) == ["wir"]
+
+
+# ---------------------------------------------------------------- Tipp
+
+def test_der_tipp_gilt_je_zelle_und_nicht_fuer_die_erste(klient):
+    """»Bei den Reihen funktioniert der Tipp nicht.«
+
+    Er tat etwas Schlimmeres als nichts. Bei einer Reihe ist
+    `erwartet` die flache Liste ALLER Formen, und der Tipp nahm davon
+    `next(iter(...))` — die erste. Es stand also ein Gerüst da, ohne
+    zu sagen, zu welchem der sechs Felder es gehört. Wer es auf das
+    Feld bezog, in dem er gerade steckte, bekam Unsinn.
+
+    Eine Reihe braucht sechs Gerüste, je eins an seinem Feld.
+    """
+    b, s = _aufbau(klient)
+    aufgabe = _reihe(klient, b, s)
+    t = klient.get("/api/lernen/tipp", params={
+        "benutzer_id": b["id"], "aufgabe_id": aufgabe["aufgabe_id"],
+        "stufe": 1}).json()
+
+    assert "zellen" in t, "Die Reihe bekommt Gerüste je Zelle"
+    assert len(t["zellen"]) == 6
+    # Jedes Gerüst gehört zu SEINER Zelle — und die Zellen sind
+    # dieselben, die in der Aufgabe stehen.
+    assert ([z["zelle"] for z in t["zellen"]]
+            == [z["zelle"] for z in aufgabe["zellen"]])
+    for zelle, form in zip(t["zellen"], PRAESENS):
+        assert zelle["maske"], f"Kein Gerüst für {zelle['beschriftung']}"
+        assert zelle["maske"] != form, "Das Gerüst ist nicht die Lösung"
+        assert zelle["maske"].startswith(form[0])
+        assert zelle["buchstaben"] == len(form)
+    # Der Stamm gilt für die ganze Reihe — sie teilen ihn sich.
+    assert t.get("stamm")
+    # Und die Lösung steht nirgends.
+    for form in PRAESENS:
+        assert form not in str(t)
+
+
+def test_mehr_tipp_deckt_mehr_auf_auch_in_der_reihe(klient):
+    b, s = _aufbau(klient)
+    aufgabe = _reihe(klient, b, s)
+    masken = []
+    for stufe in (1, 2, 3):
+        t = klient.get("/api/lernen/tipp", params={
+            "benutzer_id": b["id"], "aufgabe_id": aufgabe["aufgabe_id"],
+            "stufe": stufe}).json()
+        masken.append(t["zellen"][0]["maske"])
+    sichtbar = [sum(1 for z in m if z not in "_ ") for m in masken]
+    assert sichtbar[0] < sichtbar[1] < sichtbar[2], masken
+
+
+# ------------------------------------------------------ Zweiter Versuch
+
+def test_eine_fast_richtige_form_darf_noch_einmal_geschrieben_werden(klient):
+    """»Man kann bei ihnen nicht noch mal schreiben, das wäre schon gut.«
+
+    Beim einzelnen Wort gibt es für »fast richtig« den zweiten
+    Versuch. In der Reihe gab es ihn praktisch nie: das Urteil der
+    GANZEN Reihe wird erst »fast«, wenn jede einzelne Zelle mindestens
+    »fast« ist — ein leeres Feld zieht sie auf »falsch«, und damit war
+    auch der verrutschte Akzent daneben erledigt.
+
+    Ein Akzent ist aber auch in einer Reihe nur ein Akzent.
+    """
+    b, s = _aufbau(klient)
+    aufgabe = _reihe(klient, b, s)
+    zellen = [z["zelle"] for z in aufgabe["zellen"]]
+    # Fünf richtig, eine ohne Akzent — und eine davon leer gelassen.
+    antwort = dict(zip(zellen, PRAESENS))
+    antwort[zellen[1]] = "γραφεις"        # fast: Akzent fehlt
+    antwort[zellen[4]] = ""               # falsch: gar nichts
+    ergebnis = pruefen(klient, b, aufgabe, antwort)
+
+    assert ergebnis["urteil"]["urteil"] == "falsch"   # als Ganzes: falsch
+    assert ergebnis["nochmal_tippen"] is True
+    nach_zelle = {z["zelle"]: z for z in ergebnis["aufloesung"]["zellen"]}
+    assert nach_zelle[zellen[1]]["urteil"] == "fast"
+    assert nach_zelle[zellen[4]]["urteil"] == "falsch"
+
+
+def test_ohne_eine_fast_richtige_form_gibt_es_keinen_zweiten_versuch(klient):
+    """Wer eine Form nicht wusste, bekommt keinen zweiten Rateversuch.
+
+    Das wäre mehr, als das einzelne Wort bietet — und aus »nicht
+    gewusst« würde »gewusst«.
+    """
+    b, s = _aufbau(klient)
+    aufgabe = _reihe(klient, b, s)
+    zellen = [z["zelle"] for z in aufgabe["zellen"]]
+    antwort = dict(zip(zellen, PRAESENS))
+    antwort[zellen[2]] = "ιδρύει"          # schlicht falsch, nicht »fast«
+    ergebnis = pruefen(klient, b, aufgabe, antwort)
+    assert ergebnis["urteil"]["urteil"] == "falsch"
+    assert ergebnis["nochmal_tippen"] is False
+
+
+def test_der_zweite_versuch_gilt_nur_einmal(klient):
+    b, s = _aufbau(klient)
+    aufgabe = _reihe(klient, b, s)
+    zellen = [z["zelle"] for z in aufgabe["zellen"]]
+    antwort = dict(zip(zellen, PRAESENS))
+    antwort[zellen[1]] = "γραφεις"
+    a = klient.post("/api/lernen/pruefen", json={
+        "benutzer_id": b["id"], "aufgabe_id": aufgabe["aufgabe_id"],
+        "antwort": antwort, "versuche": 2}).json()
+    assert a["nochmal_tippen"] is False

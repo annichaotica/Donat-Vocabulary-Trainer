@@ -14,7 +14,7 @@
  * Formen anzuklicken. */
 
 import { api } from './api.js';
-import { h, leeren, meldung } from './hilfen.js';
+import { h, kapitelname, leeren, meldung } from './hilfen.js';
 import { zustand, merken } from './zustand.js';
 
 async function sammlungSichern() {
@@ -67,12 +67,14 @@ export async function zeichnen(behaelter) {
 
   const liste = h('div', { class: 'liste' });
   for (const k of uebersicht.lektionen) {
-    // Lektionen, die beim Import entstanden sind, heißen schon "Lektion 5".
-    // "Lektion 5 — Lektion 5" zu schreiben wäre albern.
-    const nummer = k.nr !== null && k.nr !== undefined ? `Lektion ${k.nr}` : null;
-    const name = nummer
-      ? (k.name && k.name !== nummer ? `${nummer} — ${k.name}` : nummer)
-      : 'Ohne Lektion';
+    // Eine Beschriftung, nicht zwei. Hier stand einmal »Lektion 5 —
+    // Lektion 5« im Blick, und der Riegel dagegen verglich auf
+    // Gleichheit. Das griff nur beim Einlesen ohne Namen; wessen
+    // Kapitel »Unit 1.4 Zahlen« heißen, las weiter »Lektion 5 — Unit
+    // 1.4 Zahlen«. Siehe kapitelname().
+    const name = k.nr === null || k.nr === undefined
+      ? (k.name ? k.name.trim() : 'Ohne Lektion')
+      : kapitelname(k.nr, k.name);
     liste.append(h('button', {
       class: 'eintrag',
       onclick: () => { location.hash = `#/freigabe/${k.nr ?? 'ohne'}`; },

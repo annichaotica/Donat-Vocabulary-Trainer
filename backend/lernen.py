@@ -177,6 +177,10 @@ def benutzer_einstellungen(db: sqlite3.Connection, benutzer_id: int) -> dict:
         # umgeschaltet hat, merkt nichts davon — Zeichen, die schon in
         # der Zielschrift ankommen, gehen unangetastet durch.
         "tastatur_umschrift": bool(e.get("tastatur_umschrift", True)),
+        # Nach einer sauber richtigen Antwort von selbst weiterspringen.
+        # Voreingestellt AUS: eine Seite, die sich von allein bewegt,
+        # muss man wollen.
+        "weiterspringen": bool(e.get("weiterspringen", False)),
     }
 
 
@@ -718,8 +722,22 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                                     e["wunschretention"], e["legasthenie"],
                                     e["beschriftung"]),
                 "herkunft": eintrag["herkunft"],
+                # Der Stand des ZIELS, nicht des Tages.
+                #
+                # »Warum steht beim Lernziel 70 von 120 heute und in
+                # der Übersicht 0 von 28?« — Weil der Balken in der
+                # Abfrage das Tagespensum misst, über alle Sammlungen
+                # und Ziele zusammen. Das ist richtig und steht an der
+                # falschen Stelle: wer gerade ein Ziel abfragt, will
+                # dessen Fortschritt sehen. Gerechnet ist er ohnehin,
+                # der Block braucht ihn selbst.
                 "lernziel": {"id": lernziel_id, "name": plan["name"],
-                             "begruendung": plan["begruendung"]},
+                             "begruendung": plan["begruendung"],
+                             "ziel": plan["fortschritt"]["ziel"],
+                             "gesamt": plan["fortschritt"]["gesamt"],
+                             "geschafft": plan["fortschritt"]["geschafft"],
+                             "angefangen": plan["fortschritt"]["angefangen"],
+                             "lage": plan["fortschritt"]["lage"]},
             })
         return ergebnis
 
@@ -1054,6 +1072,22 @@ def pruefen(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
 
     # "Fast richtig" wird noch nicht gewertet — es wird noch einmal getippt.
     nochmal = urteil.urteil == "fast" and versuche == 1 and not aufgedeckt
+    # Bei einer Reihe gilt dieselbe Regel JE ZELLE.
+    #
+    # »Man kann bei ihnen nicht noch mal schreiben, das wäre schon
+    # gut.« — Eine Reihe sitzt als Ganzes oder nicht, und dabei bleibt
+    # es: steht in einem Feld etwas Falsches, ist die Reihe falsch.
+    # Aber ein Akzent, der verrutscht ist, ist auch in einer Reihe nur
+    # ein Akzent. Beim einzelnen Wort gibt es dafür den zweiten
+    # Versuch; in der Reihe gab es ihn praktisch nie, weil schon ein
+    # einziges leeres Feld das Urteil auf "falsch" zieht.
+    #
+    # Offen ist danach NUR, was "fast" war. Wer eine Form nicht wusste,
+    # bekommt keinen zweiten Rateversuch — das wäre mehr, als das
+    # einzelne Wort bietet.
+    if not nochmal and versuche == 1 and not aufgedeckt:
+        nochmal = any(z["urteil"] == "fast"
+                      for z in (aufloesung.get("zellen") or []))
     erwartet = next(iter(aufloesung.get("erwartet") or []), None)
     gewertet = bewertungsmodul.fuer_aufgabe(
         db, benutzer_id, aufgabe_id,
@@ -1207,6 +1241,38 @@ def tipp(db: sqlite3.Connection, benutzer_id: int, aufgabe_id: int,
     stufe = max(1, min(int(stufe), TIPPSTUFEN))
     _urteil, aufloesung = aufgaben.antwort_pruefen(db, aufgabe_id, "",
                                                    fehler_benennen=False)
+
+    # Eine Reihe braucht einen Tipp JE ZELLE.
+    #
+    # »Bei den Reihen funktioniert der Tipp nicht.« — Er tat etwas
+    # Schlimmeres als nichts: `erwartet` ist bei einer Reihe die flache
+    # Liste aller Formen, und `next(iter(...))` nahm davon die erste.
+    # Es stand also ein Gerüst da, ohne zu sagen, zu welchem der sechs
+    # Felder es gehört. Wer es auf das Feld bezog, in dem er gerade
+    # steckte, bekam Unsinn.
+    zellen = aufloesung.get("zellen")
+    if zellen:
+        antwort = {
+            "stufe": stufe,
+            "hoechste_stufe": TIPPSTUFEN,
+            "zellen": [{"zelle": z["zelle"],
+                        "beschriftung": z["beschriftung"],
+                        "maske": legasthenie_modul.maske(z["erwartet"][0], stufe),
+                        "buchstaben": len([c for c in z["erwartet"][0]
+                                           if c.isalpha()])}
+                       for z in zellen if z.get("erwartet")],
+        }
+        if stufe == 1:
+            # Der Stamm gilt für die ganze Reihe — sie teilen ihn sich,
+            # das ist ja der Witz an einer Formgruppe.
+            stamm = aufgaben.stamm_fuer_aufgabe(db, aufgabe_id)
+            if stamm:
+                antwort["stamm"] = stamm
+        if not antwort["zellen"]:
+            return {"stufe": stufe, "hoechste_stufe": TIPPSTUFEN,
+                    "maske": None, "hinweis": "Dazu gibt es keinen Tipp."}
+        return antwort
+
     erwartet = next(iter(aufloesung.get("erwartet") or []), None)
     if not erwartet:
         return {"stufe": stufe, "hoechste_stufe": TIPPSTUFEN,

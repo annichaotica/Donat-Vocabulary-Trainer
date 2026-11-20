@@ -16,6 +16,63 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Der Tipp-Deckel hat nie gewirkt
+
+Beim Nachgehen eines anderen Befundes aufgefallen und der schwerste
+Fund des Tages: **die Oberfläche hat die Zahl der genommenen Tipps nie
+mitgeschickt.**
+
+Der Server kennt das Feld seit jeher und deckelt damit auf »Schwer«.
+Im Aufruf stand es nicht — weder beim Prüfen noch beim Werten. Wer
+drei Tipps nahm und dann richtig antwortete, bekam »Gut«, und der
+Terminplan legte das Wort weit weg. Der Kommentar daneben behauptete
+seit Monaten das Gegenteil.
+
+Ein Feld, das der Server auswertet und der Aufrufer vergisst, fällt
+niemandem auf: es gibt keine Fehlermeldung, nur eine Bewertung, die zu
+gut ist. Jetzt steht in der Wertung: *»Richtig, aber mit Tipp.«*
+
+### »Wort ansehen« und die Regel zählen jetzt auch
+
+Dieselbe Lücke von der anderen Seite: der Tipp wurde (theoretisch)
+gedeckelt, aber »Wort ansehen« zeigte alle Formen und die
+Grammatikregel die Bildung — beides umsonst. Damit war das Tippsystem
+freiwillig.
+
+**Nicht gesperrt, sondern gezählt.** Die Regel beim Antworten
+nachzulesen ist beim Mittelhochdeutschen durchaus erwünscht; nur
+umsonst darf es nicht sein. Es steht auch dabei: »Nachsehen ist in
+Ordnung — es zählt wie ein Tipp.«
+
+### »Aussetzen« hat jetzt einen Rückweg
+
+Die Meldung sagte »In den Einstellungen wieder einschaltbar«. Das war
+unwahr: es gab in der ganzen Oberfläche keinen einzigen Weg zurück.
+Wer auf dem Handy danebentippte — der Knopf stand randlos und grau
+direkt neben »Schluss für heute« —, verlor das Wort endgültig und
+erfuhr nie, warum es nicht mehr kommt.
+
+Jetzt steht über der nächsten Frage: *»der Tisch ist ausgesetzt und
+kommt nicht mehr dran.«* mit **Zurücknehmen** und **Passt so**. Und
+»Schluss für heute« ist von seinem gefährlichen Nachbarn abgerückt.
+
+### Der Fortschrittsbalken geht nicht mehr zurück
+
+Bei »Nochmal« wuchs der **Nenner**: aus »12 von 40« wurde »13 von
+42«. Wer etwas nicht wusste, sah einen Balken, der stehenbleibt oder
+zurückgeht — und zwar genau der, der die Ermutigung am nötigsten hat.
+
+Eine Aufgabe, die am selben Tag noch einmal kommt, ist dieselbe
+Aufgabe; sie gehört nicht ein zweites Mal ins Pensum. Die Marke steht
+jetzt fest, seit die Runde begann.
+
+### Die Wertung wird in den Blick geholt
+
+Auf dem Handy landete »Weiter« rechnerisch auf der Bildschirmkante, im
+Legastheniemodus sicher darunter — und in der ganzen Datei stand kein
+einziges `scrollIntoView`. Bei 40 bis 60 Aufgaben am Tag war das 40
+bis 60 Mal scrollen.
+
 ### Noch sechs Stellen weiß auf weiß
 
 Der weiße Tipp war nicht der einzige. Nachgemessen in allen fünf

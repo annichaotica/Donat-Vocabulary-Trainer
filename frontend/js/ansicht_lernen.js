@@ -31,6 +31,8 @@ export class Sitzung {
     this.ergebnis = null;
     this.phase = 'frage';
     this.zaehlerZuruecksetzen();
+    // Was zuletzt ausgesetzt wurde, damit es sich zurücknehmen lässt.
+    this.ausgesetzt = null;
     this.begonnen = 0;
     this.denkzeitStart = 0;     // wann die Frage stand
     this.denkzeit = null;       // bis zum ERSTEN Tastendruck
@@ -82,6 +84,7 @@ export class Sitzung {
       this.pensum = await api.stand(zustand.benutzerId,
                                     this.optionen.sammlungId || null);
     } catch { this.pensum = null; }
+    this.pensumMarke = this.pensum ? this.pensum.heute_gesamt : 0;
     // Der Punktestand ZU BEGINN. Am Ende wird verglichen — das ist
     // genauer als jede Nachrechnung in der Oberfläche und hält die
     // Regel an einem Ort: im Server.
@@ -159,6 +162,11 @@ export class Sitzung {
       try {
         this.pensum = await api.stand(zustand.benutzerId,
                                       this.optionen.sammlungId || null);
+        // Nur nach OBEN: ist zwischendurch wirklich mehr fällig
+        // geworden, soll die Marke das zeigen. Zurückgehen darf sie
+        // nicht.
+        this.pensumMarke = Math.max(this.pensumMarke || 0,
+                                    this.pensum.heute_gesamt);
       } catch { /* dann eben mit dem alten Stand */ }
       await this.zeichneFertig();
       return;
@@ -506,6 +514,7 @@ export class Sitzung {
     const el = leeren(this.behaelter);
     el.append(h('div', { class: 'abfrage' },
       this.teilFortschritt(),
+      this.teilAusgesetzt(),
       this.teilFrage(),
       this.teilEingabe(),
       // Gleich unter dem Feld, nicht am Fuß der Seite — und HIER und
@@ -524,17 +533,58 @@ export class Sitzung {
     this.vielleichtVorlesen();
   }
 
+  /** »Ausgesetzt — zurücknehmen?«
+   *
+   * Steht oben, über der nächsten Frage, und bleibt bis zur nächsten
+   * Antwort stehen. Ein Knopf, der etwas dauerhaft aus der Abfrage
+   * nimmt, braucht einen Rückweg in Reichweite — eine Meldung, die
+   * nach drei Sekunden verschwindet, ist keiner.
+   */
+  teilAusgesetzt() {
+    const a = this.ausgesetzt;
+    if (!a) return null;
+    return h('div', { class: 'karte hinweiskasten' },
+      h('p', { style: 'margin:0' },
+        h('b', { text: a.lemma || 'Die Aufgabe' }),
+        ` ist ausgesetzt und kommt nicht mehr dran${a.typ ? ` (${a.typ})` : ''}.`),
+      h('div', { class: 'frage-werkzeuge',
+                 style: 'justify-content:flex-start;margin-top:.5rem' },
+        h('button', {
+          class: 'wichtig',
+          onclick: () => tun(async () => {
+            await api.fortsetzen(a.kennung);
+            this.ausgesetzt = null;
+            meldung('Wieder dabei.');
+            this.zeichnen();
+          }),
+        }, 'Zurücknehmen'),
+        h('button', {
+          class: 'schlicht',
+          onclick: () => { this.ausgesetzt = null; this.zeichnen(); },
+        }, 'Passt so')));
+  }
+
   teilFortschritt() {
     const g = this.gezaehlt;
     // Am Tagespensum messen, nicht an einer erfundenen Marke. Vorher war
     // der Balken nach 25 Fragen voll, gleich ob noch dreißig oder
     // dreihundert kamen — und man wusste nie, ob eine Abfrage endet.
     const p = this.pensum;
-    const anteil = p && p.heute_gesamt
-      ? Math.round((p.heute_erledigt / p.heute_gesamt) * 100)
+    // Die Marke steht fest, seit die Sitzung begann.
+    //
+    // Vorher wuchs bei »Nochmal« der NENNER: aus »12 von 40« wurde
+    // »13 von 42«, der Balken stand oder ging zurück. Wer etwas nicht
+    // wusste, sah einen Fortschritt, der nicht vorangeht — und zwar
+    // genau der, der die Ermutigung am nötigsten hat.
+    //
+    // Eine Aufgabe, die am selben Tag noch einmal kommt, ist dieselbe
+    // Aufgabe. Sie gehört nicht ein zweites Mal in das Pensum.
+    const marke = p ? Math.max(this.pensumMarke || 0, p.heute_erledigt) : 0;
+    const anteil = marke
+      ? Math.round((p.heute_erledigt / marke) * 100)
       : Math.min(100, g.gesamt * 4);
-    const text = p && p.heute_gesamt
-      ? `${p.heute_erledigt} von ${p.heute_gesamt} heute`
+    const text = marke
+      ? `${p.heute_erledigt} von ${marke} heute`
         + (g.gesamt ? ` · ${g.richtig} richtig` : '')
       : (g.gesamt ? `${g.gesamt} bearbeitet · ${g.richtig} richtig` : 'Los geht’s');
     return h('div', {},
@@ -967,13 +1017,43 @@ export class Sitzung {
    * Terminplan. Und zugeklappt, denn in der Abfrage will man zuerst
    * antworten — wer nachsehen will, klappt auf.
    */
+  /** Ein Blick auf die Lösung deckelt die Bewertung — wie ein Tipp.
+   *
+   * Der Tipp wurde mitgezählt und deckelte auf »Schwer«; die Regel
+   * und »Wort ansehen« zeigten dasselbe Wissen umsonst. Damit war das
+   * Tippsystem freiwillig: wer nachsah, bekam »Gut«, und der
+   * Terminplan rechnete mit einem Wissen, das es nicht gibt.
+   *
+   * NICHT gesperrt, sondern gezählt. Die Regel beim Antworten
+   * nachzulesen ist beim Mittelhochdeutschen durchaus erwünscht — nur
+   * umsonst darf es nicht sein.
+   */
+  nachgesehen() {
+    if (this.phase === 'rueckmeldung') return;
+    if (this.tipps < 3) this.tipps = 3;
+  }
+
   teilRegeln() {
     const regeln = this.aufgabe.regeln || [];
     if (!regeln.length) return null;
+    const offen = this.phase !== 'rueckmeldung';
     const kasten = h('details', { class: 'warum regel' },
-      h('summary', { text: regeln.length === 1
+      h('summary', {
+        // Beim Aufklappen VOR der Antwort gilt dasselbe wie beim
+        // Tipp: die Regel zeigt bei einer Formaufgabe die Bildung,
+        // und das ist die halbe Lösung.
+        onclick: () => { if (offen) this.nachgesehen(); },
+        title: offen
+          ? 'Zählt wie ein Tipp — die Bewertung bleibt dann bei »Schwer«.'
+          : null,
+      }, regeln.length === 1
         ? 'Warum ist das so?'
-        : `Warum ist das so? (${regeln.length})` }));
+        : `Warum ist das so? (${regeln.length})`));
+    if (offen) {
+      kasten.append(h('p', { class: 'leise', style: 'margin:.2rem 0 .6rem',
+        text: 'Nachsehen ist in Ordnung — es zählt wie ein Tipp, die '
+            + 'Bewertung bleibt dann bei »Schwer«.' }));
+    }
     for (const r of regeln) {
       kasten.append(h('h3', { class: 'regel-titel', text: r.titel }));
       // Absätze getrennt: eine Regel in einem Block ist unlesbar.
@@ -1028,13 +1108,22 @@ export class Sitzung {
     // »Tipp« und »Weiß ich nicht« stehen NICHT mehr hier, sondern
     // gleich unter dem Antwortfeld (teilHilfen). Sie gehören zum
     // Antworten; hier stehen die Dinge, die man mit der AUFGABE macht.
-    const reihe = h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' });
+    const reihe = h('div', { class: 'frage-werkzeuge',
+                             style: 'justify-content:flex-start;width:100%' });
     reihe.append(
       h('button', {
         class: 'schlicht', title: 'Diese Aufgabe nicht mehr abfragen',
         onclick: () => tun(async () => {
+            // Was ausgesetzt wurde, MERKEN — und zwar mitsamt dem
+            // Wort. Die Meldung sagte früher »in den Einstellungen
+            // wieder einschaltbar«; das war unwahr, es gab im ganzen
+            // Frontend keinen einzigen Aufrufer für `fortsetzen`. Wer
+            // auf dem Handy danebentippte, verlor das Wort endgültig
+            // und erfuhr nie, warum es nicht mehr kommt.
+            this.ausgesetzt = { kennung, lemma: this.aufgabe.frage_text,
+                                typ: this.aufgabe.typ_name };
             await api.aussetzen(kennung);
-            meldung('Ausgesetzt. In den Einstellungen wieder einschaltbar.');
+            meldung('Ausgesetzt — oben steht, wie du es zurücknimmst.');
             this.naechste();
         }),
       }, 'Aussetzen'),
@@ -1042,8 +1131,10 @@ export class Sitzung {
       // kam man nicht. Das Wort wird eingeblendet, danach geht es weiter.
       h('button', {
         class: 'schlicht',
-        title: 'Dieses Wort ansehen, ohne die Abfrage zu verlassen',
-        onclick: () => this.wortZeigen(),
+        title: this.phase === 'rueckmeldung'
+          ? 'Dieses Wort ansehen, ohne die Abfrage zu verlassen'
+          : 'Zählt wie ein Tipp — die Bewertung bleibt dann bei »Schwer«.',
+        onclick: () => { this.nachgesehen(); this.wortZeigen(); },
       }, 'Wort ansehen'),
       // »Ebenfalls ein Knopf, wenn man eine Abfragerunde beenden
       // möchte, dass man zur Hauptseite gehen kann, damit man nicht im
@@ -1057,11 +1148,33 @@ export class Sitzung {
         class: 'schlicht',
         title: 'Abfrage beenden und zurück zur Übersicht',
         onclick: () => { location.hash = '#/uebersicht'; },
+        // Nach rechts abgesetzt: »Aussetzen« nimmt ein Wort dauerhaft
+        // aus der Abfrage, »Schluss für heute« beendet nur die Runde.
+        // Beide sahen gleich aus und standen zwei Finger nebeneinander
+        // — auf dem Handy ist das eine Falle.
+        style: 'margin-left:auto',
       }, 'Schluss für heute'));
     return reihe;
   }
 
   /* ------------------------------------------------------------- Ablauf */
+
+  /** Die Wertung in den Blick holen.
+   *
+   * »Jede Aufgabe kostet auf dem Touchgerät einen zweiten Tipp.« Auf
+   * einem 390er Gerät landet »Weiter« rechnerisch bei etwa 600 px in
+   * einem nutzbaren Bereich von 636 — also auf der Kante. Im
+   * Legastheniemodus wachsen Frage, Feld und Rückmeldung gleichzeitig,
+   * und der Knopf liegt sicher darunter. In der ganzen Datei stand
+   * kein einziges scrollIntoView.
+   *
+   * `block: 'nearest'` scrollt nur, wenn es nötig ist — wer die
+   * Wertung ohnehin schon sieht, dem springt nichts weg.
+   */
+  wertungZeigen() {
+    this.behaelter.querySelector('.wertung, .rueckmeldung')
+      ?.scrollIntoView({ block: 'nearest' });
+  }
 
   async fokussieren() {
     if (this.feld && this.phase === 'frage') {
@@ -1128,6 +1241,12 @@ export class Sitzung {
         antwort,
         denkzeit_ms: this.warVersteckt ? null : this.denkzeit,
         versuche: this.versuche,
+        // MITSCHICKEN. Der Server kennt das Feld seit jeher und
+        // deckelt damit auf »Schwer« — nur schickte die Oberfläche es
+        // nie. Der Satz im Kommentar bei `tippHolen` (»Ein genommener
+        // Tipp deckelt die Bewertung«) stimmte deshalb nicht: das
+        // ganze Tippsystem war umsonst zu haben.
+        tipps: this.tipps,
       });
     } catch (fehler) {
       meldung(fehler.message);
@@ -1153,6 +1272,7 @@ export class Sitzung {
     if (u === 'richtig') this.gezaehlt.richtig += 1;
     else if (u === 'falsch') this.gezaehlt.falsch += 1;
     this.zeichnen();
+    this.wertungZeigen();
   }
 
   async weissNicht() {
@@ -1179,6 +1299,7 @@ export class Sitzung {
       this.phase = 'rueckmeldung';
       this.gezaehlt.falsch += 1;
       this.zeichnen();
+      this.wertungZeigen();
     } catch (fehler) {
       meldung(fehler.message);
     } finally {
@@ -1207,8 +1328,12 @@ export class Sitzung {
         denkzeit_ms: this.warVersteckt ? null : this.denkzeit,
         versuche: this.versuche,
         aufgedeckt: Boolean(this.aufgedeckt),
+        tipps: this.tipps,
       });
       this.gezaehlt.gesamt += 1;
+      // Die Rücknahmezeile gilt für die EINE Aufgabe danach. Wer
+      // weiterlernt, hat sich entschieden.
+      this.ausgesetzt = null;
       // Was sich am Lernstand geändert hat. Der Zustand VOR der Antwort
       // steht in der Aufgabe, der danach in der Antwort — beide liegen
       // hier vor, und keiner davon kostet eine weitere Anfrage.

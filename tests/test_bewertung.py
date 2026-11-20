@@ -93,3 +93,42 @@ def test_signale_werden_mitgeliefert():
     s = e(denkzeit_ms=800, bezug_ms=2500)["signale"]
     assert s["zeitwert"] == 0.32 and s["zeit_gewertet"] is True
     assert s["bezugszeit_ms"] == 2500
+
+
+def test_ein_genommener_tipp_deckelt_die_bewertung(klient):
+    """Der Satz stand seit jeher im Kommentar — die Oberfläche hat die
+    Zahl nur nie mitgeschickt.
+
+    `tipps` ist Feld von PruefenEingabe und BewertenEingabe, der
+    Server reicht es an die Einschätzung weiter, und dort deckelt es
+    auf »Schwer«. In ansicht_lernen.js stand es in keinem der beiden
+    Aufrufe. Das ganze Tippsystem war damit umsonst zu haben: wer
+    dreimal nachsah und dann richtig antwortete, bekam »Gut« und der
+    Terminplan legte das Wort weit weg.
+
+    Hier der Beleg, dass der Server es kann — die Oberfläche schickt
+    es jetzt mit.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lernende 1"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={
+        "eintraege": [{"lemma": "σπίτι", "wortart": "substantiv",
+                       "bedeutungen": [{"uebersetzungen": ["das Haus"]}]}]})
+    a = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "sammlung_id": s["id"], "anzahl": 1}).json()[0]
+
+    ohne = klient.post("/api/lernen/pruefen", json={
+        "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+        "antwort": "σπίτι", "denkzeit_ms": 900, "versuche": 1}).json()
+    mit = klient.post("/api/lernen/pruefen", json={
+        "benutzer_id": b["id"], "aufgabe_id": a["aufgabe_id"],
+        "antwort": "σπίτι", "denkzeit_ms": 900, "versuche": 1,
+        "tipps": 1}).json()
+
+    assert ohne["urteil"]["urteil"] == "richtig"
+    assert mit["urteil"]["urteil"] == "richtig"
+    assert ohne["bewertung"]["bewertung"] > mit["bewertung"]["bewertung"], \
+        (ohne["bewertung"], mit["bewertung"])
+    assert mit["bewertung"]["name"] == "Schwer", mit["bewertung"]
+    assert "Tipp" in mit["bewertung"]["begruendung"], mit["bewertung"]

@@ -569,3 +569,28 @@ def test_keine_festen_farben_im_stil():
                     continue
                 funde.append(f"{datei.name}: {zeile.strip()[:72]}")
     assert not funde, "Feste Farben außerhalb der Palette:\n" + "\n".join(funde)
+
+
+def test_die_abfrage_schickt_die_genommenen_tipps_mit():
+    """Der Server kann es, die Oberfläche hat es nie getan.
+
+    `tipps` ist Feld von PruefenEingabe und BewertenEingabe und
+    deckelt die Bewertung auf »Schwer«. In ansicht_lernen.js stand es
+    in keinem der beiden Aufrufe — das Tippsystem war damit umsonst zu
+    haben, und der Kommentar bei `tippHolen` behauptete das Gegenteil.
+
+    Ein Feld, das der Server auswertet und der Aufrufer vergisst,
+    fällt niemandem auf: es gibt keine Fehlermeldung, nur eine
+    Bewertung, die zu gut ist.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_lernen.js").read_text()
+    for name in ("api.pruefen({", "api.bewerten({"):
+        anfang = quelle.index(name)
+        # Bis zur schließenden Klammer des Aufrufs.
+        ende = quelle.index("});", anfang)
+        aufruf = quelle[anfang:ende]
+        assert re.search(r"\btipps\s*:", aufruf), \
+            f"{name} schickt die genommenen Tipps nicht mit"

@@ -208,9 +208,9 @@ def test_lernziel_nicht_ueber_fremden_bestand(klient):
     import zugang
 
     a, _ = _aufbau(klient)
-    fremd_b = klient.post("/api/benutzer", json={"name": "Max"}).json()
+    fremd_b = klient.post("/api/benutzer", json={"name": "Lernender 3"}).json()
     fremd_s = klient.post("/api/sammlungen", json={
-        "besitzer_id": fremd_b["id"], "name": "Max", "sprache": "gmh"}).json()
+        "besitzer_id": fremd_b["id"], "name": "Lernender 3", "sprache": "gmh"}).json()
     fremdes_wort = _wort(klient, fremd_s["id"], "ouwê")
 
     db = dbm.verbindung()
@@ -226,7 +226,7 @@ def test_lernziel_nicht_ueber_fremden_bestand(klient):
 
 
 def test_lernziel_fuer_jemand_anderen(klient):
-    """»Kannst du es bitte zu Lernende 2 umhängen.«
+    """»Kannst du es bitte zu ihr umhängen.«
 
     Der KI-Konnektor hängt an EINEM Profil, die Ziele sind aber meist
     für die Kinder. Deshalb darf ein Ziel gleich für jemand anderen
@@ -255,14 +255,16 @@ def test_lernziel_fuer_jemand_anderen(klient):
             db, person, name="Meins", umfang={"lexeme": [w["id"]]})
         assert meins["benutzer_id"] == anni["id"]
         db.commit()
+        # Kleingeschrieben: die Suche nach dem Profilnamen soll die
+        # Schreibung nicht verlangen.
         umgehaengt = mcp_dienst.lernziel_umhaengen(db, person, meins["id"],
-                                                   "kathi")
+                                                   "lernende 2")
         db.commit()
         assert umgehaengt["benutzer_id"] == kathi["id"]
     finally:
         db.close()
 
-    # Bei Lernende 2 stehen jetzt beide, bei Annuschka keines.
+    # Beim einen Profil stehen jetzt beide, beim anderen keines.
     assert len(klient.get("/api/lernziele",
                           params={"benutzer_id": kathi["id"]}).json()) == 2
     assert klient.get("/api/lernziele",
@@ -286,10 +288,10 @@ def test_nur_der_verwalter_darf_fremde_ziele_setzen(klient):
 
     _erste, _s = _aufbau(klient, sprache="fr")        # wird Verwalterin
     annuschka = klient.post("/api/benutzer",
-                            json={"name": "Annuschka"}).json()
+                            json={"name": "Lernende 1"}).json()
     kathi = klient.post("/api/benutzer", json={"name": "Lernende 2"}).json()
     ihre = klient.post("/api/sammlungen", json={
-        "besitzer_id": kathi["id"], "name": "Lernende 2s Französisch",
+        "besitzer_id": kathi["id"], "name": "Französisch der anderen",
         "sprache": "fr"}).json()
     ihr_wort = _wort(klient, ihre["id"], "le hasard")
 
@@ -310,7 +312,7 @@ def test_nur_der_verwalter_darf_fremde_ziele_setzen(klient):
         with pytest.raises(zugang.NichtErlaubt):
             mcp_dienst.lernziel_anlegen(
                 db, kathi_person, name="für Mama",
-                umfang={"lexeme": [ihr_wort["id"]]}, fuer="Annuschka")
+                umfang={"lexeme": [ihr_wort["id"]]}, fuer="Lernende 1")
         assert annuschka["id"] != kathi["id"]
     finally:
         db.close()

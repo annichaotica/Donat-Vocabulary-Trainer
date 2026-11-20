@@ -867,8 +867,8 @@ def test_ziele_mit_termin_stehen_vor_dem_allgemeinen():
     """»Die sind ja das, worauf der Fokus liegen sollte.«
 
     Die Lernziele standen nicht nur unter der Heute-Karte, sondern
-    auch noch unter dem Bücherregal — fünfter Block. Bei Lernende 2 stand
-    dort »heute fällig, 60 offen«.
+    auch noch unter dem Bücherregal — fünfter Block. In einem Profil
+    stand dort »heute fällig, 60 offen«.
 
     Entscheidender als die Reihenfolge ist aber der Knopf: der große
     »Lernen« auf der Heute-Karte kennt die Lernziele NICHT (er schickt

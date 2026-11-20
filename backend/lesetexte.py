@@ -469,10 +469,10 @@ def wortwuensche(db: sqlite3.Connection, benutzer_id: int,
     `auch_aus_sammlungen` nimmt die Wünsche ANDERER Leute aus diesen
     Sammlungen mit. Das ist kein Zusatz, sondern der Normalfall in
     einer Familie: der Konnektor hängt an einem Profil, die Wünsche
-    entstehen aber an allen. Max markiert Wörter in seinem
-    mittelhochdeutschen Text, und die KI, die über ihr Zugang
-    spricht, sah sie nicht — obwohl Annuschka in Max' Sammlung
-    schreiben darf und die Wünsche also erfüllen KANN.
+    entstehen aber an allen. Das eine Profil markiert Wörter in seinem
+    mittelhochdeutschen Text, und die KI, die über den Zugang eines
+    anderen spricht, sah sie nicht — obwohl dieses andere in der
+    fremden Sammlung schreiben darf und die Wünsche also erfüllen KANN.
 
     Die Regel ist genau diese: was ich erfüllen darf, soll ich auch
     sehen. Dafür steht `zugang.beschreibbare_sammlungen`.

@@ -127,7 +127,7 @@ def test_die_obergrenze_ist_nicht_die_latte(klient, db_des_klienten):
 
     Die Dosis ist eine OBERGRENZE und wird absichtlich hoch gesetzt;
     der Lernzielhelfer setzt sie noch höher, damit genug Neues
-    durchkommt (bei Lernende 2 auf 224). Als Latte ist sie unerreichbar,
+    durchkommt (in einem Fall auf 224). Als Latte ist sie unerreichbar,
     und eine Latte, die niemand erreicht, ist keine.
 
     Hier also beides zugleich: eine hohe Grenze und ein erreichbares

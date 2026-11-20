@@ -532,22 +532,23 @@ def test_eine_grosse_liste_verdeckt_keine_kleine(klient):
 
 
 def test_wuensche_anderer_aus_eigener_schreibsammlung(klient):
-    """»Der Konnektor im ChatGPT war für Max gedacht, der nutzt den
-    gleichen Zugang. Das heißt, der müsste dann auch Anforderungen von
-    Max abholen.«
+    """»Der Konnektor war für ein anderes Profil gedacht, das denselben
+    Zugang nutzt. Das heißt, er müsste dann auch dessen Anforderungen
+    abholen.«
 
     In einer Familie hängt der Zugang an EINEM Profil, die Wünsche
     entstehen aber an allen. Die Regel ist deshalb nicht »meine
     Wünsche«, sondern: **was ich erfüllen darf, soll ich auch sehen.**
-    Wer in Max' Sammlung schreiben darf, kann Max' Wünsche erfüllen.
+    Wer in einer fremden Sammlung schreiben darf, kann deren Wünsche
+    erfüllen.
     """
     import sys
     sys.path.insert(0, "backend")
     import datenbank as dbm
     import mcp_dienst
 
-    anni = klient.post("/api/benutzer", json={"name": "Annuschka"}).json()
-    max_ = klient.post("/api/benutzer", json={"name": "Max"}).json()
+    anni = klient.post("/api/benutzer", json={"name": "Lernende 1"}).json()
+    max_ = klient.post("/api/benutzer", json={"name": "Lernender 3"}).json()
     seine = klient.post("/api/sammlungen", json={
         "besitzer_id": max_["id"], "name": "Mittelhochdeutsch",
         "sprache": "gmh"}).json()
@@ -578,7 +579,7 @@ def test_wuensche_anderer_aus_eigener_schreibsammlung(klient):
     # Aus der Schreibsammlung: ja — und mit dem Namen dessen, der ihn
     # gestellt hat, denn das ist nicht die Person am Zugang.
     assert "ouwê" in woerter
-    assert woerter["ouwê"]["angefordert_von"] == "Max"
+    assert woerter["ouwê"]["angefordert_von"] == "Lernender 3"
     assert woerter["ouwê"]["von_mir"] is False
     # Aus der Nur-Lese-Sammlung: nein. Sehen, was man nicht erfüllen
     # kann, wäre eine Liste, die nie kürzer wird.
@@ -593,8 +594,8 @@ def test_fremden_wunsch_darf_man_auch_abhaken(klient):
     import datenbank as dbm
     import mcp_dienst
 
-    anni = klient.post("/api/benutzer", json={"name": "Annuschka"}).json()
-    max_ = klient.post("/api/benutzer", json={"name": "Max"}).json()
+    anni = klient.post("/api/benutzer", json={"name": "Lernende 1"}).json()
+    max_ = klient.post("/api/benutzer", json={"name": "Lernender 3"}).json()
     s = klient.post("/api/sammlungen", json={
         "besitzer_id": max_["id"], "name": "Mhd", "sprache": "gmh"}).json()
     klient.put(f"/api/sammlungen/{s['id']}/zugriff", json={
@@ -680,8 +681,8 @@ def test_fremde_wuensche_nur_mit_schreibrecht_abhaken(klient):
     sys.path.insert(0, "backend")
     import datenbank as dbm
 
-    anni = klient.post("/api/benutzer", json={"name": "Annuschka"}).json()
-    max_ = klient.post("/api/benutzer", json={"name": "Max"}).json()
+    anni = klient.post("/api/benutzer", json={"name": "Lernende 1"}).json()
+    max_ = klient.post("/api/benutzer", json={"name": "Lernender 3"}).json()
     seine = klient.post("/api/sammlungen", json={
         "besitzer_id": max_["id"], "name": "Mhd", "sprache": "gmh"}).json()
     db = dbm.verbindung()

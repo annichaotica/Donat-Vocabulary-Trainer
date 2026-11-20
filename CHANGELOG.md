@@ -105,7 +105,7 @@ Dort ist die Zurückhaltung richtig.
 
 Die Lernziele standen auf der Übersicht nicht nur unter der
 Heute-Karte, sondern auch noch unter dem Bücherregal: fünfter Block.
-Bei Lernende 2 stand dort »heute fällig, 60 offen«.
+In einem Profil stand dort »heute fällig, 60 offen«.
 
 Wichtiger als die Reihenfolge war aber etwas anderes, das beim
 Nachsehen herauskam: **der große »Lernen« auf der Heute-Karte kennt
@@ -814,7 +814,7 @@ niemand bei null an.
 
 ### Zuspruch — jemandem etwas schicken
 
-»Auch möchte ich meiner Tochter Boosts schicken können.«
+»Auch möchte ich einem anderen Profil Boosts schicken können.«
 
 Unter **Zuspruch schicken** auf der Übersicht. Vier Arten:
 
@@ -838,9 +838,9 @@ fünfmal am Tag an dieselbe — aus Zuspruch im Dutzend wird
 Hintergrundrauschen. Zurückziehen geht, solange es niemand gelesen hat;
 danach nicht mehr.
 
-Auch **über den MCP**: »Schick Lernende 2 einen Boost für morgen« genügt.
-In fremde Postfächer sehen darf dabei nur, wer verwalten darf — »schick
-Lernende 2 etwas« soll nicht heißen »lies, was Lernende 2 bekommen hat«.
+Auch **über den MCP**: »Schick ihr einen Boost für morgen« genügt. In
+fremde Postfächer sehen darf dabei nur, wer verwalten darf — »schick
+jemandem etwas« soll nicht heißen »lies, was dort angekommen ist«.
 
 Weder Verdoppler noch Joker schreiben etwas ins Protokoll. Sie ändern
 nur, wie es ausgewertet wird. Es darf nie zwei Wahrheiten über
@@ -879,7 +879,7 @@ Jetzt zählt ein Tag, wenn das **Tagesziel aufgeht** — eine neue
 Einstellung, vorbelegt mit 20 Antworten. Das ist ausdrücklich **nicht**
 die »Fragen je Tag höchstens«, die es schon gab: die ist eine
 Obergrenze und steht absichtlich hoch (bei einem Lernziel mit nahem
-Termin setzt der Helfer sie noch höher, bei Lernende 2 auf 224). Der erste
+Termin setzt der Helfer sie noch höher, in einem Fall auf 224). Der erste
 Entwurf hat die Strähne daran gemessen und fiel an den echten Daten
 sofort durch: Strähne 0, obwohl an vier Tagen hintereinander 29 bis 123
 Fragen beantwortet worden waren. Eine Latte, die niemand erreicht, ist
@@ -960,8 +960,8 @@ wird und wie schnell man antwortet.
 ### Die KI kann jetzt Lernziele anlegen
 
 »Könnte ich das dem angeschlossenen Claude geben, um eine Sammlung
-aus genau den Wörtern zu erstellen, die in den zwei Fotos meiner
-Tochter enthalten sind, aus denen sie dann ein Lernziel machen kann?«
+aus genau den Wörtern zu erstellen, die auf zwei abfotografierten
+Listen stehen, aus denen sich dann ein Lernziel machen lässt?«
 
 Die Antwort ist: ja — aber **ohne neue Sammlung**. Ein Lernziel nimmt
 im `umfang` das Feld `lexeme`, also genau diese Wörter. Eine eigene
@@ -980,8 +980,8 @@ Abfrage zeigte sie dann.
 
 ### Gezielt lernen: Wort für Wort an und aus
 
-»Meine Tochter muss genau die Vokabeln lernen, die sie mir als Liste
-gegeben hat.«
+»Jemand muss genau die Vokabeln lernen, die auf einer vorgegebenen
+Liste stehen.«
 
 Eine Sammlung wächst mit der Zeit; die Liste für die nächste Arbeit
 ist ein Ausschnitt daraus. Bisher blieb nur, den Rest zu löschen oder
@@ -1059,7 +1059,8 @@ Aufrufe gewesen — länger als das Eintragen selbst. `POST
 **Beim ersten Lauf an echten Daten ging es schief**, und der Grund ist
 lehrreich: im griechischen Artikel stehen deutsche Zitate, also stand
 »ich« auf der griechischen Wunschliste — und hakte das gleichlautende
-»ich« in Max' mittelhochdeutscher Liste gleich mit ab. 89 fremde
+»ich« in der mittelhochdeutschen Liste eines anderen Profils gleich
+mit ab. 89 fremde
 Wünsche auf einen Schlag. Aus dem Abzug wiederhergestellt und gegen
 ihn geprüft; der Abgleich bleibt jetzt in einer Sammlung, und wo das
 Wort in mehreren offen steht, wird nichts geraten, sondern gemeldet.
@@ -1084,16 +1085,16 @@ ein als unbekannt gemeldetes — das eine merkt man, das andere nicht.
 
 ### Die KI sieht jetzt auch die Wünsche der anderen
 
-»Der Konnektor im ChatGPT war für Max gedacht, der nutzt den gleichen
-Zugang. Das heißt, der müsste dann auch Anforderungen von Max
+»Der Konnektor war für ein anderes Profil gedacht, das denselben
+Zugang nutzt. Das heißt, er müsste dann auch dessen Anforderungen
 abholen.«
 
 Bisher zeigte die Wunschliste nur die eigenen. In einer Familie hängt
 der Zugang aber an **einem** Profil, während die Wünsche an **allen**
-entstehen: Max markiert Wörter in seinem mittelhochdeutschen Text,
-und die KI, die über ihr Zugang spricht, sah davon nichts —
-obwohl Annuschka in Max' Sammlung schreiben darf und die Wünsche also
-erfüllen *kann*.
+entstehen: das eine Profil markiert Wörter in seinem
+mittelhochdeutschen Text, und die KI, die über den Zugang eines
+anderen spricht, sah davon nichts — obwohl dieses andere in der
+fremden Sammlung schreiben darf und die Wünsche also erfüllen *kann*.
 
 Die Regel heißt deshalb jetzt nicht mehr »meine Wünsche«, sondern:
 **was ich erfüllen darf, soll ich auch sehen.** Mitgenommen werden
@@ -1133,8 +1134,8 @@ für eine bestimmte die `sammlung_id` mitgeben soll.
 
 ### Abtippen: kein Überspringen mehr, außer man hat es versucht
 
-»Lernende 2 möchte für den Abtippen-Modus, dass sie gezwungen wird, die
-Wörter zu tippen, auch wenn sie diese schon kennt.«
+»Für den Abtippen-Modus soll man gezwungen sein, die Wörter zu
+tippen, auch wenn man sie schon kennt.«
 
 Der Knopf **Überspringen** ist weg — und erscheint erst, wenn bei
 dieser Karte einmal getippt wurde und es nicht gestimmt hat. Wer die
@@ -1236,7 +1237,7 @@ Vor dem ersten echten Durchlauf habe ich die Seite probeweise geladen.
 Dort stand:
 
 ```
-Dein Profil        ChatGPT Max      ← das ist der Konnektor, nicht sie
+Dein Profil        ChatGPT          ← das ist der Konnektor, nicht sie
 ```
 
 An der Aufrufstelle standen zwei Wörterbücher mit je einem Feld

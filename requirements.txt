@@ -1,6 +1,6 @@
 # Festgenagelt auf die Fassungen, die hier erprobt sind. Ein Vokabeltrainer
 # soll in fünf Jahren noch starten — ungenagelte Abhängigkeiten tun das nicht.
-fastapi==0.162.7
+fastapi==0.163.1
 uvicorn[standard]==0.54.0
 pydantic==2.14.3
 

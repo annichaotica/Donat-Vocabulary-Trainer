@@ -277,8 +277,8 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
                 "abgelehnt": 0, "formen_neu": 0, "formen_geaendert": 0,
                 "lektionen_neu": [], "eintraege": []}
 
-    db.execute("BEGIN")
-    try:
+    # Schachtelbar: beim Paketimport läuft schon eine Klammer darum.
+    with dbm.Klammer(db) as klammer:
         lektionen_vorher = {z["nr"] for z in lektionen(db, sammlung_id)
                             if z["nr"] is not None}
         for nr, eintrag in enumerate(eintraege, 1):
@@ -388,12 +388,7 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
             - lektionen_vorher)
 
         if nur_pruefen:
-            db.execute("ROLLBACK")
-        else:
-            db.execute("COMMIT")
-    except Exception:
-        db.execute("ROLLBACK")
-        raise
+            klammer.zuruecknehmen()
 
     # Nur die Einträge zurückgeben, zu denen es etwas zu sagen gibt —
     # bei sechzehnhundert Wörtern will niemand sechzehnhundert Zeilen lesen.

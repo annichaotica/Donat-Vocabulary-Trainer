@@ -1,8 +1,16 @@
 # Bildschirmfotos für die README
 
-Fünf Bilder, je eines für eine Stärke. Sie fehlen noch; solange sie
-fehlen, zeigt die englische README gebrochene Bilder — das ist
-beabsichtigt und sichtbarer als eine Zeile in einer Aufgabenliste.
+Fünf Bilder, je eines für eine Stärke. Sie entstehen mit einem
+Aufruf:
+
+    .venv/bin/python werkzeuge/bilder-readme.py
+
+Nicht von Hand aufnehmen. Bildschirmfotos veralten, und ein Bild, das
+etwas anderes zeigt als das Werkzeug, ist schlimmer als keines — mit
+dem Skript kostet das Erneuern einen Aufruf. Es baut dafür eine eigene
+Datenbank mit dem englischen Übungskurs auf und wirft sie hinterher
+weg; aus dem Familienbestand darf auf diesen Bildern nichts zu sehen
+sein.
 
 | Datei | Was darauf zu sehen sein soll | Wo in der Oberfläche |
 |---|---|---|
@@ -12,18 +20,22 @@ beabsichtigt und sichtbarer als eine Zeile in einer Aufgabenliste.
 | `legasthenie.png` | Die Abfrage im Legastheniemodus: größere Schrift, Zeichenabstand, gefärbte Silben, Schreibgerüst. | Einstellungen → Legastheniemodus → *aktiv* → Abfrage |
 | `freigabe.png` | Die Freigabe mit wartenden KI-Einträgen, darunter ein erkennbar falscher. | Freigabe (im Beispielbestand warten drei Wörter, eines davon mit der erfundenen Form *goed*) |
 
-## Aufnehmen
+## Zwei Dinge, die beim Bauen des Skripts herauskamen
 
-Der Beispielbestand reicht für alle fünf:
+**Englisch kann keine »Ganze Reihe« zeigen.** Jede englische
+Formgruppe hat genau eine Zelle — Infinitiv, 3. Person Singular,
+Simple past —, und eine Zelle ist keine Reihe. Das ist sprachlich
+richtig und heißt: aus dem englischen Übungskurs entsteht gar keine
+`formenreihe`-Aufgabe. `paradigma.png` kommt deshalb aus einer
+französischen Sammlung, die das Skript für sich selbst anlegt
+(`aller`, sechs Personen im Présent, aus
+`werkzeuge/beispieldaten.py`).
 
-```sh
-BEISPIELDATEN=1 .venv/bin/uvicorn app:app --app-dir backend --port 8030
-```
+**Die Aufnahmen teilen eine Datenbank.** Wer in einem Bild eine
+Aufgabe beantwortet, nimmt sie dem nächsten weg — sie ist dann nicht
+mehr fällig. Die späteren Aufnahmen gehen darum über »frei üben«, das
+den Terminplan nicht fragt.
 
-Es gibt ein Werkzeug, das die Bilder des eingebauten Lehrgangs aufnimmt
-— `werkzeuge/bilder-aufnehmen.py`. Für diese fünf ist es nicht
-eingerichtet; von Hand aufnehmen ist schneller als es zu erweitern.
-
-**Breite 1100 px**, heller Grund, und vorher nachsehen, dass kein
-echter Name und keine echte Sammlung im Bild steht. Im Beispielbestand
-heißt das Profil »Zum Ausprobieren«.
+Scheitert ein Schritt, wird das Bild **knallrot** mit der Ursache
+darauf. Ein Bild, das stillschweigend die falsche Seite zeigt, wäre
+schlimmer als keines.

@@ -56,6 +56,19 @@ class BenutzerAendern(BaseModel):
     weiterspringen: bool | None = None
 
 
+class PaketEinspielen(BaseModel):
+    """Ein Kurspaket als ZIP, base64-kodiert im Leib.
+
+    Warum nicht als Dateiupload: `UploadFile` verlangt
+    `python-multipart`, und das wäre eine neue Abhängigkeit. Das
+    Verzeichnis hat drei, auf Fassungen festgenagelt, und so soll es
+    bleiben — alle anderen Importe gehen ohnehin als JSON hinein.
+    """
+    zip_base64: str = Field(min_length=1)
+    # Schreibt nichts und meldet trotzdem alles. Zuerst immer so.
+    nur_pruefen: bool = False
+
+
 class LegasthenieEinstellungen(BaseModel):
     """Legastheniemodus. Jeder Posten einzeln schaltbar — Legasthenie sieht
     bei jedem anders aus, und eine Voreinstellung, die man nicht ändern kann,

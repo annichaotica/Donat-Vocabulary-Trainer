@@ -14,6 +14,49 @@ Eintrag wiederfindet.
 
 ---
 
+## Unveröffentlicht
+
+### Kurspakete: eine Handlung statt fünf
+
+`POST /api/sammlungen/{id}/paket` nimmt ein ZIP mit Vokabeln,
+Übungen, Texten, Regeln und Lehrgangszuordnung — **ganz oder gar
+nicht**. Schlägt ein Teil fehl, war nichts: es liegt eine
+Transaktionsklammer um alles. Vorher hätte man fünf Aufrufe
+nacheinander gebraucht, und nach dem dritten steht im Bestand ein
+halbes Paket: Vokabeln ohne die Regeln, die sie erklären, Texte ohne
+die Wörter, die sie decken.
+
+Nichts daran ist ein neues Format. Es sind genau die Gestalten, die
+die vorhandenen Einlese-Wege schon annehmen, nur zusammengepackt.
+
+**Der Prüfvermerk entscheidet über die Freigabe.** Der Trainer fragt
+nichts ab, was kein Mensch bestätigt hat — dieselbe Regel wie bei
+Einträgen über die KI-Schnittstelle. Ein Paket darf diese Zusage
+mitbringen, aber nur ausdrücklich: in `geprueft` muss stehen, **wer
+wann was** geprüft hat und dass es in Ordnung war. Ein Vermerk ohne
+Namen sagt nicht, wen man fragen kann, wenn sich später etwas als
+falsch herausstellt; ohne Datum nicht, auf welchen Stand er sich
+bezieht. Beides gilt deshalb als kein Vermerk, und die Formen warten
+in der Freigabe.
+
+Freigegeben werden dabei **nur die Formen dieses Pakets**. Nicht über
+die Spalte `quelle` — die träfe auch Formen aus einer früher
+eingelesenen Datei, und eine Zusage über fremde Arbeit ist genau das,
+was die Freigabe verhindern soll.
+
+Dazu zwei stumpfe Grenzen gegen Packbomben (200 Einträge, 20 MB
+ausgepackt) und die Regel, dass **nichts ausgepackt wird**: gelesen
+werden sechs Dateien namentlich, nichts landet auf der Platte.
+
+### Transaktionen lassen sich jetzt schachteln
+
+`dbm.Klammer` — BEGIN, oder SAVEPOINT, wenn schon eine Transaktion
+läuft. SQLite kennt kein BEGIN im BEGIN; das fiel nicht auf, solange
+jeder Import für sich lief, und stand dem Paketimport sofort im Weg.
+Sammelimport und Übungsimport benutzen sie jetzt.
+
+---
+
 ## 0.1.0 — vorbereitet, noch nicht veröffentlicht
 
 Die erste benannte Fassung. Der Tag wird **nicht** gesetzt, bevor er

@@ -448,8 +448,8 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
                 "eingereicht": len(eintraege), "angelegt": 0,
                 "aktualisiert": 0, "abgelehnt": 0, "aufgaben": 0,
                 "lektionen_neu": [], "eintraege": []}
-    db.execute("BEGIN")
-    try:
+    # Schachtelbar: beim Paketimport läuft schon eine Klammer darum.
+    with dbm.Klammer(db) as klammer:
         vorher = {z["nr"] for z in sammelimport.lektionen(db, sammlung_id)
                   if z["nr"] is not None}
         for nr, eintrag in enumerate(eintraege, 1):
@@ -472,10 +472,8 @@ def importieren(db: sqlite3.Connection, sammlung_id: int, eintraege: list,
         ergebnis["lektionen_neu"] = sorted(
             {z["nr"] for z in sammelimport.lektionen(db, sammlung_id)
              if z["nr"] is not None} - vorher)
-        db.execute("ROLLBACK" if nur_pruefen else "COMMIT")
-    except Exception:
-        db.execute("ROLLBACK")
-        raise
+        if nur_pruefen:
+            klammer.zuruecknehmen()
     ergebnis["eintraege"] = [e for e in ergebnis["eintraege"]
                              if e.get("befunde") or e.get("abweichungen")
                              or e.get("fehler") or e["zustand"] == "abgelehnt"]

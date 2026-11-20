@@ -31,6 +31,41 @@ REIHENFOLGE = (
     "flexion",
 )
 
+# Reihenfolge, in der Formen UNTEREINANDER stehen. Nicht dieselbe wie
+# oben, und das ist der Punkt.
+#
+# »Bei der Reihenfolge-Anzeige der Formen der Verben wäre es
+# zielführender, nach Zeitform statt nach Person zu sortieren.«
+#
+# REIHENFOLGE beschreibt, wie eine Form BENANNT wird — »1. Person
+# Singular Präsens Indikativ«, deutscher Sprachgebrauch, Person zuerst.
+# Danach wurde bisher auch sortiert, und damit stand im Wortschatz:
+#
+#     ιδρύω      1. sg praesens        ιδρύω      1. sg praesens
+#     ιδρύομαι   1. sg praesens        ιδρύεις    2. sg praesens
+#     ιδρύσω     1. sg praesens   statt ιδρύει    3. sg praesens
+#     ίδρυσα     1. sg aorist          ιδρύουμε   1. pl praesens
+#     θα ιδρύσω  1. sg futur           ιδρύετε    2. pl praesens
+#
+# Links sind bei 51 Formen Aktiv und Passiv ineinandergeschoben und
+# jede Zeitform einmal angerissen; rechts steht das Paradigma, wie es
+# in jedem Lehrbuch steht. Erst die Zeitform, dann die Person.
+#
+# Für Substantive ändert sich nichts: Kasus vor Numerus, wie gehabt.
+SORTIERFOLGE = (
+    "genus_verbi",   # Aktiv vollständig, dann Passiv
+    "modus",         # Indikativ vor Konjunktiv
+    "tempus",        # Präsens, Imperfekt, Aorist …
+    "aspekt",
+    "nonfinit",
+    "kasus",
+    "numerus",       # Singular vollständig, dann Plural
+    "person",        # 1., 2., 3. — innerhalb der Zahl
+    "genus",
+    "stufe",
+    "flexion",
+)
+
 # Dimension -> Wert -> (lange Beschriftung, kurze Beschriftung)
 INVENTAR: dict[str, dict[str, tuple[str, str]]] = {
     "nonfinit": {
@@ -483,10 +518,14 @@ def beschriften(merkmale: dict, profil: dict | None = None, kurz: bool = False,
 
 
 def sortierbar(merkmale: dict) -> tuple:
-    """Sortierschlüssel, damit Formen in einer sinnvollen Reihenfolge stehen
-    (1. Person vor 2. Person, Singular vor Plural)."""
+    """Sortierschlüssel für die Anzeige eines Paradigmas.
+
+    Nach SORTIERFOLGE und ausdrücklich NICHT nach REIHENFOLGE: die eine
+    sagt, wie eine Form heißt, die andere, wo sie steht. Siehe die
+    Begründung bei SORTIERFOLGE.
+    """
     schluesselteile: list[int] = []
-    for dimension in REIHENFOLGE:
+    for dimension in SORTIERFOLGE:
         werte = list(INVENTAR.get(dimension, {}))
         wert = merkmale.get(dimension)
         if wert is None:

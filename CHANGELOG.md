@@ -16,6 +16,55 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Drei Dinge bei den Reihen
+
+**Der Tipp tat etwas Schlimmeres als nichts.** Bei einer Reihe ist die
+erwartete Antwort die Liste *aller* sechs Formen — und der Tipp nahm
+davon die erste. Es stand also ein Gerüst da, ohne zu sagen, zu
+welchem Feld es gehört; wer es auf das Feld bezog, in dem er gerade
+steckte, bekam Unsinn.
+
+Jetzt gibt es **ein Gerüst je Feld**, rechts daneben, genau dort, wo
+nach der Wertung auch die Lösung steht. In Grau und nicht in der
+Lösungsfarbe: ein Gerüst ist weder eine Lösung noch ein Fehler. Der
+Wortstamm gilt für die ganze Reihe und steht einmal darunter.
+
+**Man kann jetzt noch einmal schreiben.** Beim einzelnen Wort gibt es
+für »fast richtig« den zweiten Versuch; in der Reihe gab es ihn
+praktisch nie, weil schon ein einziges leeres Feld das Urteil der
+ganzen Reihe auf »falsch« zieht — und damit war auch der verrutschte
+Akzent daneben erledigt.
+
+Ein Akzent ist aber auch in einer Reihe nur ein Akzent. Offen bleibt
+danach **nur, was »fast« war**; die richtigen Felder bleiben stehen,
+die falschen auch. Wer eine Form nicht wusste, bekommt keinen zweiten
+Rateversuch — das wäre mehr, als das einzelne Wort bietet. Die Lösung
+steht dabei nirgends: sonst wäre der zweite Versuch ein Abschreiben.
+Und der Kopf sagt nicht mehr rot »Nicht richtig« über einem Feld, in
+das man gerade tippen soll, sondern »Eine Form ist fast richtig«.
+
+An der Regel ändert das nichts: eine Reihe sitzt als Ganzes oder nicht.
+
+### Die Formen stehen jetzt wie im Lehrbuch
+
+»Zielführender nach Zeitform statt nach Person sortieren.« — Sortiert
+wurde nach der Reihenfolge, in der eine Form **benannt** wird (»1.
+Person Singular Präsens Indikativ«, deutscher Sprachgebrauch). Unter
+einem griechischen Verb mit 51 Formen stand damit:
+
+```
+ιδρύω      1. sg praesens          ιδρύω      1. sg praesens
+ιδρύομαι   1. sg praesens          ιδρύεις    2. sg praesens
+ιδρύσω     1. sg praesens   statt  ιδρύει     3. sg praesens
+ίδρυσα     1. sg aorist            ιδρύουμε   1. pl praesens
+θα ιδρύσω  1. sg futur             ιδρύετε    2. pl praesens
+```
+
+Links Aktiv und Passiv ineinandergeschoben und jede Zeitform einmal
+angerissen; rechts das Paradigma. Benannt wird weiter wie bisher — das
+sind zwei verschiedene Fragen. Für Substantive ändert sich nichts.
+
+
 ### Die Seite springt nicht mehr nach oben
 
 Zwei Stellen bauten bei jeder Kleinigkeit die ganze Seite neu auf.

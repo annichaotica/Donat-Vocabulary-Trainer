@@ -243,6 +243,18 @@ export class Sitzung {
   teilTipp() {
     const t = this.tippText;
     if (!t) return null;
+    if (t.zellen) {
+      // Die Gerüste stehen an ihren Feldern. Hier steht nur, was für
+      // die ganze Reihe gilt — und ohne das Kästchen sähe es aus, als
+      // wäre nichts passiert.
+      return h('div', { class: 'tipp' },
+        h('p', { class: 'leise', style: 'margin:0' },
+          `Gerüst für alle ${t.zellen.length} Formen steht an den Feldern.`,
+          t.stamm ? h('span', {}, ' · Stamm: ', h('b', { text: t.stamm })) : null,
+          t.stufe >= t.hoechste_stufe
+            ? h('span', { text: ' · mehr gibt es nicht' })
+            : null));
+    }
     return h('div', { class: 'tipp' },
       h('p', { class: 'tipp-maske', lang: this.aufgabe.antwort_sprache,
                text: t.maske || '' }),
@@ -751,16 +763,29 @@ export class Sitzung {
     for (const z of (this.ergebnis?.aufloesung?.zellen || [])) {
       ergebnisse[z.zelle] = z;
     }
+    // Der Tipp kommt bei einer Reihe je Zelle — ein Gerüst für alle
+    // sechs, nicht eins ohne Angabe, wozu es gehört.
+    const tippzellen = {};
+    for (const z of (this.tippText?.zellen || [])) tippzellen[z.zelle] = z;
+    // Im zweiten Versuch ist nur offen, was »fast« war.
+    //
+    // Die Lösung steht dabei NIRGENDS — sonst wäre der zweite Versuch
+    // ein Abschreiben. Beim einzelnen Wort heißt »fast richtig« auch
+    // nur: noch einmal, und nicht: hier ist die Antwort.
+    const nochmal = this.phase === 'nochmal';
     const kasten = h('div', { class: 'reihe' });
     const felder = [];
     for (const [i, z] of zellen.entries()) {
       const r = ergebnisse[z.zelle];
+      // Entschieden ist alles, was nicht »fast« war — die richtigen
+      // bleiben stehen, die falschen auch. Zurückgenommen wird nichts.
+      const entschieden = nochmal && r && r.urteil !== 'fast';
       const feld = h('input', {
         type: 'text', lang: a.antwort_sprache || a.sprache,
         autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false',
         autocomplete: 'off',
         value: this.reihenWerte[z.zelle] || '',
-        disabled: fertig,
+        disabled: fertig || entschieden,
         class: r ? r.urteil : null,
         oninput: (e) => {
           if (this.denkzeit === null && e.target.value) {
@@ -796,10 +821,17 @@ export class Sitzung {
                 h('span', { class: 'leiser', text: 'wie bei: ' }), z.beispiel)
             : null),
         feld,
-        r && r.urteil !== 'richtig'
+        // Dritte Spalte: während des Antwortens das Gerüst aus dem
+        // Tipp, nach der Wertung die Lösung. Dieselbe Stelle für
+        // dasselbe Wort — man sucht nicht zweimal woanders.
+        fertig && r && r.urteil !== 'richtig'
           ? h('div', { class: 'reihenloesung', lang: a.antwort_sprache },
               (r.erwartet || []).join(' / '))
-          : h('div', {})));
+          : (tippzellen[z.zelle]
+              ? h('div', { class: 'reihengeruest', lang: a.antwort_sprache,
+                           title: 'Gerüst aus dem Tipp',
+                           text: tippzellen[z.zelle].maske || '' })
+              : h('div', {}))));
     }
     this.feld = felder[0] || null;
     // Bei der ganzen Reihe hängt die Umschrift an jedem Feld.
@@ -872,12 +904,28 @@ export class Sitzung {
 
   teilRueckmeldung() {
     const u = this.ergebnis.urteil;
-    const titel = { richtig: 'Richtig', fast: 'Fast richtig', falsch: 'Nicht richtig' }[u.urteil];
-    const kasten = h('div', { class: 'rueckmeldung ' + u.urteil });
+    // Solange noch einmal geschrieben werden darf, ist das Urteil
+    // nicht gefällt. Ein rotes »Nicht richtig« über einem Feld, in das
+    // man gerade tippen soll, sagt das Gegenteil.
+    //
+    // Bei der Reihe kommt das jetzt regelmäßig vor: als Ganzes ist sie
+    // falsch (ein Feld blieb leer), und trotzdem steht die fast
+    // richtige Form noch offen.
+    const nochmal = this.phase === 'nochmal';
+    const fastZellen = (this.ergebnis.aufloesung?.zellen || [])
+      .filter((z) => z.urteil === 'fast').length;
+    const art = nochmal ? 'fast' : u.urteil;
+    const titel = nochmal && u.urteil !== 'fast'
+      ? (fastZellen === 1 ? 'Eine Form ist fast richtig'
+                          : `${fastZellen} Formen sind fast richtig`)
+      : { richtig: 'Richtig', fast: 'Fast richtig',
+          falsch: 'Nicht richtig' }[u.urteil];
+    const kasten = h('div', { class: 'rueckmeldung ' + art });
     kasten.append(h('div', { class: 'rueckmeldung-kopf' },
-      h('span', { text: { richtig: '✓', fast: '≈', falsch: '✗' }[u.urteil] }),
+      h('span', { text: { richtig: '✓', fast: '≈', falsch: '✗' }[art] }),
       h('span', { text: titel }),
-      u.urteil === 'fast' ? h('span', { class: 'leise', text: '— zählt nicht als Fehler' }) : null));
+      art === 'fast' && !nochmal
+        ? h('span', { class: 'leise', text: '— zählt nicht als Fehler' }) : null));
 
     if (u.hinweis) kasten.append(h('p', { text: u.hinweis }));
 
@@ -905,9 +953,12 @@ export class Sitzung {
     if (this.aufgabe.eingabeart !== 'reihe') {
       anfuegen(kasten, this.teilAlternativen());
     }
-    if (u.urteil === 'fast') {
+    if (this.phase === 'nochmal') {
       kasten.append(h('p', { class: 'leise', style: 'margin-top:.6rem',
-        text: 'Noch einmal tippen — richtig geschrieben zählt es als gewusst.' }));
+        text: this.aufgabe.eingabeart === 'reihe'
+          ? 'Was fast stimmt, steht noch offen — richtig geschrieben zählt '
+            + 'es als gewusst. Die übrigen Felder sind entschieden.'
+          : 'Noch einmal tippen — richtig geschrieben zählt es als gewusst.' }));
     }
     return kasten;
   }
@@ -1363,7 +1414,12 @@ export class Sitzung {
       this.versuche += 1;
       this.gezaehlt.fast += 1;
       this.zeichnen();
-      if (this.feld) { this.feld.disabled = false; this.feld.focus(); this.feld.select(); }
+      // In das erste OFFENE Feld springen. Bei der Reihe ist das
+      // selten das erste: die entschiedenen sind gesperrt, und ein
+      // Fokus darauf wäre ein Fingerzeig ins Leere.
+      const ziel = this.behaelter.querySelector(
+        '.reihe input:not([disabled])') || this.feld;
+      if (ziel) { ziel.disabled = false; ziel.focus(); ziel.select(); }
       return;
     }
     this.phase = 'rueckmeldung';

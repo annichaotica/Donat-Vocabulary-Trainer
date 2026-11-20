@@ -1047,3 +1047,15 @@ input[type="file"] { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .sprungbalken i { animation: none; }
 }
+
+/* Das Gerüst aus dem Tipp, in der Spalte der Reihe.
+ *
+ * Es steht dort, wo nach der Wertung die Lösung steht — dieselbe
+ * Stelle für dasselbe Wort, man sucht nicht zweimal woanders. Aber in
+ * --leise und nicht in der Lösungsfarbe: ein Gerüst ist weder eine
+ * Lösung noch ein Fehler. */
+.reihengeruest {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .14em; color: var(--leise);
+  overflow-x: auto; white-space: nowrap;
+}

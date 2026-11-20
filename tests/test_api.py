@@ -1098,3 +1098,53 @@ def test_die_reihe_nennt_die_deutsche_bedeutung(klient):
     # Und bei der Bedeutungsaufgabe steht sie NICHT da: dort wäre sie
     # die Lösung.
     assert f_wort.get("bedeutung") is None, f_wort
+
+
+def test_formen_stehen_nach_zeitform_nicht_nach_person(klient):
+    """»Zielführender nach Zeitform statt nach Person sortieren.«
+
+    Sortiert wurde nach REIHENFOLGE — und die beschreibt, wie eine Form
+    HEISST: »1. Person Singular Präsens Indikativ«, deutscher
+    Sprachgebrauch, Person zuerst. Danach stand im Wortschatz unter
+    einem griechischen Verb mit 51 Formen:
+
+        ιδρύω     1. sg praesens
+        ιδρύομαι  1. sg praesens     ← Passiv dazwischen
+        ίδρυσα    1. sg aorist
+        θα ιδρύσω 1. sg futur
+        ιδρύουμε  1. pl praesens
+
+    Jede Zeitform einmal angerissen, Aktiv und Passiv ineinander. Ein
+    Paradigma liest man nicht so, und kein Lehrbuch druckt es so.
+    """
+    b = klient.post("/api/benutzer", json={"name": "Lernende"}).json()
+    s = klient.post("/api/sammlungen", json={
+        "besitzer_id": b["id"], "name": "Griechisch", "sprache": "el"}).json()
+    formen = [
+        {"text": "θα γράψω", "merkmale": {"person": "1", "numerus": "sg",
+                                          "tempus": "futur"}},
+        {"text": "γράφουμε", "merkmale": {"person": "1", "numerus": "pl",
+                                          "tempus": "praesens"}},
+        {"text": "έγραψα", "merkmale": {"person": "1", "numerus": "sg",
+                                        "tempus": "aorist"}},
+        {"text": "γράφεις", "merkmale": {"person": "2", "numerus": "sg",
+                                         "tempus": "praesens"}},
+        {"text": "γράφω", "merkmale": {"person": "1", "numerus": "sg",
+                                       "tempus": "praesens"}},
+        {"text": "έγραψες", "merkmale": {"person": "2", "numerus": "sg",
+                                         "tempus": "aorist"}},
+    ]
+    klient.post(f"/api/sammlungen/{s['id']}/import/vokabeln", json={"eintraege": [
+        {"lemma": "γράφω", "wortart": "verb",
+         "bedeutungen": [{"uebersetzungen": ["schreiben"]}],
+         "formen": formen}]})
+    lexem_id = klient.get(f"/api/sammlungen/{s['id']}/lexeme"
+                          ).json()["lexeme"][0]["id"]
+    gelesen = klient.get(f"/api/lexeme/{lexem_id}").json()
+    # Nur die eingetragenen Formen ansehen; die Grundform kann der
+    # Import zusätzlich anlegen.
+    reihe = [f["text"] for f in gelesen["formen"]
+             if f["text"] in {f2["text"] for f2 in formen}]
+    assert reihe == ["γράφω", "γράφεις", "γράφουμε",    # Präsens komplett
+                     "έγραψα", "έγραψες",               # dann Aorist
+                     "θα γράψω"], reihe                 # dann Futur

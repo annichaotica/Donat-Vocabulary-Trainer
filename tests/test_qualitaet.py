@@ -621,3 +621,137 @@ def test_jedes_kaestchen_hat_ein_tippziel():
             assert "hakenfeld" in umgebung, (
                 f"{name}: ein Kästchen ohne Tippziel bei Zeichen "
                 f"{stelle.start()}")
+
+
+def test_keine_knopfreihe_nimmt_ihre_eigene_ausrichtung_zurueck():
+    """»Zur Anordnung der Buttons hat der Agent keine Vorschläge?«
+
+    `.frage-werkzeuge` heißt »eine Reihe Knöpfe« und richtete mittig
+    aus, weil die Klasse für die Abfragekarte entstanden ist. Benutzt
+    wird sie überall — und an 38 von 50 Stellen stand daneben ein
+    `justify-content:flex-start`, das die eigene Vorgabe wieder aufhob.
+    Die Vorgabe war damit in vier von fünf Fällen die falsche.
+
+    Wer das Gegengift vergaß, bekam eine zentrierte Reihe unter
+    linksbündigem Text; in der Regelfreigabe stand sie so und sah dort
+    nach einem anderen Bauteil aus.
+
+    Jetzt gibt die Klasse linksbündig vor, und die beiden Karten mit
+    mittigem Inhalt (`.frage`, `.abtippkarte`) zentrieren selbst. Eine
+    Angabe im Einzelfall heißt: die Vorgabe stimmt wieder nicht.
+    """
+    import pathlib
+    import re
+
+    funde = []
+    for datei in sorted(pathlib.Path("frontend/js").glob("*.js")):
+        text = datei.read_text()
+        for treffer in re.finditer(
+                r"class: '([^']*\bfrage-werkzeuge\b[^']*)',\s*style: '([^']*)'",
+                text):
+            if "justify-content" in treffer.group(2):
+                zeile = text[:treffer.start()].count("\n") + 1
+                funde.append(f"{datei.name}:{zeile}: {treffer.group(2)}")
+    assert not funde, (
+        "Knopfreihen mit eigener Ausrichtung — dann gehört sie in die "
+        "Klasse:\n" + "\n".join(funde))
+
+
+def test_in_den_einstellungen_sagt_jeder_speichern_knopf_wofuer():
+    """Vier Karten, vier Knöpfe, drei davon hießen »Speichern«.
+
+    Keiner sagte, wofür er gilt. Auf einer Seite mit vier Karten ist
+    »Speichern« keine Beschriftung, sondern eine Frage.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_einstellungen.js").read_text()
+    nackt = re.findall(r"\}, 'Speichern'\)|, 'Speichern'\)\)", quelle)
+    assert not nackt, (
+        f"{len(nackt)} Knopf/Knöpfe heißen bloß »Speichern« — welche Karte?")
+
+
+def test_die_einstellungen_zeichnen_nie_die_ganze_seite_neu():
+    """Der Fund hinter »die Anordnung der Buttons«.
+
+    Drei der Speichern-Knöpfe riefen nach dem Speichern
+    `zeichnen(behaelter)` auf, und drei Zurücknehmen-Knöpfe ebenfalls.
+    Das leert den Behälter vollständig: was in einer ANDEREN Karte
+    eingetippt und noch nicht gespeichert war, entstand aus dem
+    gespeicherten Wert neu und war damit weg. Ohne Nachfrage, ohne
+    Meldung.
+
+    Nachzustellen war es so: Tagesziel auf 30 ändern, NICHT speichern,
+    dann oben im Lehrwerk eine Lektionsnummer speichern — das Tagesziel
+    stand wieder auf 20.
+
+    Ein Neuaufbau bleibt nötig, weil die Karten abgeleitete Angaben
+    zeigen. Er gehört aber auf die eigene Karte: `karteErneuern`.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_einstellungen.js").read_text()
+    # Ohne Kommentare — dort steht, was einmal falsch war.
+    ohne = re.sub(r"/\*.*?\*/", "", quelle, flags=re.S)
+    ohne = re.sub(r"^\s*//.*$", "", ohne, flags=re.M)
+    # Die Deklaration selbst ist kein Aufruf.
+    aufrufe = re.findall(r"(?<!function )\bzeichnen\(behaelter\)", ohne)
+    assert not aufrufe, (
+        f"{len(aufrufe)}x Ganzseiten-Neuaufbau in den Einstellungen — "
+        "das verwirft ungespeicherte Eingaben in den anderen Karten. "
+        "karteErneuern(behaelter, kasten, teilX) benutzen.")
+
+
+def test_die_dritte_ueberschrift_ist_nicht_kleingedrucktes():
+    """h3 war kleiner als der Fließtext und dazu grau.
+
+    .95em bei `--leise` heißt: die dritte Gliederungsebene sieht aus
+    wie eine Fußnote. Gegen den Grund gemessen waren das im Hellen
+    6,27 — unter dem, was für Schrift gilt, die man lesen soll.
+
+    Die Größe bleibt in em, nicht in rem: `--mass` hängt an body, und
+    rem würde den Legastheniemodus übergehen.
+    """
+    import pathlib
+    import re
+
+    stil = pathlib.Path("frontend/css/stil.css").read_text()
+    regel = re.search(r"\nh3 \{([^}]*)\}", stil)
+    assert regel, "Keine h3-Regel in stil.css gefunden"
+    inhalt = regel.group(1)
+
+    groesse = re.search(r"font-size:\s*([\d.]+)em", inhalt)
+    assert groesse, f"h3 ohne Größe in em: {inhalt.strip()}"
+    assert float(groesse.group(1)) >= 1.0, (
+        f"h3 ist mit {groesse.group(1)}em kleiner als der Fließtext")
+
+    farbe = re.search(r"color:\s*var\((--[a-z-]+)\)", inhalt)
+    assert farbe and farbe.group(1) != "--leise", (
+        f"h3 ist leise gesetzt: {inhalt.strip()}")
+
+
+def test_kein_filter_brightness_statt_einer_mischung():
+    """`filter: brightness()` kennt die Richtung nicht.
+
+    Es rechnet am fertigen Bild statt in der Palette: aufhellen heißt
+    im Hellen dasselbe wie im Dunkeln. Ein gedrückter Knopf soll im
+    Hellen aber dunkler werden und im Dunkeln heller.
+
+    `color-mix(in oklab, var(--akzent) 86%, var(--text))` macht beides
+    mit einer Angabe, weil `--text` im Hellen nahschwarz und im
+    Dunkeln nahweiß ist.
+    """
+    import pathlib
+    import re
+
+    funde = []
+    for datei in sorted(pathlib.Path("frontend/css").glob("*.css")):
+        ohne = re.sub(r"/\*.*?\*/", "", datei.read_text(), flags=re.S)
+        for nr, zeile in enumerate(ohne.splitlines(), 1):
+            if re.search(r"filter:\s*brightness", zeile):
+                funde.append(f"{datei.name}:{nr}: {zeile.strip()}")
+    assert not funde, (
+        "Helligkeitsfilter statt einer Mischung in der Palette:\n"
+        + "\n".join(funde))

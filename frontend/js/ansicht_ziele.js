@@ -105,7 +105,7 @@ function zielkarte(behaelter, z) {
             : null)
       : null,
 
-    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    h('div', { class: 'frage-werkzeuge' },
       h('button', {
         class: 'wichtig',
         disabled: !(f.gesamt),
@@ -311,7 +311,7 @@ async function zeigeBlock(behaelter, z, block = null) {
     },
   }, '🎲 Neu würfeln');
 
-  el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+  el.append(h('div', { class: 'frage-werkzeuge' },
     block.anzahl ? h('button', {
       class: 'wichtig',
       onclick: () => { merken({ lernzielId: z.id }); location.hash = `#/lernen/ziel/${z.id}`; },

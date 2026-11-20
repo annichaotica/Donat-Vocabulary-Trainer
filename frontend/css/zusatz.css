@@ -965,6 +965,9 @@ input[type="file"] { max-width: 100%; }
 }
 .abtippen-balken i { display: block; height: 100%; background: var(--akzent); }
 .abtippkarte { text-align: center; padding: 1.4rem 1rem; }
+/* Die Karte ist mittig gesetzt, also auch ihre Knopfreihe — seit
+   .frage-werkzeuge linksbündig vorgibt, muss das hier stehen. */
+.abtippkarte .frage-werkzeuge { justify-content: center; }
 /* em statt rem: rem hängt am Wurzelelement, und --mass sitzt auf
    body. In rem wächst im Legastheniemodus also GAR NICHTS mit — und
    das Abtippen ist die Ansicht, in der am längsten gelesen wird.

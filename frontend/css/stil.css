@@ -48,10 +48,18 @@
   --falsch: #8f3129;
   --falsch-grund: #f9e4e1;
 
-  --rund: 12px;
-  --rund-klein: 8px;
-  --luft: clamp(.85rem, .6rem + 1.2vw, 1.15rem);
+  --rund: 14px;
+  --rund-klein: 10px;
+  /* Eine eigene Stufe für große Flächen. Ein Radius für alles heißt:
+     der 44-px-Knopf und die Abfragekarte sind gleich zugeschnitten —
+     und die große Fläche wirkt dann gedrängt. */
+  --rund-gross: 20px;
+  --luft: clamp(1rem, .75rem + 1.3vw, 1.35rem);
   --schatten: 0 1px 2px rgb(0 0 0 / 5%), 0 6px 20px rgb(0 0 0 / 6%);
+  /* Tiefe im Dunkeln. Ein Schlagschatten auf Nahschwarz zeigt nichts;
+     was dort trägt, ist eine hellere Oberkante. Im Hellen bleibt sie
+     leer — nicht weggelassen, sondern ausdrücklich nichts. */
+  --kante: 0 0 transparent;
 
   /* Mindestmaß für alles, was ein Finger treffen muss. */
   --tipp: 44px;
@@ -79,6 +87,7 @@
     --falsch: #f0a8a1;
     --falsch-grund: #301e1c;
     --schatten: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 20px rgb(0 0 0 / 30%);
+    --kante: inset 0 1px 0 rgb(255 255 255 / 7%);
   }
 }
 
@@ -103,6 +112,7 @@
   --fast: #e5c47f; --fast-grund: #2a2416;
   --falsch: #f0a8a1; --falsch-grund: #2d1d1b;
   --schatten: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 20px rgb(0 0 0 / 30%);
+  --kante: inset 0 1px 0 rgb(255 255 255 / 7%);
 }
 
 * { box-sizing: border-box; }
@@ -348,15 +358,26 @@ h3.kapitelkopf { font-size: .95em; margin: 1rem 0 .3rem; }
 }
 .inhalt:focus { outline: none; }
 
+/* Drei Stufen, die man als drei Stufen lesen kann.
+ *
+ * h3 war .95em und grau — kleiner als der Fließtext darunter und
+ * leiser. Damit sah die dritte Gliederungsebene aus wie
+ * Kleingedrucktes, und h2 lag mit 1.15em so dicht am Absatz, dass die
+ * beiden Stufen zusammenfielen. Gemessen stand h3 im Hellen bei 6,27
+ * gegen den Grund; jetzt sind es 16,68.
+ *
+ * Alles bleibt in em und wächst damit im Legastheniemodus mit — rem
+ * würde den Faktor --mass übergehen, der an body hängt. */
 h1 {
-  font-size: 1.55em; font-weight: 650; margin: 0 0 .3em;
-  line-height: 1.2; letter-spacing: calc(var(--zeichenabstand) - .012em);
+  font-size: 1.75em; font-weight: 650; margin: 0 0 .35em;
+  line-height: 1.15; letter-spacing: calc(var(--zeichenabstand) - .012em);
 }
 h2 {
-  font-size: 1.15em; font-weight: 650; margin: 1.9em 0 .55em;
+  font-size: 1.3em; font-weight: 650; margin: 1.9em 0 .5em;
+  line-height: 1.25;
   letter-spacing: calc(var(--zeichenabstand) - .005em);
 }
-h3 { font-size: .95em; font-weight: 650; margin: 1.6em 0 .5em; color: var(--leise); }
+h3 { font-size: 1.02em; font-weight: 650; margin: 1.6em 0 .4em; color: var(--text); }
 p { margin: 0 0 .8em; max-width: 42em; }
 .leise { color: var(--leise); font-size: .9em; }
 .leer { text-align: center; color: var(--leise); padding: 3rem 1rem; }
@@ -392,9 +413,22 @@ button.wichtig {
   background: var(--akzent); border-color: var(--akzent); color: var(--auf-akzent);
   font-weight: 600;
 }
-button.wichtig:not(:disabled):active { background: var(--akzent); filter: brightness(.9); }
+/* Gedrückt und überfahren: eine Mischung Richtung Schriftfarbe.
+ *
+ * Vorher stand hier `filter: brightness()`. Das rechnet am fertigen
+ * Bild statt in der Palette und kennt nur eine Richtung — im Hellen
+ * soll ein gedrückter Knopf dunkler werden, im Dunkeln heller.
+ * `--text` ist im Hellen nahschwarz und im Dunkeln nahweiß, also
+ * stimmt beides mit derselben Angabe. */
+button.wichtig:not(:disabled):active {
+  background: color-mix(in oklab, var(--akzent) 86%, var(--text));
+  border-color: color-mix(in oklab, var(--akzent) 86%, var(--text));
+}
 @media (hover: hover) and (pointer: fine) {
-  button.wichtig:hover:not(:disabled) { filter: brightness(1.12); }
+  button.wichtig:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--akzent) 92%, var(--text));
+    border-color: color-mix(in oklab, var(--akzent) 92%, var(--text));
+  }
 }
 
 button.schlicht {
@@ -441,6 +475,8 @@ input[type=range] {
   border-radius: var(--rund);
   padding: var(--luft);
   margin-bottom: .75rem;
+  /* Im Hellen nichts, im Dunkeln eine hellere Oberkante. */
+  box-shadow: var(--kante);
 }
 .karte > h2:first-child, .karte > h3:first-child { margin-top: 0; }
 .karte-reihe {
@@ -508,10 +544,13 @@ details.karte > summary:active { background: var(--grund-3); }
   background: var(--akzent); flex: none;
 }
 
+/* Das Herzstück bekommt die große Stufe: eigener Radius, mehr Luft.
+   Auf dem Handy schneidet die Ausnahme weiter unten die Seiten
+   zurück — die größere Luft wächst nur, wo Platz ist. */
 .frage {
   background: var(--grund-2); border: 1px solid var(--rand);
-  border-radius: var(--rund); padding: clamp(1.1rem, 5vw, 2.2rem) 1rem;
-  text-align: center; box-shadow: var(--schatten);
+  border-radius: var(--rund-gross); padding: clamp(1.3rem, 5.5vw, 2.4rem) 1.2rem;
+  text-align: center; box-shadow: var(--schatten), var(--kante);
 }
 .frage-wort {
   font-family: var(--schrift-wort);
@@ -526,11 +565,21 @@ details.karte > summary:active { background: var(--grund-3); }
   margin: .5rem 0 0; font-size: 1.05em; color: var(--akzent); font-weight: 600;
 }
 .frage-hinweis { margin: .35rem 0 0; font-size: .85em; color: var(--leise); }
+/* Eine Reihe Knöpfe. Links, wie alles andere auf der Seite.
+ *
+ * Die Klasse ist für die Abfragekarte entstanden und richtete darum
+ * mittig aus. Benutzt wird sie überall — und an 38 von 50 Stellen
+ * stand daneben ein `justify-content:flex-start`, das die eigene
+ * Vorgabe wieder aufhob. Wer es vergaß, bekam eine zentrierte Reihe
+ * unter linksbündigem Text; in der Regelfreigabe stand sie so.
+ *
+ * Jetzt zentrieren die beiden Karten, deren Inhalt mittig steht, ihre
+ * Reihe selbst. */
 .frage-werkzeuge {
-  display: flex; gap: .4rem; justify-content: center;
+  display: flex; gap: .4rem;
   margin-top: .9rem; flex-wrap: wrap;
 }
-.frage .frage-werkzeuge { margin-top: 1.1rem; }
+.frage .frage-werkzeuge { margin-top: 1.1rem; justify-content: center; }
 
 .antwortfeld { display: flex; gap: .5rem; align-items: stretch; }
 .antwortfeld input {
@@ -678,17 +727,35 @@ details.warum[open] > summary::before { transform: rotate(90deg); }
 
 /* ---------------------------------------------------------- Wortschatz */
 
-.liste { display: flex; flex-direction: column; gap: .4rem; }
+/* Kein Abstand zwischen den Zeilen: die Trennlinie gliedert, nicht die
+   Lücke. Mit beidem entsteht wieder ein Stapel. */
+.liste { display: flex; flex-direction: column; gap: 0; }
+/* Die Liste liest sich wie ein Glossar, nicht wie ein Stapel Kästchen.
+ *
+ * Vorher hatte jeder Eintrag einen eigenen Rahmen: bei dreißig
+ * Wörtern dreißig Kästen, also viel Kantenlärm für wenig Auskunft.
+ * Jetzt trennt eine Haarlinie, wie im Wörterverzeichnis eines
+ * Lehrwerks. Der Treffbereich von 44 px bleibt unangetastet.
+ *
+ * Ohne Rahmen muss das Überfahren den Grund wechseln und nicht die
+ * Randfarbe — sonst wäre nicht mehr zu sehen, dass die Zeile ein
+ * Schalter ist. */
 .eintrag {
   display: flex; flex-wrap: wrap; column-gap: .65rem; row-gap: .25rem;
   align-items: baseline;
-  padding: .65rem .8rem; background: var(--grund-2);
-  border: 1px solid var(--rand); border-radius: var(--rund-klein);
+  padding: .6rem .3rem; background: none;
+  border: 0; border-bottom: 1px solid var(--rand);
+  border-radius: var(--rund-klein);
   text-align: left; width: 100%; min-height: max(var(--tipp), 2.4em);
 }
+/* Die letzte Zeile braucht keine Linie — darunter kommt nichts mehr.
+   Im Wortschatz und bei den Texten steckt der Eintrag in einer
+   .eintrag-zeile, sonst liegt er unmittelbar in der Liste. */
+.liste > .eintrag:last-child,
+.liste > .eintrag-zeile:last-child > .eintrag { border-bottom: 0; }
 .eintrag:active { background: var(--grund-3); }
 @media (hover: hover) and (pointer: fine) {
-  .eintrag:hover { border-color: var(--akzent); }
+  .eintrag:hover { background: var(--grund-3); }
 }
 .eintrag .lemma {
   font-family: var(--schrift-wort); font-weight: 650;
@@ -816,7 +883,6 @@ table.paradigma .marke { align-self: auto; }
     background: var(--grund-2);
     border-top: 1px solid var(--rand);
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    box-shadow: 0 -1px 12px rgb(0 0 0 / 6%);
   }
   /* Die Beschriftung der Leiste ist Wegweiser, kein Lesetext: sie bleibt in
      rem und ohne Zeichenabstand, sonst stoßen die vier Reiter im
@@ -831,6 +897,17 @@ table.paradigma .marke { align-self: auto; }
   }
   .kopf-knoepfe button:not(:disabled):active {
     background: var(--grund-3); transform: none;
+  }
+  /* Der aktive Reiter: Farbe und eine Oberkante statt eines
+     vollflächigen Kastens. `button.aktiv` füllt die ganze Gitterzelle
+     hellblau — in einer waagerechten Kopfzeile ist das eine Pille, in
+     der unteren Leiste ein Block über drei Zentimeter.
+     Zwei Merkmale bleiben, Farbe UND Kante, dazu das aria-current, das
+     app.js ohnehin setzt. Farbe allein würde nie genügen. */
+  .kopf-knoepfe button.aktiv {
+    background: none; border-color: transparent;
+    color: var(--akzent); font-weight: 600;
+    box-shadow: inset 0 2px 0 var(--akzent);
   }
   .kopf-zeichen { width: 1.5rem; height: 1.5rem; }
   .kopf-wort {

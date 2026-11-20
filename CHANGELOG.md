@@ -16,6 +16,75 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Sieben Eingriffe in die Gestaltung
+
+Vorher als Artefakt angesehen und Stück für Stück entschieden, nicht
+blind eingebaut.
+
+**Überschriften sehen jetzt wie Überschriften aus.** `h3` war kleiner
+als der Fließtext darunter und dazu grau — die dritte Gliederungsebene
+las sich wie Kleingedrucktes. Gegen den Kartengrund gemessen waren das
+6,3:1, jetzt sind es 16,7:1. `h2` war mit 1,15em so dicht am Absatz,
+dass die beiden Stufen zusammenfielen. Alles bleibt in `em` und wächst
+im Legastheniemodus mit.
+
+**Der Wortschatz ist eine Liste geworden.** Vorher hatte jeder Eintrag
+seinen eigenen Rahmen: bei dreißig Wörtern dreißig Kästen. Jetzt
+trennt eine Haarlinie, wie im Wörterverzeichnis eines Lehrwerks. Gilt
+überall, wo dieselbe Liste steht — Texte, Freigabe, Lernziele,
+Zugänge. Die Trefferfläche von 44 px bleibt; ohne Rahmen wechselt beim
+Überfahren der Grund statt der Randfarbe, sonst sähe man nicht mehr,
+dass die Zeile ein Schalter ist.
+
+**Die Abfrage hat Luft bekommen.** Ein Radius galt bisher für alles —
+für den 44-px-Knopf wie für die Abfragekarte. Große Flächen, die wie
+kleine zugeschnitten sind, wirken gedrängt; die Abfrage hat jetzt eine
+eigene Stufe. Im Dunkeln dazu eine hellere Oberkante, weil ein
+Schlagschatten auf Nahschwarz nichts zeigt.
+
+**Der aktive Reiter auf dem Handy** füllte seine Zelle vollflächig
+hellblau — der sichtbarste Rest alter Gestaltung auf genau dem Gerät,
+das benutzt wird. Jetzt Farbe und eine Oberkante, beides tragend
+(7,4:1), dazu das `aria-current`, das ohnehin gesetzt wird.
+
+**Gedrückte Knöpfe kennen die Richtung.** `filter: brightness()`
+rechnet am fertigen Bild statt in der Palette und hellt in jeder
+Farbstimmung auf. Gemischt wird jetzt Richtung Schriftfarbe: im Hellen
+wird der gedrückte Knopf dunkler (8,6:1 für die Beschriftung), im
+Dunkeln heller (9,8:1).
+
+### Knopfreihen stehen links
+
+Die gemeinsame Klasse für »eine Reihe Knöpfe« richtete **mittig** aus,
+weil sie für die Abfragekarte entstanden ist. Benutzt wird sie
+überall: 50-mal im Quelltext, und an **38** dieser Stellen stand
+daneben eine Angabe, die genau diese Zentrierung wieder aufhob. Die
+Vorgabe war damit in vier von fünf Fällen die falsche — und wer das
+Gegengift vergaß, bekam eine zentrierte Reihe unter linksbündigem
+Text. In der Regelfreigabe stand sie so.
+
+Jetzt gibt die Klasse linksbündig vor; die beiden Karten mit mittigem
+Inhalt zentrieren selbst. Die 38 Einzelangaben sind raus.
+
+### Die Einstellungen verwarfen, was man nicht gespeichert hatte
+
+Zu merken war es so: Tagesziel auf 30 ändern, **nicht** speichern,
+dann oben im Lehrwerk eine Lektionsnummer speichern — das Tagesziel
+stand wieder auf 20. Ohne Nachfrage, ohne Meldung.
+
+Die Seite hat vier Karten mit je einem Speichern-Knopf. Drei davon
+bauten danach die **ganze Seite** neu auf, und dabei entstanden die
+anderen Karten aus dem gespeicherten Wert neu. Dasselbe galt für die
+drei Zurücknehmen-Knöpfe bei den Zugängen. Ein Neuaufbau bleibt nötig
+— die Karten zeigen abgeleitete Angaben —, er betrifft jetzt nur noch
+die eigene Karte.
+
+Dazu heißt kein Knopf mehr bloß »Speichern«: **Lehrwerk speichern**,
+**Lernverhalten speichern**, **Darstellung speichern**. Auf einer
+Seite mit vier Karten ist »Speichern« keine Beschriftung, sondern eine
+Frage.
+
+
 ### Drei Knöpfe statt zehn auf der Sammlungskarte
 
 Dort standen zehn gleich aussehende Knöpfe, davon neun ohne

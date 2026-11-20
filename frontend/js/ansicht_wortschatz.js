@@ -127,7 +127,7 @@ export async function zeichnen(behaelter) {
     stapel.append(h('div', { class: 'karte gezielt-stapel' },
       h('b', { text: `${angehakt.size} ausgewählt` }),
       h('div', { class: 'frage-werkzeuge',
-                 style: 'justify-content:flex-start;flex-wrap:wrap' },
+                 style: 'flex-wrap:wrap' },
         wohin,
         h('button', {
           class: 'wichtig',
@@ -437,7 +437,7 @@ export async function zeichnenEinzeln(behaelter, lexemId) {
       h('kbd', { text: '→' }), ' und ', h('kbd', { text: '←' }), ' blättern.'));
   }
 
-  el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:1.5rem' },
+  el.append(h('div', { class: 'frage-werkzeuge', style: 'margin-top:1.5rem' },
     h('button', { onclick: () => { location.hash = '#/wortschatz'; } }, 'Zurück zur Liste'),
     h('button', {
       class: 'schlicht gefahr',
@@ -666,7 +666,7 @@ async function formBearbeiten(behaelter, lexem, f, zeile) {
         ' nicht: der Lernstand hängt an der Zelle, nicht an der Form. '
         + 'Die Zelle, in die du sie hängst, fängt von vorn an — und die '
         + 'alte bleibt stehen, falls du es zurücknimmst.'),
-      h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+      h('div', { class: 'frage-werkzeuge' },
         h('button', { class: 'wichtig', onclick: () => sichern() }, 'Speichern'),
         h('button', { class: 'schlicht', onclick: () => schliessen() },
           'Abbrechen'))));
@@ -743,8 +743,7 @@ async function kopfBearbeiten(behaelter, lexem) {
           + 'Lexemmerkmale vorgesehen.' }));
   }
 
-  kasten.append(h('div', { class: 'frage-werkzeuge',
-                           style: 'justify-content:flex-start' },
+  kasten.append(h('div', { class: 'frage-werkzeuge' },
     h('button', {
       class: 'wichtig',
       onclick: () => tun(async () => {
@@ -804,7 +803,7 @@ function bedeutungBearbeiten(behaelter, lexem, b) {
       h('label', { class: 'leise', text: 'Hinzufügen' }), neuFeld),
     h('div', { class: 'feldzeile' },
       h('label', { class: 'leise', text: 'Erklärung' }), erklaerung),
-    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    h('div', { class: 'frage-werkzeuge' },
       h('button', {
         class: 'wichtig',
         onclick: () => tun(async () => {
@@ -903,7 +902,7 @@ export async function zeichnenNeu(behaelter) {
       lexemfelder)));
   el.append(h('h2', { text: 'Formen' }), formfelder);
 
-  el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:1rem' },
+  el.append(h('div', { class: 'frage-werkzeuge', style: 'margin-top:1rem' },
     h('button', {
       class: 'wichtig',
       onclick: async () => {

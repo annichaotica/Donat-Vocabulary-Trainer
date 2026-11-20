@@ -126,7 +126,7 @@ function teilStapel(behaelter, d) {
 
   return h('div', { class: 'karte gezielt-stapel' },
     h('b', { text: `${ausgewaehlt.size} ausgewählt` }),
-    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    h('div', { class: 'frage-werkzeuge' },
       ...vorlagen.map((name) => h('button', {
         class: 'schlicht gefahr', onclick: () => setzen(name),
       }, `Ausschalten (${name})`)),

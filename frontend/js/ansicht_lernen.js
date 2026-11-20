@@ -548,7 +548,7 @@ export class Sitzung {
         h('b', { text: a.lemma || 'Die Aufgabe' }),
         ` ist ausgesetzt und kommt nicht mehr dran${a.typ ? ` (${a.typ})` : ''}.`),
       h('div', { class: 'frage-werkzeuge',
-                 style: 'justify-content:flex-start;margin-top:.5rem' },
+                 style: 'margin-top:.5rem' },
         h('button', {
           class: 'wichtig',
           onclick: () => tun(async () => {
@@ -802,8 +802,7 @@ export class Sitzung {
     }
     const unten = h('div', {});
     if (!fertig) {
-      unten.append(h('div', { class: 'frage-werkzeuge',
-                              style: 'justify-content:flex-start' },
+      unten.append(h('div', { class: 'frage-werkzeuge' },
         h('button', { class: 'wichtig', onclick: () => this.absenden() },
           'Prüfen')));
       if (this._antwortsprache) {
@@ -949,7 +948,7 @@ export class Sitzung {
     // Wer nicht selbst bewertet, muss sehen, wonach bewertet wurde.
     kasten.append(h('p', { class: 'wertung-grund', text: w.begruendung }));
 
-    kasten.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+    kasten.append(h('div', { class: 'frage-werkzeuge' },
       h('button', { class: 'wichtig', onclick: () => this.weiter() }, 'Weiter'),
       h('button', {
         class: 'schlicht',
@@ -1109,7 +1108,7 @@ export class Sitzung {
     // gleich unter dem Antwortfeld (teilHilfen). Sie gehören zum
     // Antworten; hier stehen die Dinge, die man mit der AUFGABE macht.
     const reihe = h('div', { class: 'frage-werkzeuge',
-                             style: 'justify-content:flex-start;width:100%' });
+                             style: 'width:100%' });
     reihe.append(
       h('button', {
         class: 'schlicht', title: 'Diese Aufgabe nicht mehr abfragen',

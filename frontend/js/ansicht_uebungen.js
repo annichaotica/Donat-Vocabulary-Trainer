@@ -151,7 +151,7 @@ export class Uebungssitzung {
               h('b', { text: String(this.gezaehlt.falsch) }),
               h('span', { text: 'falsch' })))
         : null,
-      h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+      h('div', { class: 'frage-werkzeuge' },
         nichts && stand.ungeprueft
           ? h('button', {
               class: 'wichtig',
@@ -219,8 +219,7 @@ export class Uebungssitzung {
     this.feld = feld;
     kasten.append(h('div', { class: 'satzeingabe' }, feld));
     if (!fertig) {
-      kasten.append(h('div', { class: 'frage-werkzeuge',
-                               style: 'justify-content:flex-start' },
+      kasten.append(h('div', { class: 'frage-werkzeuge' },
         h('button', { class: 'wichtig', onclick: () => this.absenden() },
           'Prüfen')));
       if (this.antwortsprache) {
@@ -315,8 +314,7 @@ export class Uebungssitzung {
     if (!w) {
       // Satz: der Vergleich zählt, es gibt aber noch keine Wertung —
       // weiter drücken schreibt sie fort.
-      kasten.append(h('div', { class: 'frage-werkzeuge',
-                               style: 'justify-content:flex-start' },
+      kasten.append(h('div', { class: 'frage-werkzeuge' },
         h('button', { class: 'wichtig', onclick: () => this.weiter() },
           'Weiter')));
       return kasten;
@@ -326,8 +324,7 @@ export class Uebungssitzung {
       h('span', { class: 'leise', text: 'Gewertet als' }),
       h('b', { text: NOTEN.find((n) => n.note === w.bewertung)?.name || '' }),
       termin ? h('span', { class: 'leise', text: `· wieder dran ${termin}` }) : null));
-    kasten.append(h('div', { class: 'frage-werkzeuge',
-                             style: 'justify-content:flex-start' },
+    kasten.append(h('div', { class: 'frage-werkzeuge' },
       h('button', { class: 'wichtig', onclick: () => this.naechste() }, 'Weiter'),
       h('button', {
         class: 'schlicht',
@@ -554,7 +551,7 @@ export async function zeichnen(behaelter) {
         h('span', { text: 'sitzt' })),
       h('div', { class: 'zahl' }, h('b', { text: String(stand.gesamt) }),
         h('span', { text: 'Aufgaben' }))),
-    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:1rem' },
+    h('div', { class: 'frage-werkzeuge', style: 'margin-top:1rem' },
       h('button', {
         class: 'wichtig',
         disabled: !(stand.faellig + stand.verlernt + stand.neu),

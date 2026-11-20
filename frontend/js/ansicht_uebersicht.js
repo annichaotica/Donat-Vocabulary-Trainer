@@ -348,8 +348,7 @@ async function modusWaehlen(behaelter, s) {
 
   el.append(nachWortart);
   if (vorhanden.length) el.append(zeiten);
-  el.append(h('div', { class: 'frage-werkzeuge',
-                       style: 'justify-content:flex-start' },
+  el.append(h('div', { class: 'frage-werkzeuge' },
     h('button', { onclick: () => { merken({ lernmodus: null });
                                    zeichnen(behaelter); } },
       'Zurück')));
@@ -480,7 +479,7 @@ export async function zeichnen(behaelter) {
       zahlKasten(gesamt.neu, 'neu', 'neu'),
       zahlKasten(gesamt.reif, 'sitzt'),
       zahlKasten(gesamt.gesamt, 'Aufgaben insgesamt')),
-    h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:1rem' },
+    h('div', { class: 'frage-werkzeuge', style: 'margin-top:1rem' },
       h('button', {
         class: 'wichtig',
         disabled: !(gesamt.faellig + gesamt.verlernt + gesamt.neu),
@@ -535,7 +534,7 @@ export async function zeichnen(behaelter) {
         zahlKasten(alleTexte.length, 'Texte'),
         zahlKasten(offeneAbschnitte, 'Abschnitte ohne Übersetzung')),
       h('div', { class: 'frage-werkzeuge',
-                 style: 'justify-content:flex-start;margin-top:.8rem' },
+                 style: 'margin-top:.8rem' },
         h('button', { class: 'wichtig',
                       onclick: () => { location.hash = '#/texte'; } },
           'Zum Regal'))));
@@ -568,7 +567,7 @@ export async function zeichnen(behaelter) {
           + 'Termin — auch über Lektionen und Sammlungen hinweg. Der Trainer '
           + 'rechnet daraus aus, wie viel täglich dran sein muss.' }));
   }
-  el.append(h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' },
+  el.append(h('div', { class: 'frage-werkzeuge' },
     h('button', { onclick: () => { location.hash = '#/ziele'; } },
       ziele.length ? 'Alle Lernziele' : 'Lernziel anlegen')));
 
@@ -626,7 +625,7 @@ export async function zeichnen(behaelter) {
         zahlKasten(stand.faellig, 'fällig', 'faellig'),
         zahlKasten(stand.neu, 'neu', 'neu'),
         zahlKasten(stand.verlernt, 'verlernt', 'verlernt')),
-      h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start;margin-top:.8rem' },
+      h('div', { class: 'frage-werkzeuge', style: 'margin-top:.8rem' },
         h('button', {
           class: 'wichtig',
           onclick: () => { merken({ sammlungId: s.id, lektionId: null }); location.hash = '#/lernen'; },
@@ -668,7 +667,7 @@ export async function zeichnen(behaelter) {
       h('details', { class: 'mehr-dazu' },
         h('summary', { text: 'Mehr mit dieser Sammlung' }),
         h('div', { class: 'frage-werkzeuge',
-                   style: 'justify-content:flex-start;margin-top:.5rem' },
+                   style: 'margin-top:.5rem' },
           h('button', {
             onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/ueben'; },
           }, 'Sätze'),

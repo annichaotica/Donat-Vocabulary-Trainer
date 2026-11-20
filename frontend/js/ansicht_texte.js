@@ -163,7 +163,7 @@ function teilBuch(behaelter, b, texte, stapelZeichnen) {
           + 'zuordnen.' }));
   }
   karte.append(h('div', { class: 'frage-werkzeuge',
-                          style: 'justify-content:flex-start;margin-top:.8rem' },
+                          style: 'margin-top:.8rem' },
     h('button', { class: 'schlicht', onclick: () => buchUmbenennen(behaelter, b) },
       'Umbenennen'),
     h('button', { class: 'schlicht gefahr',
@@ -228,7 +228,7 @@ function teilStapel(behaelter, buecher, texte, stapelZeichnen) {
   return h('div', { class: 'karte gezielt-stapel' },
     h('b', { text: `${angehakt.size} ausgewählt` }),
     h('div', { class: 'frage-werkzeuge',
-               style: 'justify-content:flex-start;flex-wrap:wrap' },
+               style: 'flex-wrap:wrap' },
       wohin, kapitel, liste,
       h('button', {
         class: 'wichtig',
@@ -395,8 +395,7 @@ export async function zeichnenText(behaelter, textId) {
     behaelter.append(teilAbschnitt(a, deckung, textId, behaelter));
   }
 
-  behaelter.append(h('div', { class: 'frage-werkzeuge',
-                              style: 'justify-content:flex-start' },
+  behaelter.append(h('div', { class: 'frage-werkzeuge' },
     h('button', { onclick: () => { location.hash = '#/texte'; } },
       'Zurück zu den Texten')));
 }
@@ -430,7 +429,7 @@ function teilLesart(text, behaelter, textId) {
   }, 'Übersetzung daneben');
 
   return h('div', { class: 'frage-werkzeuge',
-                    style: 'justify-content:flex-start;margin:.6rem 0' },
+                    style: 'margin:.6rem 0' },
     schalter,
     // Ehrlich sagen, wie viel überhaupt da ist. Beim Iwein ist es
     // nichts — und dann soll nicht ein leerer Kasten den Eindruck
@@ -463,7 +462,7 @@ function teilDeckung(d, textId, behaelter) {
     // anzutippen ist dann keine Bedienung mehr, sondern eine Strafe.
     z.unbekannt
       ? h('div', { class: 'frage-werkzeuge',
-                   style: 'justify-content:flex-start;margin-top:.6rem' },
+                   style: 'margin-top:.6rem' },
           h('button', {
             onclick: async (e) => {
               e.target.disabled = true;

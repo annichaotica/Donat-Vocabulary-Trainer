@@ -104,7 +104,7 @@ function kapitel(behaelter, spurKennung, nr) {
   // sie nicht gelesen.
   const weiter = nr + 1 < spur.kapitel.length;
   el.append(h('div', { class: 'frage-werkzeuge',
-                       style: 'justify-content:flex-start;margin-top:1rem' },
+                       style: 'margin-top:1rem' },
     nr > 0
       ? h('button', {
           onclick: () => { location.hash = `#/lehrgang/${spurKennung}/${nr - 1}`; },

@@ -643,22 +643,13 @@ export async function zeichnen(behaelter) {
         h('button', {
           onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/wortschatz'; },
         }, 'Wortschatz'),
-        h('button', {
-          onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/ueben'; },
-        }, 'Sätze'),
         // »Texte« stand hier einmal — bei drei Sammlungen dreimal, jedes
         // Mal mit einem anderen Ausschnitt dahinter. Bücher und Texte
         // gehören dem Konto und haben jetzt ihre eigene Karte weiter
         // oben.
-        h('button', { onclick: () => modusWaehlen(behaelter, s) }, 'Gezielt üben'),
-        h('button', {
-          onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/gezielt'; },
-          title: 'Wort für Wort festlegen, was abgefragt wird — Eigennamen '
-               + 'und Abkürzungen stillegen, ohne sie zu löschen.',
-        }, 'Auswahl'),
-        h('button', {
-          onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/import'; },
-        }, 'Einlesen'),
+        //
+        // Freigabe bleibt in der ersten Reihe, aber NUR solange etwas
+        // wartet: das ist der eine Fall, der eine Handlung verlangt.
         wartendes(s).length
           ? h('button', {
               onclick: () => {
@@ -666,15 +657,38 @@ export async function zeichnen(behaelter) {
                 location.hash = '#/freigabe';
               },
             }, 'Freigabe')
-          : null,
-        h('button', {
-          class: 'schlicht',
-          onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/einstellungen'; },
-        }, 'Einstellungen'),
-        h('button', {
-          class: 'schlicht', title: 'Diese Karte einklappen',
-          onclick: () => { einklappen(s.id, true); zeichnen(behaelter); },
-        }, 'Einklappen'))));
+          : null),
+      // Alles Weitere eine Klappe tiefer.
+      //
+      // Hier standen zehn gleich aussehende Knöpfe, davon neun ohne
+      // Hervorhebung — bei drei Sammlungen über dreißig auf der
+      // Startseite, bevor man überhaupt lernen kann. Was man täglich
+      // braucht, sind drei; der Rest ist Einrichtung und wird im
+      // Monat vielleicht einmal angefasst.
+      h('details', { class: 'mehr-dazu' },
+        h('summary', { text: 'Mehr mit dieser Sammlung' }),
+        h('div', { class: 'frage-werkzeuge',
+                   style: 'justify-content:flex-start;margin-top:.5rem' },
+          h('button', {
+            onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/ueben'; },
+          }, 'Sätze'),
+          h('button', { onclick: () => modusWaehlen(behaelter, s) }, 'Gezielt üben'),
+          h('button', {
+            onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/gezielt'; },
+            title: 'Wort für Wort festlegen, was abgefragt wird — Eigennamen '
+                 + 'und Abkürzungen stillegen, ohne sie zu löschen.',
+          }, 'Auswahl'),
+          h('button', {
+            onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/import'; },
+          }, 'Einlesen'),
+          h('button', {
+            class: 'schlicht',
+            onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/einstellungen'; },
+          }, 'Einstellungen'),
+          h('button', {
+            class: 'schlicht', title: 'Diese Karte einklappen',
+            onclick: () => { einklappen(s.id, true); zeichnen(behaelter); },
+          }, 'Einklappen')))));
   }
   el.append(reihe);
   el.append(await teilNeueSammlung(behaelter, sprachen));

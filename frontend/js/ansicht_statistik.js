@@ -163,12 +163,33 @@ function zahl(wert, beschriftung) {
 }
 
 
+/** Eine Zeile unter dem Diagramm, die sagt, was man angetippt hat.
+ *
+ * Die Zahlen hingen bisher ausschließlich in `<title>`-Elementen —
+ * also im Mouseover. Auf dem iPad und dem Handy, wo die Statistik
+ * tatsächlich angesehen wird, gibt es kein Mouseover: das Diagramm
+ * war dort ein stummes Bild.
+ *
+ * Der durchsichtige Treffbereich über jedem Balken war schon da; er
+ * bekommt jetzt auch ein onclick. Das `<title>` bleibt für die Maus.
+ */
+function ablesezeile() {
+  const zeile = h('p', { class: 'leise ablesung',
+                         text: 'Tippe einen Balken an.' });
+  return {
+    zeile,
+    zeigen: (text) => { zeile.textContent = text; },
+  };
+}
+
+
 /** Antworten je Tag, gestapelt nach Urteil. */
 function teilTaetigkeit(d) {
   const tage = d.taetigkeit;
   const hoechst = Math.max(...tage.map((t) => t.gesamt), 1);
   const breite = 100 / tage.length;
 
+  const ablesen = ablesezeile();
   const balken = tage.map((t, i) => {
     const x = i * breite;
     let unten = 0;
@@ -184,8 +205,15 @@ function teilTaetigkeit(d) {
     // Auch leere Tage bekommen eine Fläche — sonst gäbe es nichts,
     // worauf der Hinweistext hängen könnte.
     const feld = svg('rect', { x, y: 0, width: breite, height: 100,
-                               fill: 'transparent' });
-    feld.append(svg('title', {}, `${t.tag}: ${t.gesamt} Antworten`));
+                               fill: 'transparent', class: 'ablesefeld' });
+    const satz = t.gesamt
+      ? `${datumKurz(t.tag)}: ${t.gesamt} `
+        + `${t.gesamt === 1 ? 'Antwort' : 'Antworten'} · ${t.richtig} richtig`
+        + (t.fast ? `, ${t.fast} fast` : '')
+        + (t.falsch ? `, ${t.falsch} daneben` : '')
+      : `${datumKurz(t.tag)}: nichts gelernt`;
+    feld.append(svg('title', {}, satz));
+    feld.addEventListener('click', () => ablesen.zeigen(satz));
     return [...stuecke, feld];
   }).flat();
 
@@ -196,8 +224,15 @@ function teilTaetigkeit(d) {
                  + 'Grün richtig, gelb fast, rot daneben.' }),
     diagramm(balken),
     h('div', { class: 'diagramm-achse' },
-      h('span', { text: tage[0].tag.slice(5) }),
-      h('span', { text: 'heute' })));
+      h('span', { text: datumKurz(tage[0].tag) }),
+      h('span', { text: 'heute' })),
+    ablesen.zeile);
+}
+
+
+function datumKurz(iso) {
+  const [, m, t] = (iso || '').split('-');
+  return m ? `${Number(t)}.${Number(m)}.` : iso;
 }
 
 
@@ -216,16 +251,33 @@ function teilVorschau(d) {
                    + 'ein Wort zum ersten Mal beantwortet hast.' }));
   }
 
+  const ablesen = ablesezeile();
   const balken = reihe.map((v, i) => {
-    if (!v.n) return null;
-    const hoch = (v.n / hoechst) * 100;
-    const r = svg('rect', { x: i * breite + breite * 0.15, y: 100 - hoch,
-                            width: breite * 0.7, height: hoch,
-                            // Überfälliges ist Rückstand, nicht Zukunft.
-                            fill: i === 0 ? 'var(--falsch)' : 'var(--akzent)' });
-    r.append(svg('title', {}, `${v.beschriftung}: ${v.n}`));
-    return r;
-  }).filter(Boolean);
+    // Der Server beschriftet die Vorschau mit »MM-TT« (tag[5:]) — als
+    // Achsenmarke knapp genug, als Satz gelesen aber ein Rätsel
+    // (»12-20: 0 Aufgaben«). Hier steht Platz zur Verfügung.
+    const wann = v.tag ? datumKurz(v.tag) : v.beschriftung;
+    const satz = v.n
+      ? `${wann}: ${v.n} ${v.n === 1 ? 'Aufgabe' : 'Aufgaben'} fällig`
+      : `${wann}: nichts fällig`;
+    const stuecke = [];
+    if (v.n) {
+      const hoch = (v.n / hoechst) * 100;
+      stuecke.push(svg('rect', {
+        x: i * breite + breite * 0.15, y: 100 - hoch,
+        width: breite * 0.7, height: hoch,
+        // Überfälliges ist Rückstand, nicht Zukunft.
+        fill: i === 0 ? 'var(--falsch)' : 'var(--akzent)' }));
+    }
+    // Auch der leere Tag bekommt eine Fläche — sonst lässt sich die
+    // Lücke nicht abfragen, und gerade die will man verstehen.
+    const feld = svg('rect', { x: i * breite, y: 0, width: breite, height: 100,
+                               fill: 'transparent', class: 'ablesefeld' });
+    feld.append(svg('title', {}, satz));
+    feld.addEventListener('click', () => ablesen.zeigen(satz));
+    stuecke.push(feld);
+    return stuecke;
+  }).flat();
 
   return h('div', { class: 'karte' },
     h('h2', { style: 'margin-top:0', text: 'Was auf dich zukommt' }),
@@ -235,7 +287,12 @@ function teilVorschau(d) {
     diagramm(balken),
     h('div', { class: 'diagramm-achse' },
       h('span', { text: 'überfällig · heute' }),
-      h('span', { text: `in ${reihe.length - 2} Tagen` })));
+      // `reihe.length - 2`: der erste Eintrag ist »überfällig«, der
+      // zweite »heute«. Vorher stand hier dieselbe Rechnung ohne
+      // diesen Satz, und bei einer kürzeren Reihe stand eine falsche
+      // Zahl da.
+      h('span', { text: `in ${Math.max(0, reihe.length - 2)} Tagen` })),
+    ablesen.zeile);
 }
 
 

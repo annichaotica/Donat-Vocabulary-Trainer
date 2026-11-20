@@ -211,7 +211,9 @@ export async function zeichnen(behaelter) {
       });
 
       liste.append(h('div', { class: 'eintrag-zeile' },
-        kasten,
+        // Das Kästchen in ein Tippfeld hüllen: 17 px trifft auf dem
+        // Handy niemand zuverlässig, und gehakt wird hier im Dutzend.
+        h('label', { class: 'hakenfeld', title: 'auswählen' }, kasten),
         h('button', {
           class: 'eintrag', style: 'flex:1 1 auto',
           onclick: () => { location.hash = `#/wort/${l.id}`; },

@@ -156,7 +156,7 @@ function teilListe(behaelter, d) {
     zeichnen(behaelter);
   });
   const kopf = h('div', { class: 'gezielt-zeile gezielt-kopf' },
-    alleKasten,
+    h('label', { class: 'hakenfeld', title: 'alle auswählen' }, alleKasten),
     h('span', { class: 'leise',
                 text: `Wort (${d.woerter.length} angezeigt)` }),
     h('span', { class: 'leise', text: 'Aufgaben' }),
@@ -189,7 +189,7 @@ function teilListe(behaelter, d) {
     }, w.an ? 'ja' : 'nein');
 
     liste.append(h('div', { class: 'gezielt-zeile' + (w.an ? '' : ' ist-aus') },
-      kasten,
+      h('label', { class: 'hakenfeld', title: 'auswählen' }, kasten),
       h('span', {},
         h('b', { lang: d.sprache, text: w.lemma }),
         w.bedeutung

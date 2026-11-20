@@ -196,7 +196,7 @@ function teilTexte(behaelter, liste, stapelZeichnen, mitSammlung = false) {
             : t.uebersetzt ? ` · ${t.uebersetzt} übersetzt` : '')
          : '');
     halter.append(h('div', { class: 'eintrag-zeile' },
-      haken,
+      h('label', { class: 'hakenfeld', title: 'auswählen' }, haken),
       h('button', {
         class: 'eintrag', style: 'flex:1 1 auto',
         onclick: () => { location.hash = `#/texte/${t.id}`; },

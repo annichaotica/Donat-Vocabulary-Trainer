@@ -16,6 +16,44 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Drei Knöpfe statt zehn auf der Sammlungskarte
+
+Dort standen zehn gleich aussehende Knöpfe, davon neun ohne
+Hervorhebung — bei drei Sammlungen über dreißig auf der Startseite,
+bevor man überhaupt lernen kann.
+
+Oben bleiben die drei, die man täglich braucht: **Lernen, Abtippen,
+Wortschatz** — und *Freigabe*, solange etwas wartet, denn das ist der
+eine Fall, der eine Handlung verlangt. Alles Weitere steht unter
+**»Mehr mit dieser Sammlung«**: Sätze, Gezielt üben, Auswahl,
+Einlesen, Einstellungen, Einklappen. Das ist Einrichtung und wird im
+Monat vielleicht einmal angefasst.
+
+### Die Kästchen sind jetzt zu treffen
+
+Die Haken zum Auswählen waren **17 px** groß — im Wortschatz, bei den
+Texten und in »Gezielt lernen«, also genau dort, wo man dreißig Stück
+hintereinander anhakt. Sie sitzen jetzt in einem 44-px-Feld; das
+Kästchen selbst bleibt klein, nur die Trefferfläche wächst.
+
+Dazu die Durchsichtsknöpfe (»entziehen«, »Besitz übertragen«): ihre
+32 px gelten nur noch, wo mit der Maus gearbeitet wird.
+
+### Die Statistik gibt ihre Zahlen jetzt auch dem Finger
+
+Die Balken trugen ihre Zahlen ausschließlich im Mouseover. Auf dem
+iPad und dem Handy — wo die Statistik tatsächlich angesehen wird —
+gibt es kein Mouseover: das Diagramm war dort ein stummes Bild.
+
+Antippen schreibt die Zahl jetzt unter das Diagramm:
+
+> 20.11.: 1 Antwort · 0 richtig, 1 daneben
+> 20.12.: nichts fällig
+
+Auch leere Tage lassen sich abfragen — gerade die Lücke will man
+verstehen. Nebenbei berichtigt: die Vorschau beschriftete ihre
+Achse mit »12-20«, und bei kurzer Reihe stand dort eine falsche Zahl.
+
 ### Der Tipp-Deckel hat nie gewirkt
 
 Beim Nachgehen eines anderen Befundes aufgefallen und der schwerste

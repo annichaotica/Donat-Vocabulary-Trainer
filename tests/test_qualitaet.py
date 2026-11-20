@@ -594,3 +594,30 @@ def test_die_abfrage_schickt_die_genommenen_tipps_mit():
         aufruf = quelle[anfang:ende]
         assert re.search(r"\btipps\s*:", aufruf), \
             f"{name} schickt die genommenen Tipps nicht mit"
+
+
+def test_jedes_kaestchen_hat_ein_tippziel():
+    """17 px trifft auf dem Handy niemand zuverlässig.
+
+    `.eintrag-haken` ist 1,1 rem groß, die Kästchen in »Gezielt
+    lernen« tragen die Browservorgabe — und gehakt wird damit beim
+    Durchgehen von dreißig Wörtern, also genau dort, wo oft getroffen
+    werden muss. Der Dateikopf von stil.css sagt es selbst: »ein
+    Tippziel darf nie unter 44 px fallen«.
+
+    Die Lösung ist eine Umhüllung (`.hakenfeld`), nicht ein größeres
+    Kästchen: so bleibt die Darstellung, und die Trefferfläche wächst.
+    """
+    import pathlib
+    import re
+
+    for name in ("ansicht_wortschatz.js", "ansicht_texte.js",
+                 "ansicht_gezielt.js"):
+        quelle = pathlib.Path("frontend/js") .joinpath(name).read_text()
+        for stelle in re.finditer(r"type: 'checkbox'", quelle):
+            # Das Kästchen muss in einem .hakenfeld landen. Gesucht wird
+            # der Name der Variablen und dann ihre Verwendung.
+            umgebung = quelle[max(0, stelle.start() - 300):stelle.start() + 2000]
+            assert "hakenfeld" in umgebung, (
+                f"{name}: ein Kästchen ohne Tippziel bei Zeichen "
+                f"{stelle.start()}")

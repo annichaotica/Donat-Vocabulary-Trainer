@@ -478,7 +478,14 @@ input[type="file"] { max-width: 100%; }
   background: var(--grund-2);
 }
 .durchsicht-knoepfe { display: flex; gap: .4rem; }
+/* Die Untergrenze von 44 px wird hier abgeschaltet — aber NUR, wo
+   mit der Maus gearbeitet wird. Auf dem Finger bleibt sie: in der
+   Zugriffskarte der Einstellungen liegen damit »entziehen« und
+   »Besitz übertragen« als 32-px-Knöpfe nebeneinander, und beide sind
+   nicht zurückzunehmen. */
+@media (hover: hover) and (pointer: fine) {
 .durchsicht-knoepfe button { min-height: 0; padding: .3rem .7rem; font-size: .9em; }
+}
 
 
 /* Wer darf mitlernen: Name links, was man damit tun kann rechts. */
@@ -537,6 +544,49 @@ input[type="file"] { max-width: 100%; }
 /* Noch eine Spur zurückhaltender als `.leise` — für Vorsätze wie
    »wie bei:«, die nur sagen, wie das Folgende zu lesen ist. */
 .leiser { opacity: .75; }
+
+/* Die Ablesezeile unter einem Diagramm und ihr Treffbereich.
+   Der Zeiger sagt, dass hier etwas zu holen ist — und der Bereich ist
+   so breit wie eine Balkenspalte, also auch mit dem Finger zu
+   treffen. */
+.ablesefeld { cursor: pointer; }
+.ablesung {
+  margin: .5rem 0 0;
+  min-height: 1.4em;     /* damit die Karte beim Antippen nicht springt */
+}
+
+/* »Mehr mit dieser Sammlung« — die Klappe in der Sammlungskarte.
+   Ohne Rahmen und ohne eigene Fläche: sie liegt schon IN einer Karte,
+   und eine Karte in der Karte ist Kantenlärm. */
+.mehr-dazu { margin-top: .6rem; }
+.mehr-dazu > summary {
+  display: flex; align-items: center; gap: .4rem;
+  min-height: var(--tipp);
+  color: var(--leise); font-size: .92em; cursor: pointer;
+  list-style: none;
+}
+.mehr-dazu > summary::-webkit-details-marker { display: none; }
+.mehr-dazu > summary::before {
+  content: '›'; display: inline-block; transition: transform .15s;
+}
+.mehr-dazu[open] > summary::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .mehr-dazu > summary::before { transition: none; }
+}
+
+/* Ein Tippziel um das Kästchen herum.
+ *
+ * Das Kästchen selbst ist 1,1 rem — etwa 17 px. Gehakt wird damit
+ * beim Durchgehen von dreißig Wörtern, also genau dort, wo es
+ * besonders oft getroffen werden muss. Die Umhüllung macht die
+ * Trefferfläche auf 44 px, ohne das Kästchen zu vergrößern. */
+.hakenfeld {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: var(--tipp); min-height: var(--tipp);
+  flex: none; cursor: pointer;
+  /* Nach links ausgleichen, damit die Liste nicht einrückt. */
+  margin-left: calc((var(--tipp) - 1.1rem) / -2);
+}
 
 /* Die deutsche Bedeutung über einer Formenreihe. Ruhig gesetzt: sie
    ist Begleitung, nicht die Frage. */
@@ -946,7 +996,9 @@ input[type="file"] { max-width: 100%; }
 .gezielt-liste { margin-top: .8rem; }
 .gezielt-zeile {
   display: grid;
-  grid-template-columns: 1.6rem 1fr 4rem 5rem;
+  /* Erste Spalte so breit wie das Tippziel: darin liegt jetzt ein
+     44-px-Feld um das Kästchen. */
+  grid-template-columns: var(--tipp) 1fr 4rem 5rem;
   align-items: center; gap: .6rem;
   padding: .4rem .6rem;
   border-bottom: 1px solid var(--rand);

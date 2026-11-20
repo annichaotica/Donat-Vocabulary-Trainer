@@ -14,6 +14,41 @@ Eintrag wiederfindet.
 
 ---
 
+## 20.11.2026
+
+### Der Tipp stand weiß auf weiß
+
+»Auf dem Handy sind sie weiß auf weiß.«
+
+Im Stil stand `background: var(--sanft, #f3f1ec)` — und **`--sanft`
+gibt es nirgends.** Also griff immer die helle Ersatzfarbe, auch im
+Dunkelmodus, wo die Schrift hell ist. Nachgerechnet: Kontrast **1,08**.
+Das ist nicht »schlecht lesbar«, das ist unsichtbar.
+
+Jetzt die Grundfarben des Stils, die beide Richtungen kennen — Kontrast
+11,9. Dieselbe Falle steckte im Hinweiskasten (`--warnung-grund`, auch
+nie erklärt) und zweimal in einer Rundung (`--rundung-klein` statt
+`--rund-klein`).
+
+Ein Test verbietet den Fall jetzt: jede `var(--x)` im Stil muss
+irgendwo auch erklärt sein. Eine Ersatzfarbe ist dafür da, dass etwas
+sichtbar bleibt, wenn eine Variable fehlt — fehlt sie *immer*, ist die
+Ersatzfarbe die Farbe, und eine feste Farbe kennt nur eine Richtung.
+
+### Tipp und »Weiß ich nicht« stehen jetzt beim Antwortfeld
+
+»Kann die Tipp-Schaltfläche näher an das Eingabefenster heran.«
+
+Sie standen am Fuß der Seite, zwischen »Aussetzen« und »Schluss für
+heute« — die falsche Nachbarschaft: die beiden gehören zum
+**Antworten** und nicht zur Verwaltung der Aufgabe. Wer feststeckt,
+sucht sie neben dem Feld, in dem er feststeckt.
+
+Der Tipp selbst sieht auch anders aus: eine Kante in der Akzentfarbe,
+die Maske größer und mit mehr Luft zwischen den Zeichen, die Angaben
+darunter kleiner. Und die beiden Knöpfe haben eine leichte Umrandung
+bekommen — ohne sie sind es zwei graue Wörter unter dem Feld.
+
 ## 18.11.2026
 
 ### Der Segmentierungsfehler bei Versen

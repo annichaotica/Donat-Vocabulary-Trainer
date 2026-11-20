@@ -508,10 +508,15 @@ export class Sitzung {
       this.teilFortschritt(),
       this.teilFrage(),
       this.teilEingabe(),
+      // Gleich unter dem Feld, nicht am Fuß der Seite — und HIER und
+      // nicht in teilEingabe: die Auswahl- und Merkmalsaufgaben haben
+      // ihren eigenen Zweig, sonst verlören gerade sie »Weiß ich
+      // nicht«.
+      this.teilHilfen(),
+      this.teilTipp(),
       this.ergebnis ? this.teilRueckmeldung() : null,
       this.ergebnis && this.phase === 'rueckmeldung' ? this.teilWertung() : null,
       this.ergebnis && this.phase === 'rueckmeldung' ? this.teilSignale() : null,
-      this.teilTipp(),
       this.teilRegeln(),
       this.teilWarum(),
       this.teilEingriffe()));
@@ -633,6 +638,31 @@ export class Sitzung {
       if (leiste) kasten.append(leiste);
     }
     return kasten;
+  }
+
+  /** »Tipp« und »Weiß ich nicht« — direkt unter dem Antwortfeld.
+   *
+   * »Kann die Tipp-Schaltfläche näher an das Eingabefenster heran.«
+   *
+   * Sie standen am Fuß der Seite, zwischen »Aussetzen« und »Schluss
+   * für heute«. Das ist die falsche Nachbarschaft: die beiden gehören
+   * zum ANTWORTEN und nicht zur Verwaltung der Aufgabe. Wer feststeckt,
+   * sucht sie neben dem Feld, in dem er feststeckt.
+   *
+   * Der Tipp steht vor »Weiß ich nicht«: er ist das Kleinere, und wer
+   * ihn zuerst sieht, greift nicht gleich zur Lösung.
+   */
+  teilHilfen() {
+    if (this.phase === 'rueckmeldung') return null;
+    return h('div', { class: 'hilfen' },
+      h('button', {
+        class: 'schlicht',
+        title: 'Ein Anstoß, ohne die Lösung zu zeigen',
+        disabled: this.tipps >= 3,
+        onclick: () => this.tippHolen(),
+      }, this.tipps ? 'Noch ein Tipp' : 'Tipp'),
+      h('button', { class: 'schlicht', onclick: () => this.weissNicht() },
+        'Weiß ich nicht'));
   }
 
   /** Die ganze Tabelle auf einmal — ich gehe, du gehst, er/sie/es geht.
@@ -977,19 +1007,10 @@ export class Sitzung {
 
   teilEingriffe() {
     const kennung = { benutzer_id: zustand.benutzerId, aufgabe_id: this.aufgabe.aufgabe_id };
+    // »Tipp« und »Weiß ich nicht« stehen NICHT mehr hier, sondern
+    // gleich unter dem Antwortfeld (teilHilfen). Sie gehören zum
+    // Antworten; hier stehen die Dinge, die man mit der AUFGABE macht.
     const reihe = h('div', { class: 'frage-werkzeuge', style: 'justify-content:flex-start' });
-    if (this.phase !== 'rueckmeldung') {
-      // Der Tipp steht VOR »Weiß ich nicht«: er ist das Kleinere, und
-      // wer ihn zuerst sieht, greift nicht gleich zur Lösung.
-      reihe.append(h('button', {
-        class: 'schlicht',
-        title: 'Ein Anstoß, ohne die Lösung zu zeigen',
-        disabled: this.tipps >= 3,
-        onclick: () => this.tippHolen(),
-      }, this.tipps ? 'Noch ein Tipp' : 'Tipp'));
-      reihe.append(h('button', { class: 'schlicht', onclick: () => this.weissNicht() },
-        'Weiß ich nicht'));
-    }
     reihe.append(
       h('button', {
         class: 'schlicht', title: 'Diese Aufgabe nicht mehr abfragen',

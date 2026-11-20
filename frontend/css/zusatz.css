@@ -164,7 +164,7 @@ table.paradigma input[type="checkbox"] {
 .befund {
   margin: .4rem 0;
   padding: .45rem .6rem;
-  border-radius: var(--rundung-klein, .4rem);
+  border-radius: var(--rund-klein);
   border-left: 3px solid var(--fast);
   background: var(--fast-grund);
   font-size: .9em;
@@ -474,7 +474,7 @@ input[type="file"] { max-width: 100%; }
   margin: .6rem 0 1rem;
   padding: .45rem .7rem;
   border: 1px solid var(--rand);
-  border-radius: var(--rundung-klein, .4rem);
+  border-radius: var(--rund-klein);
   background: var(--grund-2);
 }
 .durchsicht-knoepfe { display: flex; gap: .4rem; }
@@ -531,11 +531,49 @@ input[type="file"] { max-width: 100%; }
 #meldung.fehler { background: var(--falsch, #b3261e); color: #fff; }
 
 
-/* Der Tipp: sichtbar, aber nicht so laut wie die Frage selbst. */
-.tipp { margin: .6rem 0; padding: .6rem .8rem; border-radius: .5rem;
-        background: var(--sanft, #f3f1ec); }
-.tipp-maske { font-size: 1.4em; letter-spacing: .12em; margin: 0 0 .2rem;
-              font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* Die Hilfen beim Antworten: Tipp und »Weiß ich nicht«.
+   Dicht unter dem Feld und etwas eingerückt — sie gehören dorthin und
+   nicht zu den Knöpfen am Fuß der Seite. */
+.hilfen {
+  display: flex; gap: .4rem; flex-wrap: wrap;
+  margin: .4rem 0 0;
+}
+.hilfen button {
+  padding: .35em .9em; min-height: var(--tipp);
+  /* Eine leichte Kante: ohne sie sind das zwei graue Wörter unter dem
+     Feld, und auf dem Handy übersieht man sie. Laut dürfen sie
+     trotzdem nicht werden — »Prüfen« ist der Knopf, um den es geht. */
+  border: 1px solid var(--rand);
+  border-radius: var(--rund-klein);
+}
+.hilfen button:disabled { opacity: .45; }
+
+/* Der Tipp: sichtbar, aber nicht so laut wie die Frage selbst.
+ *
+ * Hier stand `background: var(--sanft, #f3f1ec)`. Die Variable gibt es
+ * nirgends — also griff IMMER die helle Ersatzfarbe, auch im Dunkeln,
+ * wo die Schrift hell ist. Auf dem Handy stand der Tipp damit weiß auf
+ * weiß. Jetzt die Grundfarben des Stils, die beide Richtungen kennen,
+ * und `color` ausdrücklich dazu: ein Kasten, der seinen Hintergrund
+ * setzt und die Schriftfarbe erbt, ist genau dieselbe Falle noch
+ * einmal. */
+.tipp {
+  margin: .5rem 0 0;
+  padding: .7rem .9rem;
+  border-radius: var(--rund-klein);
+  background: var(--grund-3);
+  color: var(--text);
+  border-left: 3px solid var(--akzent);
+}
+.tipp-maske {
+  font-size: 1.5em; letter-spacing: .18em; margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  /* Die Maske ist das Eigentliche am Tipp — sie darf auf dem Handy
+     nicht umbrechen und zum Rätsel werden. */
+  overflow-x: auto; white-space: nowrap;
+}
+.tipp .leise { margin: .35rem 0 0; font-size: .9em; }
 
 .merktafel-hinweise { font-size: .9em; color: var(--leise);
                       margin: .2rem 0 .4rem; }
@@ -564,8 +602,14 @@ input[type="file"] { max-width: 100%; }
    `.marke` ist eine Pille für ein, zwei Wörter — sie bricht nicht um,
    und ein ganzer Satz darin lief aus der Karte heraus. */
 .hinweiskasten {
-  background: var(--warnung-grund, #fdf6e3);
-  border-left: 3px solid var(--warnung, #c89000);
+  /* --fast/--fast-grund statt eigener Warnfarben: dieser Ton ist im
+     Stil schon erklärt (»fast richtig«) und kennt den Dunkelmodus.
+     Hier stand var(--warnung-grund, #fdf6e3) — eine Variable, die es
+     nirgends gibt, also immer die helle Festfarbe. Im Dunkeln dann
+     helle Schrift auf hellem Grund, genau wie beim Tipp. */
+  background: var(--fast-grund);
+  color: var(--text);
+  border-left: 3px solid var(--fast);
   border-radius: 0 var(--rund-klein) var(--rund-klein) 0;
   padding: .5rem .7rem;
   margin: .6rem 0;

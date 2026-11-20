@@ -492,3 +492,35 @@ def test_keine_zwei_routenfunktionen_heissen_gleich():
             namen[knoten.name].append(knoten.lineno)
     doppelt = {n: z for n, z in namen.items() if len(z) > 1}
     assert not doppelt, f"Doppelt vergebene Namen in app.py: {doppelt}"
+
+
+def test_kein_stil_greift_auf_eine_unbekannte_variable_zurueck():
+    """»Auf dem Handy sind sie weiß auf weiß.«
+
+    Im Stil stand `background: var(--sanft, #f3f1ec)`. `--sanft` gibt
+    es nirgends — also griff IMMER die helle Ersatzfarbe, auch im
+    Dunkeln, wo die Schrift hell ist. Der Tipp stand damit weiß auf
+    weiß.
+
+    Eine Ersatzfarbe ist genau dafür da, dass etwas sichtbar bleibt,
+    wenn die Variable fehlt. Fehlt sie IMMER, ist die Ersatzfarbe die
+    Farbe — und eine feste Farbe kennt nur eine Richtung.
+    """
+    import pathlib
+    import re
+
+    erklaert = set()
+    benutzt = {}
+    for datei in sorted(pathlib.Path("frontend/css").glob("*.css")):
+        # OHNE die Kommentare. Dort steht, was einmal falsch war —
+        # beim ersten Lauf hat der Test sich an der Erklärung des
+        # Fehlers gestört, die direkt über dessen Behebung stand.
+        text = re.sub(r"/\*.*?\*/", "", datei.read_text(), flags=re.S)
+        erklaert |= set(re.findall(r"(--[a-z0-9-]+)\s*:", text))
+        for name in re.findall(r"var\(\s*(--[a-z0-9-]+)", text):
+            benutzt.setdefault(name, datei.name)
+    # Von der Oberfläche zur Laufzeit gesetzt, nicht im Stilblatt:
+    # app.js gibt der Kopfzeile die Farbe der gewählten Sammlung.
+    erklaert |= {"--sammlungsfarbe"}
+    fehlend = {n: d for n, d in benutzt.items() if n not in erklaert}
+    assert not fehlend, f"Unbekannte CSS-Variablen: {fehlend}"

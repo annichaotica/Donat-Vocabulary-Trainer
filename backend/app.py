@@ -3351,7 +3351,10 @@ def oauth_client_zuruecknehmen(client_id: str, db: sqlite3.Connection = DB):
 
 # ============================================================ Oberfläche
 
-QUELLTEXT = "https://github.com/annichaotica/vokabeltrainer"
+# Die Adresse, die der AGPL-Hinweis nennt. Umbenannt am 20.11.2026;
+# GitHub leitet die alte zwar weiter, aber ein Hinweis nach §13 soll
+# nicht auf eine Weiterleitung zeigen.
+QUELLTEXT = "https://github.com/annichaotica/Donat-Vocabulary-Trainer"
 
 
 @app.get("/api/zustand")

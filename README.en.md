@@ -1,7 +1,7 @@
 # Donat
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/annichaotica/vokabeltrainer)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/annichaotica/Donat-Vocabulary-Trainer)
 
 *Deutsch: [README.md](README.md)*
 
@@ -59,7 +59,7 @@ anywhere but your own machine.
 
 ### Codespaces — nothing to install
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/annichaotica/vokabeltrainer)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/annichaotica/Donat-Vocabulary-Trainer)
 
 The container installs the dependencies, creates a sample course and
 opens the trainer on port 8030. First build takes a few minutes; after
@@ -68,7 +68,7 @@ that it starts in seconds.
 ### Docker — the finished image
 
 ```sh
-curl -O https://raw.githubusercontent.com/annichaotica/vokabeltrainer/main/docker-compose.beispiel.yml
+curl -O https://raw.githubusercontent.com/annichaotica/Donat-Vocabulary-Trainer/main/docker-compose.beispiel.yml
 docker compose -f docker-compose.beispiel.yml up
 ```
 

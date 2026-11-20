@@ -1,7 +1,7 @@
 # Vokabeltrainer
 
 [![Lizenz: AGPL v3](https://img.shields.io/badge/Lizenz-AGPL%20v3-blue.svg)](LICENSE)
-[![In GitHub Codespaces öffnen](https://github.com/codespaces/badge.svg)](https://codespaces.new/annichaotica/vokabeltrainer)
+[![In GitHub Codespaces öffnen](https://github.com/codespaces/badge.svg)](https://codespaces.new/annichaotica/Donat-Vocabulary-Trainer)
 
 *English: [README.en.md](README.en.md)*
 

@@ -1,6 +1,6 @@
 # Zum Ausprobieren: das fertige Abbild, ohne Klonen und ohne Bauen.
 #
-#   curl -O https://raw.githubusercontent.com/annichaotica/vokabeltrainer/main/docker-compose.beispiel.yml
+#   curl -O https://raw.githubusercontent.com/annichaotica/Donat-Vocabulary-Trainer/main/docker-compose.beispiel.yml
 #   docker compose -f docker-compose.beispiel.yml up
 #
 # Dann http://localhost:8030 aufrufen. Beim ersten Start entsteht ein

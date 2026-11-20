@@ -92,7 +92,7 @@ Tests: `.venv/bin/python -m pytest tests/ -q`
 
 ## Connecting an AI over MCP
 
-The trainer exposes an **MCP server** with 41 tools, so a chat program
+The trainer exposes an **MCP server** with 54 tools, so a chat program
 (Claude, ChatGPT) can fill and check the stock: create words, complete
 paradigms, set up language profiles, add grammar rules, post reading
 texts, generate practice sentences, read the learning state.

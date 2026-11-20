@@ -5,7 +5,7 @@
  * bekommt genau diese Felder — und nicht alle fünfzehn Zeiten. */
 
 import { api } from './api.js';
-import { h, leeren, meldung, sprechen, tun } from './hilfen.js';
+import { h, kapitelname, leeren, meldung, sprechen, tun } from './hilfen.js';
 import { stammdaten } from './stammdaten.js';
 import { zustand, merken } from './zustand.js';
 
@@ -71,8 +71,7 @@ export async function zeichnen(behaelter) {
     h('option', { value: '', text: 'alle Kapitel' }),
     lektionen.map((k) => h('option', {
       value: String(k.id),
-      text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen')
-          + ` (${k.lexeme})`,
+      text: `${kapitelname(k.nr, k.name)} (${k.lexeme})`,
     })),
     h('option', { value: OHNE_KAPITEL, text: 'ohne Kapitel' }));
   lektionWahl.value = filter.lektion;
@@ -118,7 +117,7 @@ export async function zeichnen(behaelter) {
       h('option', { value: '', text: 'Kapitel wählen …' }),
       lektionen.map((k) => h('option', {
         value: String(k.id),
-        text: (k.nr !== null ? `${k.nr}. ` : '') + (k.name || 'ohne Namen'),
+        text: kapitelname(k.nr, k.name),
       })),
       h('option', { value: OHNE_KAPITEL, text: 'ohne Kapitel' }));
     const neueNr = h('input', { type: 'number', min: '0', max: '9999',
@@ -195,8 +194,7 @@ export async function zeichnen(behaelter) {
         liste.append(h('h2', { class: 'kapitelkopf',
           text: l.lektion_id === null
             ? 'Ohne Kapitel'
-            : (l.lektion_nr !== null ? `${l.lektion_nr}. ` : '')
-              + (l.lektion_name || 'ohne Namen') }));
+            : kapitelname(l.lektion_nr, l.lektion_name) }));
       }
 
       const kasten = h('input', { type: 'checkbox', class: 'eintrag-haken',

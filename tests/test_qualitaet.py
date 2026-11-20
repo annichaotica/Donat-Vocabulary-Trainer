@@ -951,3 +951,53 @@ def test_der_ring_im_kopf_startet_keine_abfrage():
     assert ziele, "Der Ring führt nirgendwohin"
     assert not any(z.startswith("#/lernen") for z in ziele), \
         f"Der Ring startet eine Abfrage: {ziele}"
+
+
+def test_ein_kapitel_wird_nur_einmal_beschriftet():
+    """»Bei ihr werden die Units zweimal angezeigt.«
+
+    Der Trainer führt je Sammlung eine laufende Nummer — für die
+    Reihenfolge und für die Lehrgangsschranke. Angezeigt wurde sie
+    ZUSÄTZLICH zum Namen, und bei einem Lehrwerk, dessen Kapitel schon
+    »Unit 1.4 Zahlen« heißen, stand da »5. Unit 1.4 Zahlen«: zwei
+    Zählungen für dieselbe Sache, die sich auch noch widersprechen.
+
+    Die Regel steht in hilfen.kapitelname(). Wer sie umgeht und Nummer
+    und Namen selbst zusammensetzt, baut das Doppelte wieder ein.
+    """
+    import pathlib
+    import re
+
+    muster = re.compile(
+        r"\$\{[a-z_.]*(?:nr|lektion_nr)\}\.?\s*[`'\"]?\s*\+?\s*"
+        r"[^;\n]*(?:name|lektion_name)")
+    funde = []
+    for datei in sorted(pathlib.Path("frontend/js").glob("*.js")):
+        if datei.name == "hilfen.js":
+            continue          # dort steht die Regel selbst
+        text = datei.read_text()
+        for nr, zeile in enumerate(text.splitlines(), 1):
+            if muster.search(zeile):
+                funde.append(f"{datei.name}:{nr}: {zeile.strip()[:72]}")
+    assert not funde, (
+        "Nummer und Name zusammengesetzt — kapitelname() benutzen:\n"
+        + "\n".join(funde))
+
+
+def test_die_kapitelbeschriftung_steht_an_einer_stelle():
+    """Sonst läuft sie wieder auseinander.
+
+    In der Freigabe stand ein eigener Riegel: »Lektion 5 — Lektion 5 zu
+    schreiben wäre albern«. Er verglich auf Gleichheit und griff damit
+    nur beim Einlesen ohne Namen — wessen Kapitel anders heißen, las
+    weiter beides.
+    """
+    import pathlib
+
+    hilfen = pathlib.Path("frontend/js/hilfen.js").read_text()
+    assert "export function kapitelname(" in hilfen
+
+    for datei in ("ansicht_wortschatz.js", "ansicht_freigabe.js"):
+        quelle = pathlib.Path("frontend/js") / datei
+        text = quelle.read_text()
+        assert "kapitelname" in text, f"{datei} beschriftet Kapitel selbst"

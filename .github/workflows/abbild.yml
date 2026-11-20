@@ -39,12 +39,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Quelltext holen
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Erst prüfen, dann bauen. Ein Abbild aus einem Stand, dessen
       # Tests nicht laufen, ist schlimmer als keines: es sieht fertig aus.
       - name: Python einrichten
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.13"
 
@@ -55,7 +55,7 @@ jobs:
         run: python -m pytest tests/ -q
 
       - name: Anmelden bei ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRIERUNG }}
           username: ${{ github.actor }}
@@ -65,7 +65,7 @@ jobs:
       # `neuste` nur bei einer echten Veröffentlichung.
       - name: Marken bestimmen
         id: marken
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRIERUNG }}/${{ github.repository_owner }}/${{ env.ABBILD_NAME }}
           tags: |
@@ -75,7 +75,7 @@ jobs:
             type=raw,value=${{ inputs.marke }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Bauen und schieben
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: ${{ github.event_name == 'release' }}

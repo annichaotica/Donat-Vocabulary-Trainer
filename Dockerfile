@@ -7,9 +7,9 @@
 # Dependabot zieht den Digest nach; der Tag davor bleibt als Lesehilfe.
 #
 # Neu holen:
-#   docker pull python:3.13-slim
-#   docker image inspect --format '{{index .RepoDigests 0}}' python:3.13-slim
-FROM python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
+#   docker pull python:3.15-slim
+#   docker image inspect --format '{{index .RepoDigests 0}}' python:3.15-slim
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 
 # Kein Schreibrecht auf den Code, nur auf das Datenverzeichnis.
 RUN useradd --create-home --uid 10001 vokabel

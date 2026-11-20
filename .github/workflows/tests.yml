@@ -1,0 +1,50 @@
+# Die Tests bei jedem Pull Request und auf main.
+#
+# Damit es überhaupt etwas gibt, das sich als Pflichtprüfung für den
+# geschützten Zweig auswählen lässt. Die Abbild-Action taugt dafür
+# nicht: sie läuft nur bei einer Veröffentlichung, und bis dahin wäre
+# jeder PR ungeprüft.
+#
+# Node gehört dazu, auch wenn hier kein JavaScript ausgeführt wird:
+# tests/test_oberflaeche.py prüft mit `node --check` jede .js-Datei als
+# ES-Modul. Ohne node überspringt der Test sich selbst — und dann
+# bestätigt die grüne Fertigungsstraße etwas, das sie gar nicht
+# angesehen hat. Am 15.11.2026 ist genau so eine Datei mit einem
+# Syntaxfehler ausgeliefert worden.
+
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Abhängigkeiten
+        run: pip install -r requirements.txt -r requirements-test.txt
+
+      # Erst die Syntaxprüfung der Oberfläche, dann die Tests: sie ist in
+      # zwei Sekunden durch und sagt bei einem kaputten Modul genauer,
+      # welche Datei es ist.
+      - name: Oberfläche syntaktisch prüfen
+        run: ./werkzeuge/js-pruefen.sh
+
+      - name: Tests
+        run: python -m pytest tests/ -q

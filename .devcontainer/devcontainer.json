@@ -23,6 +23,14 @@
 
   "postAttachCommand": {
     // Im Hintergrund, damit der Reiter nicht an der Ausgabe hängt.
+    //
+    // BEISPIELDATEN steht HIER und nicht in containerEnv: als Teil der
+    // Umgebung gilt es auch für `pytest` im Terminal, und dann entsteht
+    // der Beispielbestand in jeder Testdatenbank. Gemessen waren das 40
+    // Fehlschläge — das Demoprofil bekommt die 1, und Tests, die mit
+    // benutzer_id=1 ihr eigenes Profil meinen, prüfen fremde Rechte.
+    // (Die conftest entfernt die Variable zusätzlich; zwei Riegel,
+    // weil der eine im Codespace und der andere überall wirkt.)
     "trainer": "BEISPIELDATEN=1 python -m uvicorn app:app --app-dir backend --host 0.0.0.0 --port 8030"
   },
 
@@ -39,7 +47,6 @@
     // Codespace gibt es kein eingehängtes Verzeichnis, und /daten
     // gehört dort niemandem.
     "VOKABEL_DB": "${containerWorkspaceFolder}/daten/vokabeltrainer.db",
-    "BEISPIELDATEN": "1",
     "PYTHONDONTWRITEBYTECODE": "1"
   },
 

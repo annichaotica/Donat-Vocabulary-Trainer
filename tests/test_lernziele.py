@@ -445,3 +445,62 @@ def test_ein_ausschnitt_ohne_wort_sagt_das_zuerst(klient):
     f = klient.get(f"/api/lernziele/{ziel['id']}/fortschritt",
                    params={"benutzer_id": b["id"]}).json()
     assert "Kein Wort" in " ".join(f["warum_leer"]), f["warum_leer"]
+
+
+def test_die_aufgabe_traegt_den_stand_ihres_ziels_mit(klient):
+    """»Warum steht beim Lernziel 70 von 120 heute und in der
+    Übersicht 0 von 28? Was wird da denn gezählt?«
+
+    Zweierlei, und beides richtig: 0 von 28 ist der Stand des Ziels,
+    70 von 120 das Tagespensum über alle Sammlungen und Ziele
+    zusammen. Nur standen die beiden Brüche einen Fingertipp
+    auseinander und sahen aus, als müssten sie zusammengehören.
+
+    Wer ein Ziel abfragt, will dessen Fortschritt sehen — und dafür
+    muss er an der Aufgabe hängen. Gerechnet ist er ohnehin: der Block
+    braucht ihn selbst.
+    """
+    b, s, lektionen = _aufbau(klient, woerter=4)
+    ziel = klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alles", "ziel": "reif",
+        "termin": (dt.date.today() + dt.timedelta(days=30)).isoformat()}).json()
+
+    aufgaben = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "lernziel_id": ziel["id"], "anzahl": 3}).json()
+    assert aufgaben
+    lz = aufgaben[0]["lernziel"]
+    assert lz["id"] == ziel["id"] and lz["name"] == "Alles"
+    assert lz["gesamt"] == 8          # vier Wörter, je zwei Aufgaben
+    assert lz["geschafft"] == 0
+    assert lz["angefangen"] == 0
+    assert lz["ziel"] == "reif"
+
+    # Eine beantworten — »angefangen« zieht an, »geschafft« nicht.
+    #
+    # Das ist der ganze Punkt der Zahl: »reif« heißt Intervall ab 21
+    # Tagen, und das vergeht in 21 Tagen. Ohne »angefangen« stünde
+    # wochenlang 0 von 8 da und sähe nach Stillstand aus.
+    klient.post("/api/lernen/bewerten", json={
+        "benutzer_id": b["id"], "aufgabe_id": aufgaben[0]["aufgabe_id"],
+        "bewertung": 3})
+    nachher = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "lernziel_id": ziel["id"], "anzahl": 1}
+    ).json()[0]["lernziel"]
+    assert nachher["angefangen"] == 1
+    assert nachher["geschafft"] == 0
+
+
+def test_die_allgemeine_abfrage_traegt_kein_lernziel(klient):
+    """Sonst behauptete sie eines, das sie gar nicht abfragt.
+
+    Der große »Lernen« auf der Heute-Karte ruft naechste() ohne
+    lernziel_id; der Planer zieht dann über den ganzen Bestand.
+    """
+    b, s, lektionen = _aufbau(klient, woerter=4)
+    klient.post("/api/lernziele", json={
+        "benutzer_id": b["id"], "name": "Alles",
+        "termin": (dt.date.today() + dt.timedelta(days=30)).isoformat()})
+    aufgaben = klient.get("/api/lernen/naechste", params={
+        "benutzer_id": b["id"], "anzahl": 3}).json()
+    assert aufgaben
+    assert all("lernziel" not in a for a in aufgaben)

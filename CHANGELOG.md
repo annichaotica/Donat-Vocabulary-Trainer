@@ -16,6 +16,56 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Im Lernziel zählt jetzt das Lernziel
+
+»Warum steht bei meinem Lernziel *70 von 120 heute* und in der
+Übersicht *0 von 28*? Was wird da denn gezählt?«
+
+Zweierlei, und beides war richtig: **0 von 28** ist der Stand des
+Ziels, **70 von 120** das Tagespensum über alle Sammlungen und Ziele
+zusammen. Nur standen die beiden Brüche seit gestern einen Fingertipp
+auseinander und sahen aus, als müssten sie zusammengehören.
+
+Wer ein Ziel abfragt, sieht jetzt oben dessen Fortschritt:
+
+> **Verben alle: 0 von 19 · 12 angefangen · heute 19 von 80**
+
+Der Balken gehört dem Ziel, die Tageszahl steht leiser daneben — sie
+sagt ja, wann Schluss ist. In der allgemeinen Abfrage bleibt alles wie
+bisher.
+
+Neu dabei ist **»angefangen«**. Ein Ziel mit Haken *reif* (»sitzt
+dauerhaft«) verlangt einen Wiederholungsabstand von 21 Tagen — und der
+vergeht in 21 Tagen. Ohne diese Zahl stünde wochenlang »0 von 19« da
+und sähe nach Stillstand aus, während in Wahrheit schon zwölf laufen.
+
+### Der Ring in der Kopfzeile führt zum Fortschritt
+
+»Da wurde mir jetzt aber ein spanischer Begriff gezeigt. Macht es denn
+überhaupt Sinn, über diesen Button zum allgemeinen Lernen zu
+springen?«
+
+Nein. Er sprang nach *Lernen*, **ohne** vorher die Sammlung zu leeren —
+also in das, was zuletzt eingestellt war. Vor allem aber ist er eine
+Anzeige und kein Startknopf: wer auf eine Zahl tippt, will wissen, was
+dahintersteckt. Das steht unter **»Dein Fortschritt«** — Stufe,
+Punkte, Strähne, überbrückte Fehltage. Gelernt wird von der Übersicht
+aus, wo auch dasteht, *was* man lernt.
+
+### Knöpfe ohne Rand sahen aus wie Text
+
+*Fortschritt* und *Zuspruch schicken* standen in einer Reihe mit
+gerahmten Knöpfen, hatten selbst aber keinen Rand — sichtbar wurden
+sie erst beim Überfahren, und auf dem Handy fährt niemand über etwas.
+Sie sind jetzt gerahmt wie ihre Nachbarn, ebenso *Ausklappen* an der
+eingeklappten Sammlungskarte und *Einstellungen* / *Einklappen* unter
+»Mehr mit dieser Sammlung«.
+
+Die beiden, die wie ein Link in einer Textzeile stehen (»3
+eingeklappt — alle zeigen«, »Diese Karte ausblenden«), bleiben leise.
+Dort ist die Zurückhaltung richtig.
+
+
 ### Was einen Termin hat, steht jetzt oben — und ist der Knopf
 
 Die Lernziele standen auf der Übersicht nicht nur unter der

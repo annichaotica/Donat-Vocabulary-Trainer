@@ -722,8 +722,22 @@ def naechste(db: sqlite3.Connection, benutzer_id: int,
                                     e["wunschretention"], e["legasthenie"],
                                     e["beschriftung"]),
                 "herkunft": eintrag["herkunft"],
+                # Der Stand des ZIELS, nicht des Tages.
+                #
+                # »Warum steht beim Lernziel 70 von 120 heute und in
+                # der Übersicht 0 von 28?« — Weil der Balken in der
+                # Abfrage das Tagespensum misst, über alle Sammlungen
+                # und Ziele zusammen. Das ist richtig und steht an der
+                # falschen Stelle: wer gerade ein Ziel abfragt, will
+                # dessen Fortschritt sehen. Gerechnet ist er ohnehin,
+                # der Block braucht ihn selbst.
                 "lernziel": {"id": lernziel_id, "name": plan["name"],
-                             "begruendung": plan["begruendung"]},
+                             "begruendung": plan["begruendung"],
+                             "ziel": plan["fortschritt"]["ziel"],
+                             "gesamt": plan["fortschritt"]["gesamt"],
+                             "geschafft": plan["fortschritt"]["geschafft"],
+                             "angefangen": plan["fortschritt"]["angefangen"],
+                             "lage": plan["fortschritt"]["lage"]},
             })
         return ergebnis
 

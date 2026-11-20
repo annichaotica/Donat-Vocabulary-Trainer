@@ -136,8 +136,21 @@ function verdrahten() {
   for (const knopf of document.querySelectorAll('.kopf-knoepfe button[data-ziel]')) {
     knopf.addEventListener('click', () => { location.hash = knopf.dataset.ziel; });
   }
+  // Der Ring zeigt den Tagesstand und die Strähne — und führte bisher
+  // mitten in eine Abfrage.
+  //
+  // »Da wurde mir jetzt aber ein spanischer Begriff gezeigt. Macht es
+  // denn überhaupt Sinn, über diesen Button zum allgemeinen Lernen zu
+  // springen?« — Nein. Er sprang nach #/lernen OHNE die Sammlung zu
+  // leeren, also in das, was zuletzt eingestellt war; und er ist eine
+  // Anzeige, kein Startknopf. Wer auf eine Zahl tippt, will wissen,
+  // was dahintersteckt.
+  //
+  // »Dein Fortschritt« ist genau die Seite dazu: Stufe, Punkte,
+  // Strähne, überbrückte Fehltage. Gestartet wird von der Übersicht,
+  // wo auch steht, WAS man lernt.
   document.getElementById('kopf-spiel').addEventListener('click', () => {
-    location.hash = '#/lernen';
+    location.hash = '#/statistik';
   });
   document.getElementById('knopf-profil').addEventListener('click', () => {
     // Von außen gibt es nichts zu wechseln.

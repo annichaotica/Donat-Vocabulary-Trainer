@@ -610,21 +610,41 @@ export class Sitzung {
       ? `${p.heute_erledigt} von ${marke} heute`
         + (g.gesamt ? ` · ${g.richtig} richtig` : '')
       : (g.gesamt ? `${g.gesamt} bearbeitet · ${g.richtig} richtig` : 'Los geht’s');
-    // In welchem Lernziel man steckt.
+    // Steckt man in einem Lernziel, misst der Balken DAS ZIEL.
     //
-    // Der Server schickt es seit jeher an jeder Aufgabe mit, die
-    // Oberfläche hat es nie angezeigt. Das fiel nicht auf, solange ein
-    // Ziel nur über die Lernzielseite zu starten war — man kam ja
-    // gerade von dort. Seit der Terminstreifen auf der Übersicht
-    // unmittelbar eine Zielabfrage startet, ist der Unterschied
-    // zwischen »planmäßig über alles« und »dieses Ziel« nicht mehr am
-    // Weg abzulesen. Dann muss er dastehen.
+    // »Warum steht bei meinem Lernziel 70 von 120 heute und in der
+    // Übersicht 0 von 28? Was wird da denn gezählt?« — Zweierlei, und
+    // beides richtig: 0 von 28 ist der Stand des Ziels, 70 von 120 das
+    // Tagespensum über alle Sammlungen und Ziele zusammen. Nur standen
+    // die beiden Brüche einen Fingertipp auseinander und sahen aus,
+    // als müssten sie zusammengehören.
+    //
+    // Wer ein Ziel abfragt, will dessen Fortschritt sehen. Die
+    // Tageszahl bleibt daneben stehen — sie sagt, wann Schluss ist —,
+    // aber sie ist nicht mehr der Balken.
     const ziel = this.aufgabe?.lernziel;
+    if (ziel && ziel.name && ziel.gesamt) {
+      const zielanteil = Math.round((ziel.geschafft / ziel.gesamt) * 100);
+      // Bei Haken »reif« bewegt sich `geschafft` in den ersten drei
+      // Wochen nicht: reif heißt Intervall ab 21 Tagen. Ohne die Zahl
+      // der angefangenen sähe 0 von 28 nach Stillstand aus, während
+      // in Wahrheit schon sechs laufen.
+      const stockt = ziel.ziel === 'reif' && !ziel.geschafft
+                  && ziel.angefangen > 0;
+      return h('div', {},
+        h('div', { class: 'fortschritt' },
+          h('i', { style: `width:${zielanteil}%` })),
+        h('p', { class: 'leise lernzielzeile', style: 'margin:.3rem 0 0' },
+          h('b', { text: ziel.name }), ': ',
+          `${ziel.geschafft} von ${ziel.gesamt}`,
+          stockt
+            ? h('span', { text: ` · ${ziel.angefangen} angefangen` })
+            : null,
+          marke ? h('span', { class: 'leiser',
+                              text: ` · heute ${p.heute_erledigt} von ${marke}` })
+                : null));
+    }
     return h('div', {},
-      ziel && ziel.name
-        ? h('p', { class: 'leise lernzielzeile', style: 'margin:0 0 .3rem' },
-            'Lernziel: ', h('b', { text: ziel.name }))
-        : null,
       h('div', { class: 'fortschritt' }, h('i', { style: `width:${anteil}%` })),
       h('p', { class: 'leise', style: 'margin:.3rem 0 0', text }));
   }

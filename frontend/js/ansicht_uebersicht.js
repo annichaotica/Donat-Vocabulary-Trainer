@@ -174,7 +174,6 @@ function teilEingeklappt(behaelter, s, stand) {
                          location.hash = '#/lernen'; },
       }, 'Lernen'),
       h('button', {
-        class: 'schlicht',
         onclick: () => { einklappen(s.id, false); zeichnen(behaelter); },
       }, 'Ausklappen')));
 }
@@ -565,15 +564,16 @@ export async function zeichnen(behaelter) {
         'Frei üben'),
       h('button', { onclick: () => { merken({ sammlungId: null }); location.hash = '#/lernen/fehler'; } },
         'Fehler wiederholen'),
-      h('button', { class: 'schlicht',
-                    onclick: () => { location.hash = '#/statistik'; } },
+      // Ohne Rand sahen diese beiden in einer Reihe aus gerahmten
+      // Knöpfen nach Text aus — sichtbar wurden sie erst beim
+      // Überfahren, und auf dem Handy fährt niemand über etwas.
+      h('button', { onclick: () => { location.hash = '#/statistik'; } },
         'Fortschritt'),
       // Erst zeigen, wenn es überhaupt jemanden gibt, dem man etwas
       // schicken darf. Ein Knopf, hinter dem »geht nicht« steht, ist
       // schlimmer als keiner.
       (post && post.empfaenger.length)
-        ? h('button', { class: 'schlicht',
-                        onclick: () => { location.hash = '#/zuspruch'; } },
+        ? h('button', { onclick: () => { location.hash = '#/zuspruch'; } },
             'Zuspruch schicken')
         : null),
     anfuegen(h('p', { class: 'leise', style: 'margin:.8rem 0 0' }),
@@ -744,11 +744,10 @@ export async function zeichnen(behaelter) {
             onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/import'; },
           }, 'Einlesen'),
           h('button', {
-            class: 'schlicht',
             onclick: () => { merken({ sammlungId: s.id }); location.hash = '#/einstellungen'; },
           }, 'Einstellungen'),
           h('button', {
-            class: 'schlicht', title: 'Diese Karte einklappen',
+            title: 'Diese Karte einklappen',
             onclick: () => { einklappen(s.id, true); zeichnen(behaelter); },
           }, 'Einklappen')))));
   }

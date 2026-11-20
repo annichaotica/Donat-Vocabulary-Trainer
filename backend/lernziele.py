@@ -321,6 +321,12 @@ def fortschritt(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
                   if r["zustand"] in ("lernen", "reif")
                   and r["faellig"] and r["faellig"] <= heute)
     verlernt = sum(1 for r in reihe if r["zustand"] == "verlernt")
+    # Wenigstens einmal beantwortet. Bei einem Ziel mit Haken »reif«
+    # ist das die einzige Zahl, die sich in den ersten drei Wochen
+    # überhaupt bewegt: »reif« heißt Intervall ab 21 Tagen, und das
+    # vergeht in 21 Tagen. Ohne sie steht dort 0 von 28 und sieht nach
+    # Stillstand aus, während in Wahrheit sechs schon laufen.
+    angefangen = sum(1 for r in reihe if r["anzahl"])
     offen = gesamt - geschafft
 
     # Wie viele WÖRTER noch nicht angefangen sind. Das Ziel rechnet in
@@ -397,6 +403,7 @@ def fortschritt(db: sqlite3.Connection, benutzer_id: int, lernziel_id: int,
         "lage": lage,
         "gesamt": gesamt,
         "geschafft": geschafft,
+        "angefangen": angefangen,
         "offen": offen,
         "anteil": round(geschafft / gesamt, 3) if gesamt else 0.0,
         "neu": neu,

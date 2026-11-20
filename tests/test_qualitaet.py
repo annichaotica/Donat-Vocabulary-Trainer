@@ -925,3 +925,29 @@ def test_die_abfrage_sagt_in_welchem_lernziel_man_steckt():
     assert "lernziel" in rumpf, \
         "Die Abfrage verrät nicht, ob sie aus einem Lernziel zieht"
     assert "ziel.name" in rumpf, "Der Name des Lernziels fehlt"
+
+
+def test_der_ring_im_kopf_startet_keine_abfrage():
+    """»Da wurde mir jetzt aber ein spanischer Begriff gezeigt.«
+
+    Der Ring zeigt den Tagesstand und die Strähne — und sprang beim
+    Antippen nach #/lernen, ohne vorher die Sammlung zu leeren. Also
+    in das, was zuletzt eingestellt war: wer gestern Spanisch
+    ausgewählt hatte, bekam Spanisch.
+
+    Der tiefere Grund ist aber nicht der fehlende Zweizeiler: er ist
+    eine ANZEIGE, kein Startknopf. Wer auf eine Zahl tippt, will
+    wissen, was dahintersteckt — und das steht unter »Dein
+    Fortschritt«: Stufe, Punkte, Strähne, überbrückte Fehltage.
+    Gestartet wird von der Übersicht, wo auch steht, WAS man lernt.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/app.js").read_text()
+    anfang = quelle.index("getElementById('kopf-spiel').addEventListener")
+    rumpf = quelle[anfang:anfang + quelle[anfang:].index("});")]
+    ziele = re.findall(r"location\.hash = '([^']+)'", rumpf)
+    assert ziele, "Der Ring führt nirgendwohin"
+    assert not any(z.startswith("#/lernen") for z in ziele), \
+        f"Der Ring startet eine Abfrage: {ziele}"

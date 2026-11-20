@@ -601,7 +601,7 @@ class LernzielAendern(BaseModel):
     notiz: str | None = None
     # Umhängen. Gebraucht, weil der KI-Konnektor an EINEM Profil
     # hängt, die Ziele aber meist für jemand anderen in der Familie
-    # sind: »kannst du es bitte zu Lernende 2 umhängen«.
+    # sind: »kannst du es bitte zu ihr umhängen«.
     benutzer_id: int | None = None
 
 

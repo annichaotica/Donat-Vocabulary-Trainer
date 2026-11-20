@@ -584,7 +584,7 @@ def test_das_protokoll_enthaelt_keine_argumente(mcp, caplog):
 
 
 def test_zuspruch_laesst_sich_ueber_den_mcp_schicken(klient, mcp):
-    """»Schick Lernende 2 einen Boost für morgen.«
+    """»Schick ihr einen Boost für morgen.«
 
     Der Weg, auf dem es gedacht ist: nicht in der Oberfläche
     herumklicken, sondern es der KI sagen, die schon am Trainer hängt.
@@ -608,7 +608,7 @@ def test_zuspruch_laesst_sich_ueber_den_mcp_schicken(klient, mcp):
 
 
 def test_in_fremde_postfaecher_sieht_nur_wer_verwalten_darf(klient, mcp):
-    """»Schick Lernende 2 einen Boost« soll nicht heißen »lies, was Lernende 2
+    """»Schick ihr einen Boost« soll nicht heißen »lies, was ihr
     geschickt wurde«."""
     kind = person_mit_token(klient, "Lernende 2")
     s = klient.post("/api/sammlungen", json={

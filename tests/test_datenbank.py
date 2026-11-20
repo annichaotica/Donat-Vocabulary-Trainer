@@ -29,7 +29,7 @@ def test_abfrage_wird_nachgeruestet(tmp_path, monkeypatch):
     """Eine bestehende Datenbank ohne die Spalte bekommt sie beim Start.
 
     Nachgestellt, indem die Spalte aus einer fertigen Datenbank wieder
-    entfernt wird — denn genau so sah ihr Bestand aus: das
+    entfernt wird — denn genau so sah der echte Bestand aus: das
     Schemaskript legt sie bei einer NEUEN Datenbank an, eine
     bestehende ändert es nicht.
     """

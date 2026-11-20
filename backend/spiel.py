@@ -8,7 +8,8 @@ und die Strähne als Zahl, die wächst. Beides wird GERECHNET, nicht
 mitgeschrieben — aus `wiederholung`, das nie geleert wird. Drei Folgen,
 und alle drei sind der Grund für diesen Zuschnitt:
 
-  Niemand fängt bei null an. Lernende 2s 66 Antworten zählen vom ersten Tag
+  Niemand fängt bei null an. Die 66 Antworten aus der Zeit davor zählen
+  vom ersten Tag
   an mit, statt dass eine leere Anzeige behauptet, sie hätte noch nie
   etwas getan.
 

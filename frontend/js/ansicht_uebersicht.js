@@ -410,7 +410,7 @@ function lernwahlZeile(s) {
  * »Die sind ja das, worauf der Fokus liegen sollte, wenn welche mit
  * Terminen da sind.« Und das stimmt doppelt: sie standen nicht nur
  * unter der Heute-Karte, sondern auch noch unter dem Bücherregal —
- * fünfter Block. Bei Lernende 2 stand dort »heute fällig, 60 offen«.
+ * fünfter Block. In einem Profil stand dort »heute fällig, 60 offen«.
  *
  * ENTSCHEIDEND ist aber nicht die Reihenfolge, sondern der Knopf: der
  * große »Lernen« auf der Heute-Karte kennt die Lernziele NICHT. Er

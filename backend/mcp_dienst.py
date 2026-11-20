@@ -649,7 +649,8 @@ def offene_woerter_lesen(db: sqlite3.Connection, person: dict,
         zugang.sammlung_pruefen(db, person["id"], sammlung_id)
     # Auch die Wünsche ANDERER aus Sammlungen, in die ich schreiben
     # darf: der Konnektor hängt an einem Profil, die Wünsche entstehen
-    # an allen. Wer in Max' Sammlung eintragen darf, kann Max' Wünsche
+    # an allen. Wer in einer fremden Sammlung eintragen darf, kann deren
+    # Wünsche
     # erfüllen — und soll sie darum sehen.
     meine = zugang.beschreibbare_sammlungen(db, person["id"])
     offen = lesetexte.wortwuensche(db, person["id"], sammlung_id, offen=True,
@@ -748,7 +749,7 @@ def _fuer_wen(db: sqlite3.Connection, person: dict, fuer: str | None) -> int:
     """Für wen gilt das Ziel — für mich oder für jemanden in der Familie?
 
     Der Konnektor hängt an EINEM Profil, die Ziele sind aber meist für
-    die Kinder: »kannst du es bitte zu Lernende 2 umhängen«. Ein fremdes
+    die Kinder: »kannst du es bitte zu ihr umhängen«. Ein fremdes
     Profil darf nur bestimmen, wer den Bestand verwaltet — sonst
     könnte jeder jedem Pflichten in den Plan schreiben.
     """
@@ -810,7 +811,7 @@ def zuspruch_lesen(db: sqlite3.Connection, person: dict,
     import zuspruch as zuspruchmodul
     ziel_id = _fuer_wen(db, person, fuer) if fuer else person["id"]
     # In fremde Postfächer sieht nur, wer verwalten darf. Sonst wäre
-    # »schick Lernende 2 einen Boost« auch »lies, was Lernende 2 geschickt wurde«.
+    # »schick ihr einen Boost« auch »lies, was ihr geschickt wurde«.
     if ziel_id != person["id"]:
         zugang.verwalter_pruefen(person)
     return {

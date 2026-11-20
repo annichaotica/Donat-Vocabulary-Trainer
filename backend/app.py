@@ -2872,7 +2872,26 @@ def abfrage_uebersicht(sammlung_id: int, lektion_nr: int | None = None,
         bedingungen.append("json_extract(l.abfrage, '$.an') = 0")
     wo = " AND ".join(bedingungen)
     gesamt = dbm.wert(db, f"SELECT COUNT(*) FROM lexem l WHERE {wo}", werte)
-    zeilen = dbm.zeilen(db, f"""
+    zeilen = dbm.zeilen(db, f"""{_ABFRAGE_AUSWAHL}
+         WHERE {wo}
+         ORDER BY COALESCE(k.nr, 9999), l.reihenfolge, l.id
+         LIMIT ? OFFSET ?""", (*werte, anzahl, ab))
+    woerter = [_abfragezeile(z) for z in zeilen]
+    return {"sammlung_id": sammlung_id, "gesamt": gesamt,
+            "stillgelegt": dbm.wert(db, f"""SELECT COUNT(*) FROM lexem l
+                WHERE {wo} AND json_extract(l.abfrage, '$.an') = 0""", werte),
+            "vorlagen": aufgaben.abfragevorlagen(db, sammlung_id),
+            "woerter": woerter}
+
+
+# Die Zeile von »Gezielt lernen«, an einer Stelle beschrieben.
+#
+# Sie wird zweimal gebraucht: für die Liste und — seit der Schalter
+# nicht mehr die ganze Seite neu baut — für die EINE Zeile, die sich
+# gerade geändert hat. Zwei Beschreibungen derselben Zeile laufen
+# auseinander, und dann zeigt die ausgetauschte Zeile etwas anderes
+# als ihre Nachbarn.
+_ABFRAGE_AUSWAHL = """
         SELECT l.id, l.lemma, l.wortart, l.abfrage, k.nr AS lektion_nr,
                (SELECT COUNT(*) FROM aufgabe a
                  WHERE a.lexem_id = l.id AND a.aktiv = 1) AS aufgaben,
@@ -2882,23 +2901,17 @@ def abfrage_uebersicht(sammlung_id: int, lektion_nr: int | None = None,
                  ORDER BY b.reihenfolge, b.id, u.ist_haupt DESC, u.id
                  LIMIT 1) AS bedeutung
           FROM lexem l LEFT JOIN lektion k ON k.id = l.lektion_id
-         WHERE {wo}
-         ORDER BY COALESCE(k.nr, 9999), l.reihenfolge, l.id
-         LIMIT ? OFFSET ?""", (*werte, anzahl, ab))
-    woerter = []
-    for z in zeilen:
-        a = dbm.j_lesen(z["abfrage"] or "{}")
-        woerter.append({"lexem_id": z["id"], "lemma": z["lemma"],
-                        "wortart": z["wortart"], "lektion_nr": z["lektion_nr"],
-                        "bedeutung": z["bedeutung"],
-                        "aufgaben": z["aufgaben"],
-                        "an": bool(a.get("an", True)),
-                        "vorlage": a.get("vorlage")})
-    return {"sammlung_id": sammlung_id, "gesamt": gesamt,
-            "stillgelegt": dbm.wert(db, f"""SELECT COUNT(*) FROM lexem l
-                WHERE {wo} AND json_extract(l.abfrage, '$.an') = 0""", werte),
-            "vorlagen": aufgaben.abfragevorlagen(db, sammlung_id),
-            "woerter": woerter}
+"""
+
+
+def _abfragezeile(z: sqlite3.Row) -> dict:
+    a = dbm.j_lesen(z["abfrage"] or "{}")
+    return {"lexem_id": z["id"], "lemma": z["lemma"],
+            "wortart": z["wortart"], "lektion_nr": z["lektion_nr"],
+            "bedeutung": z["bedeutung"],
+            "aufgaben": z["aufgaben"],
+            "an": bool(a.get("an", True)),
+            "vorlage": a.get("vorlage")}
 
 
 @app.put("/api/abfrage")
@@ -2910,8 +2923,10 @@ def abfrage_setzen(eingabe: AbfrageSetzen, db: sqlite3.Connection = DB):
     Sammlung soll so lange ruhen.
     """
     geaendert = 0
+    sammlungen = set()
     for lexem_id in eingabe.lexem_ids:
         lexem = _holen(db, "lexem", lexem_id)
+        sammlungen.add(lexem["sammlung_id"])
         vorlagen = aufgaben.abfragevorlagen(db, lexem["sammlung_id"])
         try:
             wert = aufgaben.abfrage_deuten(eingabe.abfrage, vorlagen)
@@ -2921,7 +2936,27 @@ def abfrage_setzen(eingabe: AbfrageSetzen, db: sqlite3.Connection = DB):
                    (dbm.j_schreiben(wert) if wert else None, lexem_id))
         aufgaben.erzeugen(db, lexem_id)
         geaendert += 1
-    return {"geaendert": geaendert}
+    # Was jetzt dasteht, gleich mitschicken.
+    #
+    # Die Oberfläche baute nach jedem »ja/nein« die GANZE Liste neu auf:
+    # eine Anfrage über bis zu 200 Zeilen, jede mit zwei Unterabfragen,
+    # und die Seite sprang nach oben. Bei 1927 Wörtern ist das der
+    # Unterschied zwischen »ein Wort umgeschaltet« und »alles neu«.
+    # Die Zahl der aktiven Aufgaben steht erst nach `erzeugen` fest —
+    # sie zu schicken kostet hier nichts und spart dort die Anfrage.
+    zeilen = dbm.zeilen(db, f"""{_ABFRAGE_AUSWAHL}
+         WHERE l.id IN ({",".join("?" * len(eingabe.lexem_ids))})""",
+                        tuple(eingabe.lexem_ids)) if eingabe.lexem_ids else []
+    # Der Zähler »davon ausgeschaltet« gilt je Sammlung. Bei mehreren
+    # auf einmal — über die Schnittstelle möglich — bleibt er offen;
+    # die Oberfläche schaltet immer innerhalb einer Sammlung.
+    stillgelegt = None
+    if len(sammlungen) == 1:
+        stillgelegt = dbm.wert(db, """SELECT COUNT(*) FROM lexem
+            WHERE sammlung_id = ?
+              AND json_extract(abfrage, '$.an') = 0""", (sammlungen.pop(),))
+    return {"geaendert": geaendert, "woerter": [_abfragezeile(z) for z in zeilen],
+            "stillgelegt": stillgelegt}
 
 
 # ============================================================== Abtippen

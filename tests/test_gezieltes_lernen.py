@@ -314,3 +314,64 @@ def test_nur_der_verwalter_darf_fremde_ziele_setzen(klient):
         assert annuschka["id"] != kathi["id"]
     finally:
         db.close()
+
+
+def test_das_umschalten_schickt_die_fertige_zeile_zurueck(klient):
+    """Damit die Oberfläche nicht die ganze Liste neu holen muss.
+
+    Sie tat genau das: nach jedem »ja/nein« eine Anfrage über bis zu
+    200 Zeilen, jede mit zwei Unterabfragen — und die Seite sprang
+    nach oben. Bei 1927 griechischen Wörtern ist das der Unterschied
+    zwischen »ein Wort umgeschaltet« und »alles neu«.
+
+    Die Zahl der aktiven Aufgaben steht erst fest, NACHDEM `erzeugen`
+    gelaufen ist. Genau deshalb kann die Oberfläche sie nicht selbst
+    ausrechnen, und genau deshalb gehört sie in die Antwort.
+    """
+    _b, s = _aufbau(klient)
+    eins = _wort(klient, s["id"], "το σπίτι")
+    zwei = _wort(klient, s["id"], "το μήλο")
+    assert _aufgaben(klient, eins["id"])
+
+    antwort = klient.put("/api/abfrage", json={
+        "lexem_ids": [eins["id"]], "abfrage": False}).json()
+    assert antwort["geaendert"] == 1
+    zeile = antwort["woerter"][0]
+    assert zeile["lexem_id"] == eins["id"]
+    assert zeile["lemma"] == "το σπίτι"
+    assert zeile["an"] is False
+    assert zeile["aufgaben"] == 0          # nach dem Neuerzeugen, nicht davor
+    assert zeile["bedeutung"] == "irgendwas"
+    # Der Zähler unter den Filtern zählt die ganze Sammlung mit.
+    assert antwort["stillgelegt"] == 1
+
+    # Und wieder an: dieselbe Zeile, andere Zahlen.
+    zurueck = klient.put("/api/abfrage", json={
+        "lexem_ids": [eins["id"]], "abfrage": True}).json()
+    assert zurueck["woerter"][0]["an"] is True
+    assert zurueck["woerter"][0]["aufgaben"] > 0
+    assert zurueck["stillgelegt"] == 0
+
+    # Gesammelt genauso — eine Zeile je Wort, in einer Antwort.
+    viele = klient.put("/api/abfrage", json={
+        "lexem_ids": [eins["id"], zwei["id"]], "abfrage": False}).json()
+    assert {w["lexem_id"] for w in viele["woerter"]} == {eins["id"], zwei["id"]}
+    assert viele["stillgelegt"] == 2
+
+
+def test_die_zurueckgeschickte_zeile_sieht_aus_wie_die_aus_der_liste(klient):
+    """Zwei Beschreibungen derselben Zeile laufen auseinander.
+
+    Die ausgetauschte Zeile steht zwischen Zeilen aus der Liste. Zeigt
+    sie andere Felder, fällt es als Erstes dort auf — und zwar als
+    »da fehlt was«, nicht als Fehler.
+    """
+    _b, s = _aufbau(klient)
+    wort = _wort(klient, s["id"], "το σπίτι")
+
+    aus_der_liste = klient.get(f"/api/sammlungen/{s['id']}/abfrage"
+                               ).json()["woerter"][0]
+    aus_dem_setzen = klient.put("/api/abfrage", json={
+        "lexem_ids": [wort["id"]], "abfrage": True}).json()["woerter"][0]
+    assert aus_der_liste.keys() == aus_dem_setzen.keys()
+    assert aus_der_liste == aus_dem_setzen

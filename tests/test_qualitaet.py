@@ -805,3 +805,59 @@ def test_der_weitersprung_gilt_nur_bei_sauber_richtig():
                       "this.wertungOffen"):
         assert bedingung in rumpf, \
             f"springtGleich() prüft {bedingung} nicht — der Sprung käme zu oft"
+
+
+def test_gezieltes_lernen_benutzt_die_zurueckgeschickte_zeile():
+    """Sonst wäre der Umbau am Server umsonst.
+
+    »Gezielt lernen« baute nach jedem »ja/nein« die ganze Liste neu
+    auf — bis zu 200 Zeilen, und die Seite sprang nach oben. Dass das
+    falsch ist, stand in derselben Datei schon beschrieben: das
+    Kästchen daneben erneuert seit jeher nur den Stapelkasten, »beim
+    Durchhaken von fünfzig Wörtern darf die Seite nicht unter den
+    Fingern wegspringen«.
+
+    Der Server schickt die geänderte Zeile jetzt zurück. Ein Aufruf,
+    der die Antwort wegwirft, hat den Neuaufbau noch im Gepäck.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_gezielt.js").read_text()
+    weggeworfen = re.findall(r"^\s*await api\.abfrageSetzen", quelle, re.M)
+    assert not weggeworfen, (
+        f"{len(weggeworfen)}x wird die Antwort von abfrageSetzen verworfen — "
+        "dann bleibt nur der Neuaufbau der ganzen Liste")
+    assert "zeilenErneuern" in quelle, \
+        "Ohne zeilenErneuern wird wieder die ganze Liste gezeichnet"
+
+
+def test_die_textwerkstatt_baut_nur_fuer_die_lesart_neu():
+    """Ein angetipptes Wort baute 85 Verse neu auf.
+
+    »Für die KI merken« rief `zeichnenText`, und das holt Text UND
+    Deckung neu und baut jeden Abschnitt wieder auf. Beim Iwein-Prolog
+    sind das 85 Verse: man liest bei Vers 70, tippt ein unbekanntes
+    Wort an — und steht wieder bei Vers 1. Dabei ändert sich dadurch
+    genau eine Farbe.
+
+    Ein Neuaufbau bleibt richtig für »Übersetzung daneben«: dort
+    entsteht je Abschnitt ein anderer Aufbau, zwei Spalten statt
+    einer. Das ist die EINE Stelle, die ihn braucht.
+    """
+    import pathlib
+    import re
+
+    quelle = pathlib.Path("frontend/js/ansicht_texte.js").read_text()
+    ohne = re.sub(r"/\*.*?\*/", "", quelle, flags=re.S)
+    ohne = re.sub(r"^\s*//.*$", "", ohne, flags=re.M)
+    aufrufe = re.findall(r"(?<!function )\bzeichnenText\(behaelter", ohne)
+    assert len(aufrufe) == 1, (
+        f"{len(aufrufe)} Neuaufbauten des ganzen Textes — erwartet ist der "
+        "eine für »Übersetzung daneben«")
+
+    # Und er steht dort, wo er hingehört.
+    anfang = ohne.index("function teilLesart(")
+    rumpf = ohne[anfang:anfang + ohne[anfang:].index("\n}\n")]
+    assert "zeichnenText(behaelter" in rumpf, \
+        "Der verbliebene Neuaufbau steht nicht in teilLesart"

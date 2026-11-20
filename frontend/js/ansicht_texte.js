@@ -28,6 +28,34 @@ const FARBE = {
   unbekannt: 'wort-unbekannt',
 };
 
+/** Welche Wörter des offenen Textes auf der Liste für die KI stehen.
+ *
+ * An EINER Stelle, nicht an jedem Wortstück. Ein Wort kommt im Iwein
+ * dreißigmal vor; jedes Vorkommen bekommt sein eigenes Stück aus
+ * `woerterDesAbschnitts`, und die tragen alle denselben Zustand. Wer
+ * ihn dort führte, müsste dreißig Stücke nachführen oder den ganzen
+ * Text neu bauen — und genau das hat die Ansicht getan: ein Antippen
+ * von »Für die KI merken« rief `zeichnenText`, und das holt Text UND
+ * Deckung neu und baut jeden Vers wieder auf. Beim Prolog sind das 85
+ * Abschnitte, und man stand wieder bei Vers 1.
+ *
+ * Mit einem Satz Wörter ist es ein Klassenwechsel an den betroffenen
+ * Knöpfen — der Rest der Seite rührt sich nicht.
+ */
+let gewuenscht = new Set();
+
+
+/** Einen Wunsch setzen oder zurücknehmen — überall, wo das Wort steht.
+ *
+ * Der Vergleich geht über die Beschriftung des Knopfes: sie IST das
+ * Wort, genau in der Schreibung, die auch an den Server ging. */
+function wunschSetzen(behaelter, wort, an) {
+  if (an) gewuenscht.add(wort); else gewuenscht.delete(wort);
+  for (const k of behaelter.querySelectorAll('.wortknopf')) {
+    if (k.textContent === wort) k.classList.toggle('wort-gewuenscht', an);
+  }
+}
+
 
 // --------------------------------------------------------- Bücherregal
 
@@ -377,6 +405,8 @@ export async function zeichnenText(behaelter, textId) {
     api.textDeckung(textId, zustand.benutzerId),
   ]);
   merken({ sammlungId: text.sammlung_id });
+  gewuenscht = new Set(deckung.woerter.filter((w) => w.gewuenscht)
+                                      .map((w) => w.wort));
 
   behaelter.append(h('h1', { text: text.titel }));
   behaelter.append(teilDeckung(deckung, textId, behaelter));
@@ -471,10 +501,14 @@ function teilDeckung(d, textId, behaelter) {
                   textId, zustand.benutzerId);
                 meldung(`${r2.angefordert} Wörter stehen auf der Liste für `
                       + 'die KI — häufigste zuerst.', 5000);
-                zeichnenText(behaelter, textId);
-              } catch (f) {
-                meldung(f.message, 'fehler'); e.target.disabled = false;
-              }
+                // Dieselbe Bedingung, die der Server anlegt: kein
+                // Lexem dahinter heißt unbekannt. Eine Zahl von dort
+                // nachzurechnen wäre eine zweite Wahrheit.
+                for (const w of d.woerter) {
+                  if (!w.lexem_id) wunschSetzen(behaelter, w.wort, true);
+                }
+              } catch (f) { meldung(f.message, 'fehler'); }
+              e.target.disabled = false;
             },
           }, `Alle ${z.unbekannt} unbekannten anfordern`),
           h('button', {
@@ -483,7 +517,9 @@ function teilDeckung(d, textId, behaelter) {
               try {
                 const r2 = await api.alleZurueck(textId, zustand.benutzerId);
                 meldung(`${r2.entfernt} wieder von der Liste.`);
-                zeichnenText(behaelter, textId);
+                for (const w of [...gewuenscht]) {
+                  wunschSetzen(behaelter, w, false);
+                }
               } catch (f) { meldung(f.message, 'fehler'); }
             },
           }, 'Aus diesem Text zurücknehmen'))
@@ -508,7 +544,7 @@ function teilAbschnitt(a, deckung, textId, behaelter) {
     const knopf = h('button', {
       type: 'button',
       class: 'wortknopf ' + FARBE[stueck.art]
-           + (stueck.gewuenscht ? ' wort-gewuenscht' : ''),
+           + (gewuenscht.has(stueck.text) ? ' wort-gewuenscht' : ''),
       onclick: (e) => wortZeigen(e.target, stueck, textId, a, behaelter),
     }, stueck.text);
     // Jedes Wort steht in einer Säule: Bedeutung oben, Wort unten.
@@ -686,21 +722,32 @@ async function wortZeigen(knopf, stueck, textId, abschnitt, behaelter) {
 
   karte.append(h('p', { style: 'margin:.3rem 0',
     text: 'Steht nicht in deinem Wortschatz.' }));
-  const schon = stueck.gewuenscht;
-  karte.append(h('button', {
-    class: schon ? 'schlicht' : 'wichtig',
-    onclick: async () => {
-      try {
-        if (schon) {
-          await api.wortVergessen(textId, zustand.benutzerId, stueck.text);
-          meldung(`»${stueck.text}« ist wieder von der Liste.`);
-        } else {
-          await api.wortMerken(textId, zustand.benutzerId, stueck.text,
-                               abschnitt.original);
-          meldung(`»${stueck.text}« steht auf der Liste für die KI.`);
-        }
-        zeichnenText(behaelter, textId);
-      } catch (f) { meldung(f.message, 'fehler'); }
-    },
-  }, schon ? 'Doch nicht anfordern' : 'Für die KI merken'));
+  // Der Knopf beschriftet sich aus dem Wunschsatz, nicht aus einer
+  // Kopie davon: so steht nach dem Umschalten das Richtige da, ohne
+  // dass der Text neu gebaut werden muss.
+  const wunsch = h('button', {});
+  const beschriften = () => {
+    const an = gewuenscht.has(stueck.text);
+    wunsch.className = an ? 'schlicht' : 'wichtig';
+    wunsch.textContent = an ? 'Doch nicht anfordern' : 'Für die KI merken';
+  };
+  wunsch.addEventListener('click', async () => {
+    const an = gewuenscht.has(stueck.text);
+    wunsch.disabled = true;
+    try {
+      if (an) {
+        await api.wortVergessen(textId, zustand.benutzerId, stueck.text);
+        meldung(`»${stueck.text}« ist wieder von der Liste.`);
+      } else {
+        await api.wortMerken(textId, zustand.benutzerId, stueck.text,
+                             abschnitt.original);
+        meldung(`»${stueck.text}« steht auf der Liste für die KI.`);
+      }
+      wunschSetzen(behaelter, stueck.text, !an);
+      beschriften();
+    } catch (f) { meldung(f.message, 'fehler'); }
+    wunsch.disabled = false;
+  });
+  beschriften();
+  karte.append(wunsch);
 }

@@ -16,6 +16,44 @@ Eintrag wiederfindet.
 
 ## 20.11.2026
 
+### Die Seite springt nicht mehr nach oben
+
+Zwei Stellen bauten bei jeder Kleinigkeit die ganze Seite neu auf.
+
+**»Gezielt lernen«:** Jedes »ja/nein« an einer Wortzeile holte die
+Liste neu — bis zu 200 Zeilen, jede mit zwei Unterabfragen, und die
+Seite sprang nach oben. Bei 1927 griechischen Wörtern war das der
+Unterschied zwischen »ein Wort umgeschaltet« und »alles neu«. Dabei
+stand der Einwand in derselben Datei schon geschrieben: das Kästchen
+zum Auswählen daneben erneuert seit jeher nur den Stapelkasten, »beim
+Durchhaken von fünfzig Wörtern darf die Seite nicht unter den Fingern
+wegspringen«.
+
+Jetzt schickt der Server die geänderte Zeile zurück, und nur sie wird
+ausgetauscht. Gemessen: **eine** Anfrage statt zwei, Scrollposition
+unverändert, sieben von acht Zeilen unberührt. Dasselbe gilt für
+»alle auswählen«, »Auswahl aufheben« und die Stapelknöpfe. Neu
+gezeichnet wird nur noch, wenn die Zeile gar nicht mehr in die Liste
+gehört — unter »Nur ausgeschaltete« verschwindet ein wieder
+eingeschaltetes Wort ja daraus.
+
+**Die Textwerkstatt:** Ein einzelnes »Für die KI merken« baute den
+ganzen Text neu auf. Beim Iwein-Prolog sind das 85 Verse — man liest
+bei Vers 70, tippt ein unbekanntes Wort an und steht wieder bei
+Vers 1. Dabei ändert sich dadurch genau eine Farbe.
+
+Jetzt wechselt nur die Farbe, und zwar an **allen** Stellen, wo das
+Wort vorkommt. Gemessen an zehn Versen mit fünf Vorkommen von »ξενος«:
+Scrollposition unverändert, alle fünf umgefärbt, alle zehn Abschnitte
+unberührt, die Wortkarte bleibt offen und beschriftet ihren Knopf um.
+Auch die beiden Sammelknöpfe (»Alle 28 unbekannten anfordern«, »Aus
+diesem Text zurücknehmen«) arbeiten so.
+
+Ein Neuaufbau bleibt an einer Stelle richtig: bei **»Übersetzung
+daneben«**. Dort entsteht je Abschnitt ein anderer Aufbau — zwei
+Spalten statt einer —, und das ist tatsächlich der ganze Text.
+
+
 ### Nach »richtig« springt der Trainer weiter — wenn du willst
 
 Jede Aufgabe kostete auf dem Handy einen zweiten Tipp: erst antworten,
